@@ -1,5 +1,6 @@
 project structure
 
+```
 main
 |- command
 |   |- admin
@@ -20,6 +21,7 @@ main
     \- registry
         |- keys
         \- registries
+```
 
 ---
 MACHINES
@@ -42,6 +44,6 @@ machines should also be packageable, like what Ion has.
 ---
 POWER
 
-machines should take a fixed amount of power from a source, like a circuit. if a power line is starved of voltage, the machine stalls.
-stalling can slow down or completely halt a machine, depending on the configuration.
-BUT THE BASIC GIST IS THAT A MACHINE TAKES A FIXED AMOUNT OF POWER, AND IF THE LINE DOES NOT HAVE ENOUGH OF ENERGY AVAILANLE IT WILL STALL. LINES MUST HAVE A CONSTANT SUPPLY OF THIS POWER!
+- machines should take a fixed amount of power from a source, like a circuit. if a power line is starved of voltage, the machine stalls.
+- stalling can slow down or completely halt a machine, depending on the configuration.
+- BUT THE BASIC GIST IS THAT A MACHINE TAKES A FIXED AMOUNT OF POWER, AND IF THE LINE DOES NOT HAVE ENOUGH OF ENERGY AVAILANLE IT WILL STALL. LINES MUST HAVE A CONSTANT SUPPLY OF THIS POWER!
