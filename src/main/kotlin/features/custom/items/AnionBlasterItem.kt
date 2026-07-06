@@ -77,8 +77,11 @@ open class AnionBlasterItem(
 
 			// spawn particle for every nearby player
 			player.world.spawnParticle(Particle.END_ROD, rangeVector.toLocation(loc.world), 0)
+
 			// spawn particle at full distance for player that shot
-			player.spawnParticle(Particle.END_ROD, rangeVector.toLocation(loc.world), 0)
+			player.spawnParticle(
+				Particle.END_ROD, rangeVector.x, rangeVector.y, rangeVector.z, 0,
+				0.0, 0.0, 0.0, 0.0, null, true)
 
 		}
 	}
