@@ -2,34 +2,41 @@ project structure
 
 main
 |- command
+|   |- admin
+|   \- utils
+|- extensions
 |- features
-|   |- starship
-|   |- machine
-|   \- 
-|- listeners
+|   |- custom
+|   |   |- blocks
+|   |   |- energies
+|   |   |- fluids
+|   |   |- gasses
+|   |   \- items
+|   \- listeners
+|   \- machine
 \- data
-    |- data
-    |   |- item
-    |   |- block
-    |   |- gas
-    |   \- fluid
-    \- database
-
-how do we want to handle data.... ion uses text displays and physical, in-world state (inventories, pdc of text displays (iirc)).
-this has flaws, though: text displays must be loaded when being used, it's unnecessary extra overhead.
+    |- datagen
+    |   \- resourcepack
+    \- registry
+        |- keys
+        \- registries
 
 ---
 MACHINES
 
-TERF machine cores are janky, but work,
-Ion's sign detection is fine, and works well enough....
-But I want to make a new system: one that can operate WITHOUT a machine core representation or a sign!
+how do we want to handle data.... ion uses text displays and physical, in-world state (inventories, pdc of text displays (iirc)).
+this has flaws, though: text displays must be loaded when being used, it's unnecessary extra overhead.
+
+- TERF machine cores are janky, but work,
+- Ion's sign detection is fine, and works well enough....
+- But I want to make a new system: one that can operate WITHOUT a machine core representation or a sign!
+
 **idea: place down all the blocks for a multiblock, then interact with a wrench to assemble it.**
 
 an assembled machine remains active until a block on it is broken or moved, then it becomes inactive again.
 mimicking mekanism's particles for this effect would be quite cool: the redstone particles emitted around an assembled or broken machine.
 
-however! signs should still totally be used to display information and text about the machine.
+however! signs should still totally be used to display information and text about the machine (look at KBUSJ's anemone machine screens for inspiration).
 machines should also be packageable, like what Ion has.
 
 ---
