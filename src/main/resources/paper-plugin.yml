@@ -1,0 +1,7 @@
+name: Anion
+version: '0.1'
+api-version: '26.2'
+
+main: dev.diena.anion.Anion
+bootstrapper: dev.diena.anion.AnionBootstrap
+load: STARTUP
