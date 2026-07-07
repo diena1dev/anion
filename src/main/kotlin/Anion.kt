@@ -3,11 +3,13 @@ package dev.diena.anion
 import com.example.plugin.Registration
 import dev.diena.anion.features.custom.items.AnionItemDispatcher
 import dev.diena.anion.features.custom.items.AnionItems
+import dev.diena.anion.features.starship.Starship
 import io.papermc.paper.plugin.bootstrap.BootstrapContext
 import io.papermc.paper.plugin.bootstrap.PluginBootstrap
 import io.papermc.paper.plugin.bootstrap.PluginProviderContext
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents.COMMANDS
 import org.bukkit.plugin.java.JavaPlugin
+import java.util.UUID
 
 class AnionBootstrap : PluginBootstrap {
     val startTime = System.currentTimeMillis()
@@ -44,6 +46,9 @@ class Anion : JavaPlugin() {
 
     companion object {
         const val NAMESPACE = "anion"
+
+        val TEMPORARY_ACTIVE_STARSHIPS_MAP: HashMap<UUID, Starship> = hashMapOf()
+
     }
 
 }

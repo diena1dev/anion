@@ -119,6 +119,15 @@ inline operator fun Vec3.minus(other: Vec3) = subtract(other)
 inline operator fun Vec3.times(other: Vec3) = multiply(other)
 inline operator fun Vec3.div(other: Int) = Vec3(x / other, y / other, z / other)
 
+inline operator fun Vec3i.unaryPlus() = this
+inline operator fun Vec3i.unaryMinus() = Vector(-x, -y, -z)
+inline operator fun Vec3i.plus(other: Vec3i) = Vec3i(x + other.x, y + other.y, z + other.z)
+inline operator fun Vec3i.minus(other: Vec3i) = Vec3i(x - other.x, y - other.y, z - other.z)
+inline operator fun Vec3i.times(other: Vec3i) = Vec3i(x * other.x, y * other.y, z * other.z)
+inline operator fun Vec3i.times(other: Int) = Vec3i(x * other, y * other, z * other)
+inline operator fun Vec3i.div(other: Vec3i) = Vec3i(x / other.x, y / other.y, z / other.z)
+inline operator fun Vec3i.div(other: Int) = Vec3i(x / other, y / other, z / other)
+
 fun BlockFace.rotateRight() = when (this) {
     BlockFace.NORTH -> BlockFace.EAST
     BlockFace.EAST -> BlockFace.SOUTH
