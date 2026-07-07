@@ -1,27 +1,46 @@
 package dev.diena.anion.features.custom.items
 
 import dev.diena.anion.extensions.div
+import dev.diena.anion.extensions.minus
 import dev.diena.anion.extensions.plus
+import dev.diena.anion.extensions.set
 import dev.diena.anion.extensions.times
+import io.papermc.paper.datacomponent.DataComponentTypes
+import io.papermc.paper.datacomponent.item.ChargedProjectiles
 import net.kyori.adventure.text.Component
+import org.bukkit.Material
 import org.bukkit.Particle
 import org.bukkit.block.BlockType
 import org.bukkit.entity.Player
+import org.bukkit.event.entity.EntityShootBowEvent
 import org.bukkit.event.player.PlayerInteractEvent
+import org.bukkit.inventory.ItemStack
 import org.bukkit.inventory.ItemType
 import org.bukkit.util.Vector
 
 open class AnionBlasterItem(
 	displayName: String,
-	itemRepresentation: ItemType = ItemType.CARROT_ON_A_STICK,
+	itemRepresentation: ItemType = ItemType.CROSSBOW,
 	styledDisplayName: Component = Component.text(displayName)
 ) : AnionItem(displayName, itemRepresentation, 1) {
 
 	val RANGE = 1..100    // how many blocks to move across
 	val RESOLUTION = 1..5 // how many places within a block to move
 
+	init {
+		@Suppress("UnstableApiUsage")
+		internalItemStack[DataComponentTypes.CHARGED_PROJECTILES] = ChargedProjectiles.chargedProjectiles()
+			.add(ItemStack.of(Material.ARROW))
+			.build()
+	}
+
 	override fun onPlayerInteract(event: PlayerInteractEvent) {
+		event.isCancelled = true
 		shootBullet(event.player)
+	}
+
+	override fun onEntityShootBow(event: EntityShootBowEvent) {
+		event.isCancelled = true
 	}
 
 	// TODO: make into common functions that all the blaster classes can call
@@ -35,15 +54,16 @@ open class AnionBlasterItem(
 		val r   = wu.clone().crossProduct(np).normalize()  // strafe-right  (worldUp * forward)
 		val d   = r.clone().crossProduct(np).normalize()   // camera-down   (right * forward)
 
-		val emo = loc.toVector()+(r.clone()*-0.9)+(d.clone()*0.3)
+		// VISUAL ORIGIN, adjust values to shift origin point
+		val emo = loc.toVector()+(r.clone()*-0.4)+(d.clone()*0.2)
 
-		// emitter debug — remove once offset is tuned
+		// visual origin debug
 		w.spawnParticle(Particle.CRIT, emo.toLocation(w), 0)
 
 		rangeLoop@ for (i in RANGE) {
 
 			// rangeVector is what is iterated over and increased, this is what the visuals spawn on
-			val rangeVector = emo+(np*i)
+			val rangeVector = loc.toVector()+(np*i)
 
 			// RESOLUTION is to check for collision!
 			for (r in RESOLUTION) {
@@ -52,8 +72,6 @@ open class AnionBlasterItem(
 
 				val scaledDir = np/resMax          // scale down our normal (np) by the set resolution value
 				val rc = rangeVector+(scaledDir*r) // this (resolutionCheck) is what we check for entities in
-
-				println(rc)
 
 				if (w.getBlockAt(rc.toLocation(w)).type.asBlockType() != BlockType.AIR) break@rangeLoop
 
@@ -72,8 +90,6 @@ open class AnionBlasterItem(
 				}
 
 			}
-
-			//println(rangeVector)
 
 			// spawn particle for every nearby player
 			player.world.spawnParticle(Particle.END_ROD, rangeVector.toLocation(loc.world), 0)

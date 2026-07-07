@@ -8,6 +8,7 @@ import net.kyori.adventure.text.Component
 import org.bukkit.NamespacedKey
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
+import org.bukkit.event.entity.EntityShootBowEvent
 import org.bukkit.event.player.PlayerInteractEvent
 import org.bukkit.event.player.PlayerSwapHandItemsEvent
 import org.bukkit.inventory.ItemStack
@@ -38,7 +39,7 @@ open class AnionItem(
 ) {
 
 	// go-go gadget internal item stack
-	private val internalItemStack: ItemStack = this.itemRepresentation.createItemStack()
+	protected val internalItemStack: ItemStack = this.itemRepresentation.createItemStack()
 
 	// item stack magic
 	init {
@@ -53,6 +54,7 @@ open class AnionItem(
 
 	open fun onPlayerInteract(event: PlayerInteractEvent) { interactHandler?.invoke(event) }
 	open fun onPlayerSwapHand(event: PlayerSwapHandItemsEvent) { swapHandler?.invoke(event) }
+	open fun onEntityShootBow(event: EntityShootBowEvent) {}
 	open fun onRemove() {}
 	open fun onAdd() {}
 
@@ -71,6 +73,11 @@ class AnionItemDispatcher : Listener {
 			?: event.offHandItem.toAnionItem()
 			?: return
 		item.onPlayerSwapHand(event)
+	}
+
+	@EventHandler
+	fun onEntityShootBow(event: EntityShootBowEvent) {
+		event.bow?.toAnionItem()?.onEntityShootBow(event)
 	}
 
 }
