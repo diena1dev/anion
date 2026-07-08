@@ -8,6 +8,7 @@ import io.papermc.paper.plugin.bootstrap.BootstrapContext
 import io.papermc.paper.plugin.bootstrap.PluginBootstrap
 import io.papermc.paper.plugin.bootstrap.PluginProviderContext
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents.COMMANDS
+import org.bukkit.Server
 import org.bukkit.plugin.java.JavaPlugin
 import java.util.UUID
 
@@ -30,6 +31,9 @@ class Anion : JavaPlugin() {
     override fun onEnable() {
         Registration.listeners(this)
 
+        instance = this.server
+        plugin = this
+
         // init our feature classes that call registries
         AnionItems
         //AnionBlocks
@@ -41,13 +45,14 @@ class Anion : JavaPlugin() {
     }
 
     override fun onDisable() {
-        // Plugin shutdown logic
+        Tasks.shutdown()
     }
 
     companion object {
         const val NAMESPACE = "anion"
 
-        val TEMPORARY_ACTIVE_STARSHIPS_MAP: HashMap<UUID, Starship> = hashMapOf()
+        lateinit var instance: Server private set
+        lateinit var plugin: Anion private set
 
     }
 
