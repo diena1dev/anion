@@ -1,14 +1,21 @@
 package dev.diena.anion.features.starship
 
 import dev.diena.anion.extensions.adjacentBlocks
+import dev.diena.anion.extensions.blockPos
 import dev.diena.anion.extensions.div
 import dev.diena.anion.extensions.plus
 import dev.diena.anion.extensions.vec3i
+import net.minecraft.core.BlockPos
 import net.minecraft.core.Vec3i
-import org.bukkit.Location
+import net.minecraft.server.level.ServerLevel
+import net.minecraft.world.item.Items
+import net.minecraft.world.level.block.state.BlockState
+import org.bukkit.Material
 import org.bukkit.World
 import org.bukkit.block.Block
 import org.bukkit.block.BlockType
+import org.bukkit.craftbukkit.CraftWorld
+import org.bukkit.craftbukkit.block.CraftBlock
 import java.util.UUID
 
 /**
@@ -20,34 +27,35 @@ class Starship {
         val loadedStarships: HashMap<UUID, Starship> = hashMapOf()
     }
 
-    lateinit var world: World   // world that the ship currently exists in
-    lateinit var origin: Vec3i  // approximated center of the starship, what is rotated around
-    var yaw: Double = 0.0     // TODO: autodetect angle of starship based on detection time
+    lateinit var level: ServerLevel // nms Level that the ship currently exists in
+    lateinit var origin: Vec3i      // approximated center of the starship, what is rotated around
+    var yaw: Double = 0.0           // TODO: autodetect angle of starship based on detection time
 
-    // what IS a starship?
-    // i don't like it.... but it will work, i guess
-    lateinit var blockHashMap: HashMap<Vec3i, BlockType> private set
+    /** Represents the blocks that make up a ship. Readable publicly, writable privately. */
+    lateinit var blockHashMap: HashMap<Vec3i, BlockState> private set // nms BlockState
 
+    // internal airBLock reference
+    private val airBlock = net.minecraft.world.level.block.Block.byItem(Items.AIR)
+
+    /** Creates a fresh instance of a [Starship] with the provided Block locations. */
     fun create(
 
-        blockLocations: Set<Location>
+        blockPosSet: Set<BlockPos>,
+        setWorld: World
 
     ): Starship {
 
-        val worldCheck = blockLocations.first().world
-        blockHashMap = hashMapOf() // init hashmap
+        level = (setWorld as CraftWorld).handle // init level
+        blockHashMap = hashMapOf()              // init hashmap
 
-        for (b in blockLocations) {
+        for (b in blockPosSet) {
 
-            if (b.world != worldCheck) throw IllegalStateException("Cannot create starship with blocks from different worlds!")
+            val block = level.getBlockState(b.blockPos)
 
-            val vec3i = Vec3i(b.blockX, b.blockY, b.blockZ)
-            val blockType = b.block.type.asBlockType() ?: continue
+            // don't add air
+            if (block.`is`(airBlock)) continue
 
-            if (blockType == BlockType.AIR) continue
-
-            this.world = worldCheck
-            this.blockHashMap[vec3i] = blockType
+            this.blockHashMap[b] = block
 
         }
 
@@ -71,16 +79,23 @@ class Starship {
 
     ) {
 
-        /*val addingVector = when (direction) {
-            Direction.DOWN  -> Vec3i(0, toMove*-1, 0)
-            Direction.UP    -> Vec3i(0, toMove*1, 0)
-            Direction.EAST  -> Vec3i(toMove*1, 0, 0)
-            Direction.WEST  -> Vec3i(toMove*-1, 0, 0)
-            Direction.NORTH -> Vec3i(0, 0, toMove*-1)
-            Direction.SOUTH -> Vec3i(0, 0, toMove*1)
-        }*/
+        /**
+         * level.setBlock(blockPos, blockState, flags)
+         * // flags constants on Block:
+         * //   UPDATE_NEIGHBORS = 1
+         * //   UPDATE_CLIENTS   = 2
+         * //   UPDATE_INVISIBLE = 4   (no packet, no physics)
+         * //   UPDATE_KNOWN_SHAPE = 16
+         *
+         * level.removeBlock(blockPos, /*move=*/false)
+         * level.destroyBlock(blockPos, /*drop=*/true)
+         * level.destroyBlock(blockPos, /*drop=*/true, entity, /*recursion=*/0)
+         *
+         * // Bypassing neighbor updates (silent placement):
+         * level.setBlock(blockPos, state, 2 or 16)  // client update + known shape
+         */
 
-        val newBlockMap: HashMap<Vec3i, BlockType> = hashMapOf()
+        val newBlockMap: HashMap<Vec3i, BlockState> = hashMapOf() // nms BlockState
 
         // BEGIN COLLISION INSERT
 
@@ -99,7 +114,7 @@ class Starship {
 
                 newBlockMap[vecToMoveTo] = blockHashMap[vec] ?: continue
 
-            } else if (world.getBlockAt(vecToMoveTo.x, vecToMoveTo.y, vecToMoveTo.z).isEmpty) {
+            } else if (level.getBlockState(vecToMoveTo.blockPos).isAir) {
 
                 newBlockMap[vecToMoveTo] = blockHashMap[vec] ?: continue
 
@@ -111,19 +126,22 @@ class Starship {
 
         // END INSERT
 
+
+
         // move ship
         for ((vec, b) in newBlockMap) {
-            world.setBlockData(
-                vec.x, vec.y, vec.z, b.createBlockData()
-            )
+
+            // TODO: `4 or 16` (no client sending) instead of `3 or 32` (no drops, no physics when replacing),
+            //        in order to reduce client packet spam and improve performance of starships.
+            level.setBlock(vec.blockPos, b, 2 or 32)
 
             blockHashMap.remove(vec)
         }
 
         // REmove old ship section
         for ((vec, _) in blockHashMap) {
-            world.setBlockData(
-                vec.x, vec.y, vec.z, BlockType.AIR.createBlockData()
+            level.setBlock(
+                vec.blockPos, airBlock.defaultBlockState(), 2 or 32
             )
         }
 
@@ -152,6 +170,9 @@ class Starship {
             else -> { throw IllegalStateException("what the fuck did you do") }
         }
 
+        // get facing component for directional blocks and rotate them accordingly
+        BlockType.WAXED_WEATHERED_CUT_COPPER_STAIRS.createBlockData().facing
+
         val angleSnapshot = yaw
 
         // definitely didn't overcomplicate this before using modulo
@@ -179,7 +200,7 @@ class Starship {
 
     ) {
 
-        if (block.world != this.world) throw IllegalStateException("you cannot add a block to a ship from another world")
+        if ((block.world as CraftWorld).handle != level) throw IllegalStateException("you cannot add a block to a ship from another level!")
 
         blockHashMap.remove(block.vec3i)
 
@@ -196,14 +217,14 @@ class Starship {
 
     ) {
 
-        if (block.world != this.world) throw IllegalStateException("you cannot remove a block from a ship from another world")
+        if ((block.world as CraftWorld).handle != level) throw IllegalStateException("you cannot remove a block from a ship from another world")
         // this might be an obvious optimization, but i'm proud of it :3
         for (b in block.adjacentBlocks) {
             // if not in entry continue, if in no entries do not add block.
             if (blockHashMap[b.vec3i] != null) continue
 
             // if at least one adjacent block was found, add it to the ship
-            blockHashMap[block.vec3i] = block.type.asBlockType() ?: return
+            blockHashMap[block.vec3i] = (block as CraftBlock).blockState
         }
 
     }

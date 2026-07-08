@@ -6,6 +6,7 @@ import dev.astralchroma.processor.annotations.Sender
 import dev.astralchroma.processor.annotations.Subcommand
 import dev.diena.anion.Anion
 import dev.diena.anion.Tasks
+import dev.diena.anion.extensions.blockPos
 import dev.diena.anion.extensions.vec3i
 import dev.diena.anion.features.starship.Starship
 import net.minecraft.core.Vec3i
@@ -137,8 +138,8 @@ object StarshipCommand {
             }
         }
 
-        val locations = visited.map { it.location }.toSet()
-        Starship.loadedStarships[UUID.randomUUID()] = Starship().create(locations)
+        val locations = visited.map { it.location.blockPos }.toSet()
+        Starship.loadedStarships[UUID.randomUUID()] = Starship().create(locations, sender.world)
         sender.sendMessage("Detected ${visited.size} blocks.")
 
         // select ship too
