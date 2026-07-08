@@ -7,10 +7,12 @@ import dev.diena.anion.extensions.plus
 import dev.diena.anion.extensions.vec3i
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Vec3i
+import net.minecraft.nbt.CompoundTag
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.item.Items
+import net.minecraft.world.level.block.Blocks
+import net.minecraft.world.level.block.entity.BlockEntity
 import net.minecraft.world.level.block.state.BlockState
-import org.bukkit.Material
 import org.bukkit.World
 import org.bukkit.block.Block
 import org.bukkit.block.BlockType
@@ -30,6 +32,7 @@ class Starship {
     lateinit var level: ServerLevel // nms Level that the ship currently exists in
     lateinit var origin: Vec3i      // approximated center of the starship, what is rotated around
     var yaw: Double = 0.0           // TODO: autodetect angle of starship based on detection time
+    private var moving = false      // internal check to prevent concurrent modification
 
     /** Represents the blocks that make up a ship. Readable publicly, writable privately. */
     lateinit var blockHashMap: HashMap<Vec3i, BlockState> private set // nms BlockState
@@ -73,80 +76,64 @@ class Starship {
 
     fun move(
 
-        //direction: Direction, // direction to move in (may change) // it changed
-        //toMove: Int           // amount to move in blocks
         vectorToMoveIn: Vec3i,  // Vec3i to move the ship by, relative to current position
 
     ) {
 
-        /**
-         * level.setBlock(blockPos, blockState, flags)
-         * // flags constants on Block:
-         * //   UPDATE_NEIGHBORS = 1
-         * //   UPDATE_CLIENTS   = 2
-         * //   UPDATE_INVISIBLE = 4   (no packet, no physics)
-         * //   UPDATE_KNOWN_SHAPE = 16
-         *
-         * level.removeBlock(blockPos, /*move=*/false)
-         * level.destroyBlock(blockPos, /*drop=*/true)
-         * level.destroyBlock(blockPos, /*drop=*/true, entity, /*recursion=*/0)
-         *
-         * // Bypassing neighbor updates (silent placement):
-         * level.setBlock(blockPos, state, 2 or 16)  // client update + known shape
-         */
+        // lock updates
+        moving = true
 
-        val newBlockMap: HashMap<Vec3i, BlockState> = hashMapOf() // nms BlockState
+        val newBlockMap: HashMap<Vec3i, BlockState> = hashMapOf()            // nms BlockState collection
+        val beMap: HashMap<Vec3i, CompoundTag>      = hashMapOf()            // serialized nms BlockEntities
+        val provider                                = level.registryAccess() // nbt fuckery
 
-        // BEGIN COLLISION INSERT
+        // check collision, if true then safe otherwise fail
+        if (!StarshipCollision.processCollision(this, vectorToMoveIn)) return
 
-        // if block moving to not in already existing entry (e.g. notnull key for blockHashMap)
-        // then continue
-        // if block moving to not in entry, fetch if air.
-        // if true, set newBlockMap and continue
-        // if false, cancel movement // FIXME: do not cancel, move as close as possible
+        for ((vec, _) in blockHashMap) {
+            // shift blocks
+            newBlockMap[vec + vectorToMoveIn] = blockHashMap[vec] ?: continue
 
-        // this takes our old hash map and shifts values in the new block map
-        for (vec in blockHashMap.keys) {
+            // store BEs and remove BE blocks
+            val be = level.getBlockEntity(vec.blockPos) ?: continue
+            val nbt = be.saveWithFullMetadata(provider)
+            val newPos = vec + vectorToMoveIn
+            nbt.putInt("x", newPos.x)
+            nbt.putInt("y", newPos.y)
+            nbt.putInt("z", newPos.z)
+            beMap[newPos] = nbt
+            level.removeBlockEntity(vec.blockPos)
 
-            val vecToMoveTo = vec+vectorToMoveIn
-
-            if (blockHashMap[vecToMoveTo] != null) {
-
-                newBlockMap[vecToMoveTo] = blockHashMap[vec] ?: continue
-
-            } else if (level.getBlockState(vecToMoveTo.blockPos).isAir) {
-
-                newBlockMap[vecToMoveTo] = blockHashMap[vec] ?: continue
-
-            } else {
-                return
-            }
-
-        }
-
-        // END INSERT
-
-
-
-        // move ship
-        for ((vec, b) in newBlockMap) {
-
-            // TODO: `4 or 16` (no client sending) instead of `3 or 32` (no drops, no physics when replacing),
-            //        in order to reduce client packet spam and improve performance of starships.
-            level.setBlock(vec.blockPos, b, 2 or 32)
-
-            blockHashMap.remove(vec)
         }
 
         // REmove old ship section
         for ((vec, _) in blockHashMap) {
-            level.setBlock(
-                vec.blockPos, airBlock.defaultBlockState(), 2 or 32
-            )
+            // 4. no observer updates, 16. no shape recalc, 32. no item drops
+            level.setBlock(vec.blockPos, Blocks.AIR.defaultBlockState(), 4 or 16 or 32)
         }
 
+        // actually MOVE ship blocks
+        for ((vec, b) in newBlockMap) {
+            //blockHashMap.remove(vec)
+            // 1. update neighboring blocks, 4. no observer updates, 16. no shape recalc
+            level.setBlock(vec.blockPos, b, 1 or 4 or 16)
+        }
+
+        // then load ship BEs
+        for ((vec, nbt) in beMap) {
+            val bs = newBlockMap[vec] ?: continue
+            val newBe = BlockEntity.loadStatic(vec.blockPos, bs, nbt, provider) ?: continue
+            level.setBlockEntity(newBe)
+        }
+
+        // send update packets to the client
+        StarshipPackets.sendSections(level, newBlockMap.keys, blockHashMap.keys, newBlockMap)
+
         blockHashMap = newBlockMap
-        origin+=vectorToMoveIn
+        origin += vectorToMoveIn
+
+        // unlock updates
+        moving = false
 
     }
 
@@ -200,6 +187,8 @@ class Starship {
 
     ) {
 
+        if (moving) return
+
         if ((block.world as CraftWorld).handle != level) throw IllegalStateException("you cannot add a block to a ship from another level!")
 
         blockHashMap.remove(block.vec3i)
@@ -217,11 +206,30 @@ class Starship {
 
     ) {
 
+        if (moving) return
+
         if ((block.world as CraftWorld).handle != level) throw IllegalStateException("you cannot remove a block from a ship from another world")
         // this might be an obvious optimization, but i'm proud of it :3
         for (b in block.adjacentBlocks) {
             // if not in entry continue, if in no entries do not add block.
-            if (blockHashMap[b.vec3i] != null) continue
+            if (blockHashMap[b.vec3i] == null) continue
+
+            // if at least one adjacent block was found, add it to the ship
+            blockHashMap[block.vec3i] = (block as CraftBlock).blockState
+        }
+
+    }
+
+    fun updateBlock(
+
+        block: Block
+
+    ) {
+
+        if (moving) return
+        for (b in block.adjacentBlocks) {
+            // if not in entry continue, if in no entries do not add block.
+            if (blockHashMap[b.vec3i] == null) continue
 
             // if at least one adjacent block was found, add it to the ship
             blockHashMap[block.vec3i] = (block as CraftBlock).blockState

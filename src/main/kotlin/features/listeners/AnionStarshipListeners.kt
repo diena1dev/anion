@@ -5,6 +5,7 @@ import dev.diena.anion.features.starship.Starship
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
 import org.bukkit.event.block.BlockBreakEvent
+import org.bukkit.event.block.BlockPhysicsEvent
 import org.bukkit.event.block.BlockPlaceEvent
 
 @Register
@@ -26,6 +27,16 @@ object AnionStarshipListeners: Listener {
 
 		Starship.loadedStarships.values.forEach { starship ->
 			starship.removeBlock(blockBroken)
+		}
+	}
+
+	@EventHandler
+	fun onBlockPhysics(event: BlockPhysicsEvent) {
+		val block = event.block
+
+		Starship.loadedStarships.values.forEach {
+			starship ->
+			starship.updateBlock(block)
 		}
 	}
 	// construction listeners end
