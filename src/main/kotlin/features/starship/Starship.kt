@@ -1,30 +1,32 @@
 package dev.diena.anion.features.starship
 
+import dev.diena.anion.extensions.adjacentBlocks
 import dev.diena.anion.extensions.div
 import dev.diena.anion.extensions.plus
-import net.minecraft.core.Direction
+import dev.diena.anion.extensions.vec3i
 import net.minecraft.core.Vec3i
 import org.bukkit.Location
 import org.bukkit.World
+import org.bukkit.block.Block
 import org.bukkit.block.BlockType
+import java.util.UUID
 
 /**
  * main coordination class for Starship, StarshipMovement and Starship collision are modules that Starship uses.
  * */
-class Starship(
+class Starship {
 
-) {
+    companion object {
+        val loadedStarships: HashMap<UUID, Starship> = hashMapOf()
+    }
 
     lateinit var world: World   // world that the ship currently exists in
-    var angle: Double = 0.0     // TODO: autodetect angle of starship based on detection time
     lateinit var origin: Vec3i  // approximated center of the starship, what is rotated around
+    var yaw: Double = 0.0     // TODO: autodetect angle of starship based on detection time
 
     // what IS a starship?
-
     // i don't like it.... but it will work, i guess
-    var blockHashMap: HashMap<Vec3i, BlockType> = hashMapOf()
-
-    // val collisionHashMap: HashMap<Vec3i, Boolean> = hashMapOf() // redundant?
+    lateinit var blockHashMap: HashMap<Vec3i, BlockType> private set
 
     fun create(
 
@@ -33,6 +35,7 @@ class Starship(
     ): Starship {
 
         val worldCheck = blockLocations.first().world
+        blockHashMap = hashMapOf() // init hashmap
 
         for (b in blockLocations) {
 
@@ -57,6 +60,7 @@ class Starship(
         this.origin = vectorAddedTo/blockHashMap.size
 
         return this
+
     }
 
     fun move(
@@ -124,13 +128,13 @@ class Starship(
             else -> { throw IllegalStateException("what the fuck did you do") }
         }
 
-        val angleSnapshot = angle
+        val angleSnapshot = yaw
 
         // definitely didn't overcomplicate this before using modulo
-        angle = ((angle+byAmount % 360) + 360) % 360
+        yaw = ((yaw+byAmount % 360) + 360) % 360
 
         // new angle
-        val vecToRotateWith = angleRange(angle)
+        val vecToRotateWith = angleRange(yaw)
 
     }
 
@@ -140,6 +144,43 @@ class Starship(
         posInNewWorld: Vec3i
 
     ) {
+
+    }
+
+    // TODO: rethink parameters for block functions
+
+    fun removeBlock(
+
+        block: Block
+
+    ) {
+
+        if (block.world != this.world) throw IllegalStateException("you cannot add a block to a ship from another world")
+
+        blockHashMap.remove(block.vec3i)
+
+    }
+
+    /** adds block to starship if block is adjacent to the ship */
+    // FIXME: this currently adds ANY adjacently placed block to the ship ONTO the ship.
+    //        in this current state, blocks cannot be placed on the world directly adjacent
+    //        to the ship without being added onto it. a more ideal solution would be to ONLY
+    //        add a block of the clicked block (in placement) was already part of a starship
+    fun addBlock(
+
+        block: Block
+
+    ) {
+
+        if (block.world != this.world) throw IllegalStateException("you cannot remove a block from a ship from another world")
+        // this might be an obvious optimization, but i'm proud of it :3
+        for (b in block.adjacentBlocks) {
+            // if not in entry continue, if in no entries do not add block.
+            if (blockHashMap[b.vec3i] != null) continue
+
+            // if at least one adjacent block was found, add it to the ship
+            blockHashMap[block.vec3i] = block.type.asBlockType() ?: return
+        }
 
     }
 
