@@ -145,3 +145,15 @@ fun BlockFace.rotateLeft() = when (this) {
 }
 
 inline val Block.blockPos get() = BlockPos(x, y, z)
+inline val Block.vec3i get() = Vec3i(x, y, z)
+inline val Block.adjacentBlocks get() = run {
+	val blockSet: MutableSet<Block> = mutableSetOf()
+	blockSet.add(world.getBlockAt(x+1, y, z))
+	blockSet.add(world.getBlockAt(x-1, y, z))
+	blockSet.add(world.getBlockAt(x, y+1, z))
+	blockSet.add(world.getBlockAt(x, y-1, z))
+	blockSet.add(world.getBlockAt(x, y, z+1))
+	blockSet.add(world.getBlockAt(x, y, z-1))
+
+    blockSet
+}
