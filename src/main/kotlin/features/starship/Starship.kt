@@ -82,10 +82,34 @@ class Starship {
 
         val newBlockMap: HashMap<Vec3i, BlockType> = hashMapOf()
 
+        // BEGIN COLLISION INSERT
+
+        // if block moving to not in already existing entry (e.g. notnull key for blockHashMap)
+        // then continue
+        // if block moving to not in entry, fetch if air.
+        // if true, set newBlockMap and continue
+        // if false, cancel movement // FIXME: do not cancel, move as close as possible
+
         // this takes our old hash map and shifts values in the new block map
         for (vec in blockHashMap.keys) {
-            newBlockMap[vec+vectorToMoveIn] = blockHashMap[vec] ?: continue
+
+            val vecToMoveTo = vec+vectorToMoveIn
+
+            if (blockHashMap[vecToMoveTo] != null) {
+
+                newBlockMap[vecToMoveTo] = blockHashMap[vec] ?: continue
+
+            } else if (world.getBlockAt(vecToMoveTo.x, vecToMoveTo.y, vecToMoveTo.z).isEmpty) {
+
+                newBlockMap[vecToMoveTo] = blockHashMap[vec] ?: continue
+
+            } else {
+                return
+            }
+
         }
+
+        // END INSERT
 
         // move ship
         for ((vec, b) in newBlockMap) {
