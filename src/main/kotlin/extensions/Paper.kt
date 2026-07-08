@@ -1,3 +1,5 @@
+@file:Suppress("NOTHING_TO_INLINE", "Unused")
+
 package dev.diena.anion.extensions
 
 import dev.diena.anion.data.registry.AnionRegistryKey
@@ -22,8 +24,6 @@ import org.bukkit.inventory.ItemStack
 import org.bukkit.util.Vector
 import org.jetbrains.annotations.ApiStatus.Experimental
 import org.joml.Quaternionf
-
-// I totally just stole all of these from Stardust's Paper class before it had a license. -diena1dev
 
 inline fun <reified E: Entity> RegionAccessor.spawn(
     location: Location,

@@ -5,6 +5,7 @@ import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
 
+@Suppress("Unused")
 object Tasks {
 
     private val executor: ScheduledExecutorService = Executors.newScheduledThreadPool(4)
