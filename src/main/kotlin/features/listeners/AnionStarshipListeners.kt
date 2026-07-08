@@ -10,6 +10,7 @@ import org.bukkit.event.block.BlockPlaceEvent
 @Register
 object AnionStarshipListeners: Listener {
 
+	// construction listeners start
 	@EventHandler
 	fun onBlockPlace(event: BlockPlaceEvent) {
 		val blockPlaced = event.blockPlaced
@@ -27,5 +28,6 @@ object AnionStarshipListeners: Listener {
 			starship.removeBlock(blockBroken)
 		}
 	}
+	// construction listeners end
 
 }
