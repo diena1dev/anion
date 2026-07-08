@@ -119,6 +119,9 @@ class Starship {
             level.setBlock(vec.blockPos, b, 1 or 4 or 16)
         }
 
+        // transfer scheduled block/fluid ticks to new positions
+        //StarshipTicks.transferTicks(level, blockHashMap.keys, vectorToMoveIn)
+
         // then load ship BEs
         for ((vec, nbt) in beMap) {
             val bs = newBlockMap[vec] ?: continue
