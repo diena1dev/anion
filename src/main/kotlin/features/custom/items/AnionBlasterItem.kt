@@ -10,6 +10,7 @@ import io.papermc.paper.datacomponent.item.ChargedProjectiles
 import net.kyori.adventure.text.Component
 import org.bukkit.Material
 import org.bukkit.Particle
+import org.bukkit.Sound
 import org.bukkit.block.BlockType
 import org.bukkit.entity.Player
 import org.bukkit.event.entity.EntityShootBowEvent
@@ -59,6 +60,7 @@ open class AnionBlasterItem(
 
 		// visual origin debug
 		w.spawnParticle(Particle.CRIT, emo.toLocation(w), 0)
+		w.playSound(loc, Sound.BLOCK_RESPAWN_ANCHOR_CHARGE, 1f, 10f)
 
 		rangeLoop@ for (i in RANGE) {
 
