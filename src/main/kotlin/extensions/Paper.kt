@@ -128,6 +128,8 @@ inline operator fun Vec3i.times(other: Int) = Vec3i(x * other, y * other, z * ot
 inline operator fun Vec3i.div(other: Vec3i) = Vec3i(x / other.x, y / other.y, z / other.z)
 inline operator fun Vec3i.div(other: Int) = Vec3i(x / other, y / other, z / other)
 
+inline val Vec3i.blockPos get() = BlockPos(x, y, z)
+
 fun BlockFace.rotateRight() = when (this) {
     BlockFace.NORTH -> BlockFace.EAST
     BlockFace.EAST -> BlockFace.SOUTH
@@ -157,3 +159,5 @@ inline val Block.adjacentBlocks get() = run {
 
     blockSet
 }
+
+inline val Location.blockPos get() = BlockPos(x.toInt(), y.toInt(), z.toInt())
