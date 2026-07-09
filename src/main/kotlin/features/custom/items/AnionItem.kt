@@ -34,12 +34,14 @@ open class AnionItem(
 	stacksTo: Int = 64,
 	styledDisplayName: Component = Component.text(displayName),
 	val namespacedKey: NamespacedKey = NamespacedKey(Anion.NAMESPACE, displayName.replace(" ", "_").lowercase()),
+
 	private val interactHandler: ((PlayerInteractEvent) -> Unit)? = null,
 	private val swapHandler: ((PlayerSwapHandItemsEvent) -> Unit)? = null,
 ) {
 
 	// go-go gadget internal item stack
-	protected val internalItemStack: ItemStack = this.itemRepresentation.createItemStack()
+	// override with caution
+	protected open val internalItemStack: ItemStack = this.itemRepresentation.createItemStack()
 
 	// item stack magic
 	init {
