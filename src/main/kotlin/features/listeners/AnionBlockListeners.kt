@@ -27,6 +27,8 @@ import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
 import org.bukkit.event.block.Action
 import org.bukkit.event.block.BlockBreakEvent
+import org.bukkit.event.block.BlockExplodeEvent
+import org.bukkit.event.entity.EntityExplodeEvent
 import org.bukkit.event.block.BlockPhysicsEvent
 import org.bukkit.event.block.BlockPlaceEvent
 import org.bukkit.event.block.BlockPistonEvent
@@ -293,5 +295,33 @@ object AnionBlockListeners : Listener {
     }
 
     // pick block end
+
+    // explosion
+
+    private fun handleExplosionBlockList(blocks: MutableList<Block>) {
+        val iter = blocks.iterator()
+
+        while (iter.hasNext()) {
+            val block = iter.next()
+            val anionBlock = anionBlockAt(block) ?: continue
+
+            val item = anionBlock.drops ?: AnionRegistries.ITEM_REGISTRY.getValue(AnionRegistryKey(anionBlock.namespacedKey.key))?.asItemStack()
+            block.type = Material.AIR
+            if (item != null) block.world.dropItem(block.location.toCenterLocation(), item)
+
+            iter.remove()
+            anionBlock.onBreak(block, null)
+        }
+    }
+
+    // not entity explosions
+    @EventHandler
+    fun onBlockExplode(event: BlockExplodeEvent) = handleExplosionBlockList(event.blockList())
+
+    // creepers, tnt
+    @EventHandler
+    fun onEntityExplode(event: EntityExplodeEvent) = handleExplosionBlockList(event.blockList())
+
+    // explosion end
 
 }
