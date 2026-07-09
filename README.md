@@ -47,3 +47,45 @@ POWER
 - machines should take a fixed amount of power from a source, like a circuit. if a power line is starved of voltage, the machine stalls.
 - stalling can slow down or completely halt a machine, depending on the configuration.
 - BUT THE BASIC GIST IS THAT A MACHINE TAKES A FIXED AMOUNT OF POWER, AND IF THE LINE DOES NOT HAVE ENOUGH OF ENERGY AVAILANLE IT WILL STALL. LINES MUST HAVE A CONSTANT SUPPLY OF THIS POWER!
+
+
+---
+RECIPE RAMBLING
+
+time to ramble
+recipe system!
+needs to be solid, support custom recipes, processing times, and vanilla compat
+
+so i need an api to
+- register vanilla crafting table recipe
+- register vanilla furnace recipe (for both furnace fuels and custom furnace burn times for certain AnionItems)
+- register generic recipes that take varied amount of custom resources
+
+like a run() recipe takes 10E every tick, and a process() recipe takes 100E every tick
+so it would benefit people to actually switch off machines
+
+so really i would need a generic api with adapters for each context
+boils down to:
+- ingredients (any resource/resources, AnionVanillaItem can be used internally)
+- time (in ticks)
+- result (each function takes a different type, so you'd have ItemResult, GasResult, EnergyResult, CompoundResult (builder), FluidResult, etc)
+
+result should have ingredient predicates that fill up as the items are provided, so a starved machine can still partially complete an operation (e.g. machines does not take 3kE and THEN smelt, but it takes 3kE WHILE smelting and as it gets the E it feeds it to the progress for that ingredient... same with gas, items, anything)
+HOWEVER! this is still limited proportionately to the needed amount of resource based on the recipe processing time AGAINST/VS the machine inputs!
+
+example:
+machine has ten inputs with 10R/pTick per input.
+MACHINES HAVE A SEPARATE CONFIG, ALONG WITH INTERNAL BUFFERS THAT GET PULLED FROM AS FAST AS THE RECIPE CALLS FOR THINGS
+
+Recipe has two ingredients:
+1. `18R/pTick Oxygen for 1800R`
+2. `5R/pTick  Iron   for 500R`
+   Processing Time: 10o/pTick (o = operations)
+   Output: `1 Steel Ingot`
+
+machine is starved if only one input is used for iron and one input used for oxygen
+it REQUIRES usage of multiple ports. (two oxygen inputs = 20R/pTick, feeds 18R/pTick demand)
+
+---
+
+again, this will all be powered by a GENERIC system, we just need a recipe system that can be implemented by specific classes, just like AnionItem and AnionBlock work!
