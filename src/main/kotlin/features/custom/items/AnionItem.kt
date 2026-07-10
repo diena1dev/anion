@@ -46,10 +46,13 @@ open class AnionItem(
 
 	// item stack magic
 	init {
-		internalItemStack[DataComponentTypes.ITEM_NAME] = styledDisplayName
-		internalItemStack[DataComponentTypes.ITEM_MODEL] = namespacedKey
-		internalItemStack[DataComponentTypes.MAX_STACK_SIZE] = stacksTo
+		if (internalItemStack != null) {
+			internalItemStack[DataComponentTypes.ITEM_NAME] = styledDisplayName
+			internalItemStack[DataComponentTypes.ITEM_MODEL] = namespacedKey
+			internalItemStack[DataComponentTypes.MAX_STACK_SIZE] = stacksTo
+		}
 	}
+
 
 	fun asItemStack(quantity: Int = 1): ItemStack {
 		return internalItemStack.asQuantity(quantity)
