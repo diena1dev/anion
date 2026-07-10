@@ -15,6 +15,7 @@ repositories {
 dependencies {
     compileOnly(libs.paper.api)
     implementation(libs.kotlin.stdlib)
+    implementation(libs.rocksdb)
 
     paperweight.paperDevBundle("26.2.build.+")
     compileOnly("dev.astralchroma:brigadier-processor:0.1.2")

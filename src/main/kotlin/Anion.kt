@@ -1,6 +1,7 @@
 package dev.diena.anion
 
 import com.example.plugin.Registration
+import dev.diena.anion.data.database.AnionDatabase
 import dev.diena.anion.features.custom.blocks.AnionBlocks
 import dev.diena.anion.features.custom.items.AnionItems
 import io.papermc.paper.plugin.bootstrap.BootstrapContext
@@ -33,6 +34,8 @@ class Anion : JavaPlugin() {
         instance = this.server
         plugin = this
 
+        AnionDatabase.open(dataFolder)
+
         // init our feature classes that call registries
         AnionItems
         AnionBlocks
@@ -42,6 +45,7 @@ class Anion : JavaPlugin() {
     }
 
     override fun onDisable() {
+        AnionDatabase.close()
         Tasks.shutdown()
     }
 
