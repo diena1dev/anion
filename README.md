@@ -68,7 +68,7 @@ so really i would need a generic api with adapters for each context
 boils down to:
 - ingredients (any resource/resources, AnionVanillaItem can be used internally)
 - time (in ticks)
-- result (each function takes a different type, so you'd have ItemResult, GasResult, EnergyResult, CompoundResult (builder), FluidResult, etc)
+- result (each function takes a different type, so you'd have ItemResult, GasResult, EnergyResult, CompoundResult (builder, can return more than one result with more than one type (used in machines)), FluidResult, etc)
 
 result should have ingredient predicates that fill up as the items are provided, so a starved machine can still partially complete an operation (e.g. machines does not take 3kE and THEN smelt, but it takes 3kE WHILE smelting and as it gets the E it feeds it to the progress for that ingredient... same with gas, items, anything)
 HOWEVER! this is still limited proportionately to the needed amount of resource based on the recipe processing time AGAINST/VS the machine inputs!
@@ -89,3 +89,7 @@ it REQUIRES usage of multiple ports. (two oxygen inputs = 20R/pTick, feeds 18R/p
 ---
 
 again, this will all be powered by a GENERIC system, we just need a recipe system that can be implemented by specific classes, just like AnionItem and AnionBlock work!
+so then there will be RecipeTypes that have adapters for the recipe subsystem. ShapedCraftingTableAdapter handles shaped crafting recipes, FurnaceSmeltAdapter handles furnace items to smelt, while FurnaceFuelAdapter handles custom fuel burning types (not natively supported, implement using listeners)
+Machines will also have their own unique recipe adapters that interface with the recipe subsystem.
+
+WHILE WORKING ON THIS, KEEP THE STRUCTURE OF THE ANIONBLOCK AND ANIONITEM CLASSES IN MIND. THE API FOR THOSE SHOULD BE AS IDENTICAL AS POSSIBLE.
