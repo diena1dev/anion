@@ -1,5 +1,6 @@
 package dev.diena.anion.features.custom.items
 
+import dev.astralchroma.processor.annotations.Register
 import dev.diena.anion.Anion
 import dev.diena.anion.extensions.set
 import dev.diena.anion.extensions.toAnionItem
@@ -62,7 +63,8 @@ open class AnionItem(
 
 }
 
-class AnionItemDispatcher : Listener {
+@Register
+object AnionItemDispatcher : Listener {
 
 	@EventHandler
 	fun onPlayerInteract(event: PlayerInteractEvent) {

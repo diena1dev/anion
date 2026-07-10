@@ -1,7 +1,6 @@
 package dev.diena.anion
 
 import com.example.plugin.Registration
-import dev.diena.anion.features.custom.items.AnionItemDispatcher
 import dev.diena.anion.features.custom.blocks.AnionBlocks
 import dev.diena.anion.features.custom.items.AnionItems
 import io.papermc.paper.plugin.bootstrap.BootstrapContext
@@ -39,8 +38,6 @@ class Anion : JavaPlugin() {
         AnionBlocks
         //AnionGasses
         //AnionEnergies
-
-        server.pluginManager.registerEvents(AnionItemDispatcher(), this)
 
     }
 
