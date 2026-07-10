@@ -4,11 +4,13 @@ import dev.diena.anion.data.registry.AnionRegistryKey
 import dev.diena.anion.data.registry.registries.AnionRegistries
 import dev.diena.anion.features.custom.blocks.AnionBlocks
 import dev.diena.anion.features.custom.items.AnionItems
+import dev.diena.anion.features.custom.items.AnionVanillaItem
 import dev.diena.anion.features.custom.recipes.adapters.FurnaceFuelAdapter
 import dev.diena.anion.features.custom.recipes.adapters.FurnaceSmeltAdapter
 import dev.diena.anion.features.custom.recipes.adapters.RecipeAdapter
 import dev.diena.anion.features.custom.recipes.adapters.ShapedCraftingTableAdapter
 import dev.diena.anion.features.custom.recipes.adapters.ShapelessCraftingTableAdapter
+import org.bukkit.inventory.ItemType
 
 /**
  * Declarative recipe registrations. Mirrors [AnionItems] / [AnionBlocks]:
@@ -138,6 +140,26 @@ import dev.diena.anion.features.custom.recipes.adapters.ShapelessCraftingTableAd
  * -------------------------------------------------------------------------
  */
 object AnionRecipes {
+
+	val BLASTER_PISTOL_FROM_ITEM = registerRecipe(
+		ShapedCraftingTableAdapter(
+			recipe = AnionRecipe(
+				displayName     = "Blaster Pistol From Items",
+				ingredients     = emptyList(),
+				processingTicks = 0,
+				result          = AnionResult.Item(AnionItems.ANION_BLASTER_PISTOL, quantity = 1),
+			),
+			shape = listOf(
+				"   ",
+				"UUU",
+				"S  ",
+			),
+			key = mapOf(
+				'U' to AnionItems.URANIUM_INGOT,
+				'S' to AnionVanillaItem(ItemType.STICK.createItemStack())
+				),
+		)
+	)
 
 	// ── uranium block: 9 uranium ingots -> 1 uranium block ─────────────
 	val URANIUM_BLOCK_FROM_ITEM = registerRecipe(
