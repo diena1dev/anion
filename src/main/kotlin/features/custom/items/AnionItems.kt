@@ -20,6 +20,14 @@ object AnionItems {
 		)
 	)
 
+	val TEST_FUEL = registerItem(
+		AnionItem(
+			displayName = "Test Fuel",
+			itemRepresentation = ItemType.STICK,
+			styledDisplayName = Component.text("Test Fuel").color(TextColor.color(Color.RED.asARGB()))
+		)
+	)
+
 	val ANION_BLASTER_PISTOL = registerItem(
 		AnionBlasterPistolItem()
 	)

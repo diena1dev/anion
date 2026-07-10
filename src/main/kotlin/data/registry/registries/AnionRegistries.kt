@@ -8,6 +8,7 @@ import dev.diena.anion.features.custom.energies.AnionEnergy
 import dev.diena.anion.features.custom.fluids.AnionFluid
 import dev.diena.anion.features.custom.gasses.AnionGas
 import dev.diena.anion.features.custom.items.AnionItem
+import dev.diena.anion.features.custom.recipes.AnionRecipe
 
 object AnionRegistries {
 
@@ -34,6 +35,11 @@ object AnionRegistries {
     val ENERGY_REGISTRY = object : AnionRegistry<AnionEnergy>() {
         override val registryKey = AnionRegistryKeys.ANION_ENERGY_REGISTRY
         override val all: MutableMap<AnionRegistryKey, AnionEnergy> = mutableMapOf()
+    }
+
+    val RECIPE_REGISTRY = object : AnionRegistry<AnionRecipe>() {
+        override val registryKey = AnionRegistryKeys.ANION_RECIPE_REGISTRY
+        override val all: MutableMap<AnionRegistryKey, AnionRecipe> = mutableMapOf()
     }
 
 }

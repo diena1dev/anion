@@ -6,6 +6,7 @@ import dev.diena.anion.data.database.AnionPersistence
 import dev.diena.anion.features.custom.blocks.AnionBlocks
 import dev.diena.anion.features.custom.items.AnionItems
 import dev.diena.anion.features.starship.Starship
+import dev.diena.anion.features.recipes.AnionRecipes
 import io.papermc.paper.plugin.bootstrap.BootstrapContext
 import io.papermc.paper.plugin.bootstrap.PluginBootstrap
 import io.papermc.paper.plugin.bootstrap.PluginProviderContext
@@ -43,6 +44,7 @@ class Anion : JavaPlugin() {
         AnionBlocks
         //AnionGasses
         //AnionEnergies
+	    AnionRecipes
 
         // periodic save — flush dirty starships every second
         server.scheduler.runTaskTimer(this, Runnable {
