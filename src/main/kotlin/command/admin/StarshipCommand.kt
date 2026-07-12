@@ -6,6 +6,7 @@ import dev.astralchroma.processor.annotations.Sender
 import dev.astralchroma.processor.annotations.Subcommand
 import dev.diena.anion.Anion
 import dev.diena.anion.Tasks
+import dev.diena.anion.data.database.AnionPersistence
 import dev.diena.anion.extensions.blockPos
 import dev.diena.anion.extensions.vec3i
 import dev.diena.anion.features.starship.Starship
@@ -139,7 +140,11 @@ object StarshipCommand {
         }
 
         val locations = visited.map { it.location.blockPos }.toSet()
-        Starship.loadedStarships[UUID.randomUUID()] = Starship().create(locations, sender.world)
+        val uuid = UUID.randomUUID()
+        val ship = Starship().create(locations, sender.world)
+        ship.uuid = uuid
+        Starship.loadedStarships[uuid] = ship
+        AnionPersistence.saveStarship(uuid, ship)
         sender.sendMessage("Detected ${visited.size} blocks.")
 
         // select ship too
@@ -147,6 +152,25 @@ object StarshipCommand {
 
     }
 
+    /** remove starship from all starship related things (very helpful note i know :3) */
+    @Subcommand
+    fun destroy(
+
+        @Sender sender: Player
+
+    ) {
+
+        val starship = Starship.loadedStarships[UUID.fromString(sender.persistentDataContainer.get(
+            NamespacedKey(Anion.NAMESPACE, "selected_starship"),
+            PersistentDataType.STRING
+        ))] ?: return
+
+        AnionPersistence.deleteStarship(starship.uuid)
+        Starship.loadedStarships.remove(starship.uuid)
+
+    }
+
+    /** move ship in given direction */
     @Subcommand
     fun move(
         @Sender sender: Player,
@@ -161,6 +185,7 @@ object StarshipCommand {
 
     }
 
+    /** apply and loop "velocity" */
     @Subcommand
     fun velocity(
         @Sender sender: Player,
@@ -203,6 +228,7 @@ object StarshipCommand {
 
     }
 
+    /** stop applied velocity */
     @Subcommand
     fun stop(
         @Sender sender: Player,
