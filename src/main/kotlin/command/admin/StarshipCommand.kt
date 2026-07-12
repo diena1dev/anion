@@ -160,13 +160,12 @@ object StarshipCommand {
 
     ) {
 
-        val starship = Starship.loadedStarships[UUID.fromString(sender.persistentDataContainer.get(
-            NamespacedKey(Anion.NAMESPACE, "selected_starship"),
-            PersistentDataType.STRING
-        ))] ?: return
+        val starship = getSelectedStarship(sender)
 
         AnionPersistence.deleteStarship(starship.uuid)
         Starship.loadedStarships.remove(starship.uuid)
+
+        sender.sendMessage("destroyed ${starship.uuid} from loaded ships and database")
 
     }
 
@@ -185,6 +184,21 @@ object StarshipCommand {
 
     }
 
+    @Subcommand
+    fun rotate(
+
+        @Sender sender: Player,
+        rotation: Double
+
+    ) {
+
+        val ship = getSelectedStarship(sender)
+        ship.rotate(rotation)
+
+        sender.sendMessage("rotated starship by $rotation degrees")
+
+    }
+
     /** apply and loop "velocity" */
     @Subcommand
     fun velocity(
@@ -197,6 +211,8 @@ object StarshipCommand {
 
         run = true
         velocityLoop(sender, x, y, z, tickTime)
+
+        sender.sendMessage("set starship velocity to vector [$x $y $z] at $tickTime ticks per update")
 
     }
 
@@ -235,6 +251,8 @@ object StarshipCommand {
     ) {
 
         run = false
+
+        sender.sendMessage("stopped starship")
 
     }
 

@@ -4,6 +4,7 @@ import dev.diena.anion.data.database.AnionPersistence
 import dev.diena.anion.extensions.adjacentBlocks
 import dev.diena.anion.extensions.blockPos
 import dev.diena.anion.extensions.div
+import dev.diena.anion.extensions.minus
 import dev.diena.anion.extensions.plus
 import dev.diena.anion.extensions.rotateRight
 import dev.diena.anion.extensions.vec3i
@@ -16,6 +17,7 @@ import net.minecraft.world.entity.PositionMoveRotation
 import net.minecraft.world.entity.Relative
 import net.minecraft.world.item.Items
 import net.minecraft.world.level.block.Blocks
+import net.minecraft.world.level.block.Rotation
 import net.minecraft.world.level.block.entity.BlockEntity
 import net.minecraft.world.level.block.state.BlockState
 import net.minecraft.world.phys.AABB
@@ -23,7 +25,6 @@ import net.minecraft.world.phys.Vec3
 import org.bukkit.World
 import org.bukkit.block.Block
 import org.bukkit.block.BlockFace
-import org.bukkit.block.BlockType
 import org.bukkit.craftbukkit.CraftWorld
 import org.bukkit.craftbukkit.block.CraftBlock
 import org.bukkit.craftbukkit.entity.CraftPlayer
@@ -164,7 +165,7 @@ class Starship {
         }
 
         // transfer scheduled block/fluid ticks to new positions
-        //StarshipTicks.transferT   icks(level, blockHashMap.keys, vectorToMoveIn)
+        //StarshipTicks.transferTicks(level, blockHashMap.keys, vectorToMoveIn)
 
         // then load ship BEs
         for ((vec, nbt) in beMap) {
@@ -261,49 +262,136 @@ class Starship {
     // Clockwise: Swap the x and y values, and multiply the new y by -1.
     // Example: \(\left[\begin{matrix}4\\ 2\end{matrix}\right]\) becomes \(\left[\begin{matrix}2\\ -4\end{matrix}\right]\)
     /** can only rotate yaw, not pitch or roll for obvious reasons (the ship would be torn apart....) */
-    /*fun rotate(
+    fun rotate(
 
         byAmount: Double // can be negative
 
     ) {
 
-        // helper function
-        fun Double.angleRange(): BlockFace = when (toDouble()) {
-            in 0.0..90.0    -> return BlockFace.SOUTH
-            in 90.0..180.0  -> return BlockFace.EAST
-            in 180.0..270.0 -> return BlockFace.NORTH
-            in 270.0..360.0 -> return BlockFace.WEST
-            else -> { throw IllegalStateException("what the fuck did you do") }
+        fun Double.toFace(): BlockFace = when {
+            this in 0.0..90.0    -> BlockFace.SOUTH
+            this in 90.0..180.0  -> BlockFace.EAST
+            this in 180.0..270.0 -> BlockFace.NORTH
+            this in 270.0..360.0 -> BlockFace.WEST
+            else -> throw IllegalStateException("what the fuck did you do")
         }
 
-        // snapshot our old yaw so we know how much to rotate by based on the current rotation of the ship
-        val angleSnapshot = yaw
+        fun stepsFromTo(from: BlockFace, to: BlockFace): Int {
+            var steps = 0; var cur = from
+            while (cur != to && steps < 4) { cur = cur.rotateRight(); steps++ }
+            return steps
+        }
 
-        // definitely didn't overcomplicate this before using modulo
-        // add amount to yaw first
-        yaw = ((yaw+byAmount % 360) + 360) % 360
+        fun rotateVec(rel: Vec3i, steps: Int): Vec3i {
+            var x = rel.x; var z = rel.z
+            repeat(steps) { val nx = -z; z = x; x = nx }
+            return Vec3i(x, rel.y, z)
+        }
 
-        // no change
-        if (angleSnapshot.angleRange() == yaw.angleRange()) return
+        val oldFace = yaw.toFace()
+        // modulo my beloved
+        yaw = ((yaw + byAmount % 360) + 360) % 360
+        val newFace = yaw.toFace()
 
-        // change
-        for (i in 1..4) {
+        // if yaw did not change enough to require a rotation do not rotate
+        if (oldFace == newFace) return
 
-            if (angleSnapshot.angleRange().rotateRight() != angleSnapshot.angleRange()) continue else break
+        val steps = stepsFromTo(oldFace, newFace)
+
+        val nmsRotation = when (steps) {
+            1    -> Rotation.CLOCKWISE_90
+            2    -> Rotation.CLOCKWISE_180
+            3    -> Rotation.COUNTERCLOCKWISE_90
+            else -> return
+        }
+
+        moving = true
+
+        val newBlockMap: HashMap<Vec3i, BlockState> = hashMapOf()
+        val beMap: HashMap<Vec3i, CompoundTag>      = hashMapOf()
+        val provider                                = level.registryAccess()
+
+        val riders = collectRiders()
+
+        for ((vec, state) in blockHashMap) {
+
+            val newVec = origin + rotateVec(vec - origin, steps)
+            newBlockMap[newVec] = state.rotate(nmsRotation)
+
+            // store BEs and remove BE blocks
+            val be = level.getBlockEntity(vec.blockPos) ?: continue
+            val nbt = be.saveWithFullMetadata(provider)
+            val newPos = origin + rotateVec(vec - origin, steps)
+            nbt.putInt("x", newPos.x)
+            nbt.putInt("y", newPos.y)
+            nbt.putInt("z", newPos.z)
+            beMap[newPos] = nbt
+            level.removeBlockEntity(vec.blockPos)
 
         }
 
-        // get facing component for directional blocks and rotate them accordingly
-        BlockType.WAXED_WEATHERED_CUT_COPPER_STAIRS.createBlockData().facing
+        // collision check, only positions not already occupied by the ship
+        for ((newVec, _) in newBlockMap) {
+            if (blockHashMap.containsKey(newVec)) continue
+            if (!level.getBlockState(newVec.blockPos).isAir) {
+                yaw = ((yaw - byAmount % 360) + 360) % 360 // revert yaw
+                return
+            }
+        }
 
+        // REmove old ship section
+        for ((vec, _) in blockHashMap) {
+            // 4. no observer updates, 16. no shape recalc, 32. no item drops
+            level.setBlock(vec.blockPos, Blocks.AIR.defaultBlockState(), 4 or 16 or 32)
+        }
 
+        // actually MOVE ship blocks
+        for ((vec, b) in newBlockMap) {
+            //blockHashMap.remove(vec)
+            // 1. update neighboring blocks, 4. no observer updates, 16. no shape recalc
+            level.setBlock(vec.blockPos, b, 1 or 4 or 16)
+        }
 
+        // transfer scheduled block/fluid ticks to new positions
+        //StarshipTicks.transferTicks(level, blockHashMap.keys, vectorToMoveIn)
 
+        StarshipPackets.sendSections(level, newBlockMap.keys, blockHashMap.keys, newBlockMap)
 
-        // new angle
-        val vecToRotateWith = angleRange(yaw)
+        blockHashMap = newBlockMap
+        rebuildAABB()
+        dirty = true
 
-    }*/
+        for (entity in riders) {
+
+            val entityVec = Vec3i(entity.x.toInt(), entity.y.toInt(), entity.z.toInt())
+            val rotatedVec = origin + rotateVec(entityVec - origin, steps)
+
+            val newX = (rotatedVec.x - entityVec.x).toDouble()
+            val newY = (rotatedVec.y - entityVec.y).toDouble()
+            val newZ = (rotatedVec.z - entityVec.z).toDouble()
+
+            val bukkitEntity = entity.bukkitEntity
+            if (bukkitEntity is Player) {
+                // I FUCKING HATE NMS
+                val destination = PositionMoveRotation(Vec3(newX, newY, newZ), Vec3.ZERO, 0f, 0f)
+
+                (bukkitEntity as CraftPlayer).handle.connection.teleport(
+                    destination,
+                    setOf(Relative.X, Relative.Y, Relative.Z, Relative.Y_ROT, Relative.X_ROT)
+                )
+
+            } else {
+
+                bukkitEntity.teleport(bukkitEntity.location.add(newX, newY, newZ))
+
+            }
+
+        }
+
+        // unlock updates
+        moving = false
+
+    }
 
     fun changeWorld(
 
