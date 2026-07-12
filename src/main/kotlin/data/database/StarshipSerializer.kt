@@ -103,7 +103,6 @@ object StarshipSerializer {
         return try {
             val dis = DataInputStream(ByteArrayInputStream(bytes))
             dis.readShort() // schema version
-            dis.readByte()  // ship state
             val msb = dis.readLong()
             val lsb = dis.readLong()
             val storedWorldUid = UUID(msb, lsb)
