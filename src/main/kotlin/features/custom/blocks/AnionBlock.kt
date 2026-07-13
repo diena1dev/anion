@@ -4,7 +4,11 @@ import dev.diena.anion.Anion
 import net.kyori.adventure.text.Component
 import org.bukkit.Instrument
 import org.bukkit.NamespacedKey
+import org.bukkit.Note
 import org.bukkit.block.Block
+import org.bukkit.block.BlockState
+import org.bukkit.block.BlockType
+import org.bukkit.block.data.type.NoteBlock
 import org.bukkit.entity.Player
 import org.bukkit.event.player.PlayerInteractEvent
 import org.bukkit.inventory.ItemStack
@@ -23,6 +27,19 @@ open class AnionBlock(
     private val interactHandler: ((event: PlayerInteractEvent) -> Unit)? = null,
     private val neighborChangeHandler: ((block: Block) -> Unit)? = null,
 ) {
+
+    companion object {
+        private val internalBlock = BlockType.NOTE_BLOCK
+
+        fun AnionBlock.getBlockState(): BlockState? {
+            val block = internalBlock.createBlockData() as? NoteBlock
+            block?.note = Note(this.note)
+            block?.instrument = instrument
+
+            return block?.createBlockState()
+        }
+    }
+
     init {
         if (note !in 0..24) throw IllegalStateException("note must be 0–24, got $note for ${this.namespacedKey}")
     }
