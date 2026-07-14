@@ -1,8 +1,8 @@
-package dev.diena.anion.features.custom.recipes.adapters
+package dev.diena.anion.features.recipes.adapters
 
 import dev.diena.anion.Anion
 import dev.diena.anion.features.custom.items.AnionItem
-import dev.diena.anion.features.custom.recipes.AnionRecipe
+import dev.diena.anion.features.recipes.AnionRecipe
 import org.bukkit.NamespacedKey
 
 /**

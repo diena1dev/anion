@@ -1,13 +1,13 @@
-package dev.diena.anion.features.custom.recipes.adapters
+package dev.diena.anion.features.recipes.adapters
 
-import dev.diena.anion.features.custom.recipes.AnionRecipe
+import dev.diena.anion.features.recipes.AnionRecipe
 
 /**
  * Adapter contract: bridges a generic [AnionRecipe] into a specific runtime
  * context (Bukkit crafting table, furnace, custom machine, etc).
  *
  * Adapters own construction of their concrete Bukkit recipe (if any) and
- * are invoked once by [dev.diena.anion.features.custom.recipes.AnionRecipes]
+ * are invoked once by [dev.diena.anion.features.recipes.AnionRecipes]
  * during registration.
  */
 interface RecipeAdapter {

@@ -1,9 +1,9 @@
-package dev.diena.anion.features.custom.recipes.adapters
+package dev.diena.anion.features.recipes.adapters
 
 import dev.diena.anion.Anion
 import dev.diena.anion.features.custom.items.AnionItem
-import dev.diena.anion.features.custom.recipes.AnionRecipe
-import dev.diena.anion.features.custom.recipes.AnionResult
+import dev.diena.anion.features.recipes.AnionRecipe
+import dev.diena.anion.features.recipes.AnionResult
 import org.bukkit.Bukkit
 import org.bukkit.inventory.RecipeChoice
 import org.bukkit.inventory.ShapelessRecipe

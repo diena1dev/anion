@@ -1,15 +1,15 @@
-package dev.diena.anion.features.custom.recipes
+package dev.diena.anion.features.recipes
 
 import dev.diena.anion.data.registry.AnionRegistryKey
 import dev.diena.anion.data.registry.registries.AnionRegistries
 import dev.diena.anion.features.custom.blocks.AnionBlocks
 import dev.diena.anion.features.custom.items.AnionItems
 import dev.diena.anion.features.custom.items.AnionVanillaItem
-import dev.diena.anion.features.custom.recipes.adapters.FurnaceFuelAdapter
-import dev.diena.anion.features.custom.recipes.adapters.FurnaceSmeltAdapter
-import dev.diena.anion.features.custom.recipes.adapters.RecipeAdapter
-import dev.diena.anion.features.custom.recipes.adapters.ShapedCraftingTableAdapter
-import dev.diena.anion.features.custom.recipes.adapters.ShapelessCraftingTableAdapter
+import dev.diena.anion.features.recipes.adapters.FurnaceFuelAdapter
+import dev.diena.anion.features.recipes.adapters.FurnaceSmeltAdapter
+import dev.diena.anion.features.recipes.adapters.RecipeAdapter
+import dev.diena.anion.features.recipes.adapters.ShapedCraftingTableAdapter
+import dev.diena.anion.features.recipes.adapters.ShapelessCraftingTableAdapter
 import org.bukkit.inventory.ItemType
 
 /**
@@ -144,10 +144,10 @@ object AnionRecipes {
 	val BLASTER_PISTOL_FROM_ITEM = registerRecipe(
 		ShapedCraftingTableAdapter(
 			recipe = AnionRecipe(
-				displayName     = "Blaster Pistol From Items",
-				ingredients     = emptyList(),
+				displayName = "Blaster Pistol From Items",
+				ingredients = emptyList(),
 				processingTicks = 0,
-				result          = AnionResult.Item(AnionItems.ANION_BLASTER_PISTOL, quantity = 1),
+				result = AnionResult.Item(AnionItems.ANION_BLASTER_PISTOL, quantity = 1),
 			),
 			shape = listOf(
 				"   ",
@@ -157,7 +157,7 @@ object AnionRecipes {
 			key = mapOf(
 				'U' to AnionItems.URANIUM_INGOT,
 				'S' to AnionVanillaItem(ItemType.STICK.createItemStack())
-				),
+			),
 		)
 	)
 
@@ -165,10 +165,10 @@ object AnionRecipes {
 	val URANIUM_BLOCK_FROM_ITEM = registerRecipe(
 		ShapedCraftingTableAdapter(
 			recipe = AnionRecipe(
-				displayName     = "Uranium Block From Uranium Ingot",
-				ingredients     = emptyList(),
+				displayName = "Uranium Block From Uranium Ingot",
+				ingredients = emptyList(),
 				processingTicks = 0,
-				result          = AnionResult.Item(AnionItems.URANIUM_BLOCK, quantity = 1),
+				result = AnionResult.Item(AnionItems.URANIUM_BLOCK, quantity = 1),
 			),
 			shape = listOf(
 				"III",
@@ -183,10 +183,10 @@ object AnionRecipes {
 	val URANIUM_ORE_BLOCK_FROM_ITEM = registerRecipe(
 		ShapedCraftingTableAdapter(
 			recipe = AnionRecipe(
-				displayName     = "Uranium Ore Block From Raw Uranium Ore",
-				ingredients     = emptyList(),
+				displayName = "Uranium Ore Block From Raw Uranium Ore",
+				ingredients = emptyList(),
 				processingTicks = 0,
-				result          = AnionResult.Item(AnionItems.URANIUM_ORE_BLOCK, quantity = 1),
+				result = AnionResult.Item(AnionItems.URANIUM_ORE_BLOCK, quantity = 1),
 			),
 			shape = listOf(
 				"OOO",
@@ -200,10 +200,10 @@ object AnionRecipes {
 	val URANIUM_INGOT_FROM_BLOCK = registerRecipe(
 		ShapelessCraftingTableAdapter(
 			recipe = AnionRecipe(
-				displayName     = "Uranium Ingot From Uranium Block",
-				ingredients     = emptyList(),
+				displayName = "Uranium Ingot From Uranium Block",
+				ingredients = emptyList(),
 				processingTicks = 0,
-				result          = AnionResult.Item(AnionItems.URANIUM_INGOT, quantity = 9),
+				result = AnionResult.Item(AnionItems.URANIUM_INGOT, quantity = 9),
 			),
 			ingredients = listOf(AnionItems.URANIUM_BLOCK),
 		)
@@ -212,11 +212,11 @@ object AnionRecipes {
 	val URANIUM_ORE_FROM_BLOCK = registerRecipe(
 		ShapelessCraftingTableAdapter(
 			recipe = AnionRecipe(
-				displayName     = "Raw Uranium Ore From Uranium Ore Block",
-				ingredients     = emptyList(),
+				displayName = "Raw Uranium Ore From Uranium Ore Block",
+				ingredients = emptyList(),
 				processingTicks = 0,
-				result          = AnionResult.Item(AnionItems.RAW_URANIUM_ORE, quantity = 9),
-				),
+				result = AnionResult.Item(AnionItems.RAW_URANIUM_ORE, quantity = 9),
+			),
 			ingredients = listOf(AnionItems.URANIUM_ORE_BLOCK),
 		)
 	)
@@ -225,12 +225,12 @@ object AnionRecipes {
 	val URANIUM_ORE_SMELT = registerRecipe(
 		FurnaceSmeltAdapter(
 			recipe = AnionRecipe(
-				displayName     = "Uranium Ore Smelt",
-				ingredients     = emptyList(),
+				displayName = "Uranium Ore Smelt",
+				ingredients = emptyList(),
 				processingTicks = 200,
-				result          = AnionResult.Item(AnionItems.URANIUM_INGOT, quantity = 1),
+				result = AnionResult.Item(AnionItems.URANIUM_INGOT, quantity = 1),
 			),
-			input      = AnionItems.RAW_URANIUM_ORE,
+			input = AnionItems.RAW_URANIUM_ORE,
 			experience = 0.7f,
 		)
 	)
@@ -240,12 +240,12 @@ object AnionRecipes {
 	val URANIUM_ORE_BLOCK_SMELT = registerRecipe(
 		FurnaceSmeltAdapter(
 			recipe = AnionRecipe(
-				displayName     = "Uranium Ore Block Smelt",
-				ingredients     = emptyList(),
+				displayName = "Uranium Ore Block Smelt",
+				ingredients = emptyList(),
 				processingTicks = 1800,
-				result          = AnionResult.Item(AnionItems.URANIUM_BLOCK, quantity = 1),
+				result = AnionResult.Item(AnionItems.URANIUM_BLOCK, quantity = 1),
 			),
-			input      = AnionItems.URANIUM_ORE_BLOCK,
+			input = AnionItems.URANIUM_ORE_BLOCK,
 			experience = 6.3f,
 		)
 	)
@@ -254,12 +254,12 @@ object AnionRecipes {
 	val TEST_FUEL_FUEL = registerRecipe(
 		FurnaceFuelAdapter(
 			recipe = AnionRecipe(
-				displayName     = "Test Fuel Fuel",
-				ingredients     = emptyList(),
+				displayName = "Test Fuel Fuel",
+				ingredients = emptyList(),
 				processingTicks = 0,
-				result          = AnionResult.Item(AnionItems.TEST_FUEL, quantity = 0),
+				result = AnionResult.Item(AnionItems.TEST_FUEL, quantity = 0),
 			),
-			fuel      = AnionItems.TEST_FUEL,
+			fuel = AnionItems.TEST_FUEL,
 			burnTicks = 20,
 		)
 	)

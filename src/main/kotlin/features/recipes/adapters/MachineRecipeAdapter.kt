@@ -1,7 +1,7 @@
-package dev.diena.anion.features.custom.recipes.adapters
+package dev.diena.anion.features.recipes.adapters
 
-import dev.diena.anion.features.custom.recipes.AnionIngredient
-import dev.diena.anion.features.custom.recipes.AnionRecipe
+import dev.diena.anion.features.recipes.AnionIngredient
+import dev.diena.anion.features.recipes.AnionRecipe
 
 /**
  * Adapter that drives an [AnionRecipe] as a per-tick machine operation.

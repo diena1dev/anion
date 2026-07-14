@@ -1,4 +1,4 @@
-package dev.diena.anion.features.custom.recipes
+package dev.diena.anion.features.recipes
 
 import dev.diena.anion.Anion
 import org.bukkit.NamespacedKey

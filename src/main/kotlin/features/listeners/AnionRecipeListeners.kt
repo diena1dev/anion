@@ -2,8 +2,8 @@ package dev.diena.anion.features.listeners
 
 import dev.astralchroma.processor.annotations.Register
 import dev.diena.anion.extensions.toAnionItem
-import dev.diena.anion.features.custom.recipes.adapters.FurnaceFuelAdapter
-import dev.diena.anion.features.custom.recipes.adapters.FurnaceSmeltAdapter
+import dev.diena.anion.features.recipes.adapters.FurnaceFuelAdapter
+import dev.diena.anion.features.recipes.adapters.FurnaceSmeltAdapter
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
 import org.bukkit.event.block.BlockCookEvent

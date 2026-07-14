@@ -8,7 +8,7 @@ import dev.diena.anion.features.custom.energies.AnionEnergy
 import dev.diena.anion.features.custom.fluids.AnionFluid
 import dev.diena.anion.features.custom.gasses.AnionGas
 import dev.diena.anion.features.custom.items.AnionItem
-import dev.diena.anion.features.custom.recipes.AnionRecipe
+import dev.diena.anion.features.recipes.AnionRecipe
 
 object AnionRegistries {
 
