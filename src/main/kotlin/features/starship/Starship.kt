@@ -264,6 +264,7 @@ class Starship {
 
     }
 
+    // FIXME: block entity and entity rotation translation
     // 90° Counterclockwise: Swap the x and y values, and multiply the new x by -1.
     // Example: \(\left[\begin{matrix}4\\ 2\end{matrix}\right]\) becomes \(\left[\begin{matrix}-2\\ 4\end{matrix}\right]\)90°
     // Clockwise: Swap the x and y values, and multiply the new y by -1.

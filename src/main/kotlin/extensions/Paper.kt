@@ -7,11 +7,15 @@ import dev.diena.anion.data.registry.registries.AnionRegistries
 import dev.diena.anion.features.custom.items.AnionItem
 import io.papermc.paper.datacomponent.DataComponentType
 import io.papermc.paper.datacomponent.DataComponentTypes
-import net.minecraft.core.BlockPos
 import net.kyori.adventure.key.Key
+import net.kyori.adventure.text.Component
+import net.kyori.adventure.text.TextComponent
+import net.kyori.adventure.text.format.TextColor
+import net.minecraft.core.BlockPos
 import net.minecraft.core.BlockPos.MutableBlockPos
 import net.minecraft.core.SectionPos
 import net.minecraft.core.Vec3i
+import net.minecraft.world.level.block.Rotation
 import net.minecraft.world.phys.Vec3
 import org.bukkit.Location
 import org.bukkit.RegionAccessor
@@ -146,6 +150,15 @@ fun BlockFace.rotateLeft() = when (this) {
     else -> throw NotImplementedError("non-cartesian faces are not supported")
 }
 
+/** Rotate given vector by 90 degrees. */
+inline fun Vec3i.rotate(rotation: Rotation): Vec3i =
+	when (rotation) {
+		Rotation.CLOCKWISE_90 -> Vec3i(-this.z, this.y, this.x)
+		Rotation.CLOCKWISE_180 -> Vec3i(-this.x, this.y, -this.z)
+		Rotation.COUNTERCLOCKWISE_90 -> Vec3i(this.z, this.y, -this.x)
+		Rotation.NONE -> this
+	}
+
 inline val Block.blockPos get() = BlockPos(x, y, z)
 inline val Block.vec3i get() = Vec3i(x, y, z)
 inline val Block.adjacentBlocks get() = run {
@@ -161,3 +174,19 @@ inline val Block.adjacentBlocks get() = run {
 }
 
 inline val Location.blockPos get() = BlockPos(x.toInt(), y.toInt(), z.toInt())
+
+/** Colors each character of this component's content as a gradient between [from] and [to]. Children are kept as-is. */
+fun TextComponent.gradient(from: TextColor, to: TextColor): TextComponent {
+    val text = content()
+    if (text.isEmpty()) return this
+
+    val lastIndex = text.length - 1
+    val builder = Component.text().style(style())
+    for (i in text.indices) {
+        val fraction = if (lastIndex == 0) 0f else i / lastIndex.toFloat()
+        builder.append(Component.text(text[i], TextColor.lerp(fraction, from, to)))
+    }
+    builder.append(children())
+
+    return builder.build()
+}
