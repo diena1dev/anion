@@ -96,6 +96,7 @@ import org.bukkit.inventory.ItemType
  *         ),
  *         fuel      = AnionItems.URANIUM_INGOT,
  *         burnTicks = 32_000,
+ *         cookTimeModifier = 0.5,                                // smelts twice as fast while lit
  *     )
  * )
  * ```
@@ -141,6 +142,9 @@ import org.bukkit.inventory.ItemType
  */
 object AnionRecipes {
 
+	// CRAFTING RECIPES
+
+	// blaster pistol: 3 uranium ingots, 1 stick -> 1 blaster pistol
 	val BLASTER_PISTOL_FROM_ITEM = registerRecipe(
 		ShapedCraftingTableAdapter(
 			recipe = AnionRecipe(
@@ -161,7 +165,7 @@ object AnionRecipes {
 		)
 	)
 
-	// ── uranium block: 9 uranium ingots -> 1 uranium block ─────────────
+	// uranium block: 9 uranium ingots -> 1 uranium block
 	val URANIUM_BLOCK_FROM_ITEM = registerRecipe(
 		ShapedCraftingTableAdapter(
 			recipe = AnionRecipe(
@@ -179,7 +183,7 @@ object AnionRecipes {
 		)
 	)
 
-	// ── uranium ore block: 9 raw uranium ore -> 1 uranium ore block ────
+	// uranium ore block: 9 raw uranium ore -> 1 uranium ore block
 	val URANIUM_ORE_BLOCK_FROM_ITEM = registerRecipe(
 		ShapedCraftingTableAdapter(
 			recipe = AnionRecipe(
@@ -197,6 +201,7 @@ object AnionRecipes {
 		)
 	)
 
+	// uranium ingot: 1 uranium block -> 9 uranium ingot
 	val URANIUM_INGOT_FROM_BLOCK = registerRecipe(
 		ShapelessCraftingTableAdapter(
 			recipe = AnionRecipe(
@@ -209,6 +214,7 @@ object AnionRecipes {
 		)
 	)
 
+	// uranium ore: 1 uranium ore block -> 9 raw uranium ore
 	val URANIUM_ORE_FROM_BLOCK = registerRecipe(
 		ShapelessCraftingTableAdapter(
 			recipe = AnionRecipe(
@@ -221,7 +227,9 @@ object AnionRecipes {
 		)
 	)
 
-	// ── uranium ore smelt: raw uranium ore -> uranium ingot ────────────
+	// FURNACE RECIPES
+
+	// uranium ore smelt: raw uranium ore -> uranium ingot
 	val URANIUM_ORE_SMELT = registerRecipe(
 		FurnaceSmeltAdapter(
 			recipe = AnionRecipe(
@@ -235,7 +243,7 @@ object AnionRecipes {
 		)
 	)
 
-	// ── uranium ore block smelt: ore block -> uranium block ────────────
+	// uranium ore block smelt: ore block -> uranium block
 	// costs a proportionally longer cook time and rewards a proportionate larger amount of xp
 	val URANIUM_ORE_BLOCK_SMELT = registerRecipe(
 		FurnaceSmeltAdapter(
@@ -250,7 +258,7 @@ object AnionRecipes {
 		)
 	)
 
-	// ── test item furnace fuel: burns for ~8 vanilla smelts (1600t) ────
+	// test item furnace fuel: super short burn, smelts at 2x speed
 	val TEST_FUEL_FUEL = registerRecipe(
 		FurnaceFuelAdapter(
 			recipe = AnionRecipe(
@@ -261,8 +269,11 @@ object AnionRecipes {
 			),
 			fuel = AnionItems.TEST_FUEL,
 			burnTicks = 20,
+			cookTimeModifier = 0.5, // half normal processing time of whatever furnace recipe is being smelted
 		)
 	)
+
+	// HELPER FUNCTIONS
 
 	fun <T : RecipeAdapter> registerRecipe(adapter: T): T = adapter.also {
 		AnionRegistries.RECIPE_REGISTRY.register(

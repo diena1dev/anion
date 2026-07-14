@@ -4,10 +4,13 @@ import dev.astralchroma.processor.annotations.Register
 import dev.diena.anion.extensions.toAnionItem
 import dev.diena.anion.features.recipes.adapters.FurnaceFuelAdapter
 import dev.diena.anion.features.recipes.adapters.FurnaceSmeltAdapter
+import org.bukkit.block.Furnace
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
 import org.bukkit.event.block.BlockCookEvent
 import org.bukkit.event.inventory.FurnaceBurnEvent
+import org.bukkit.event.inventory.FurnaceStartSmeltEvent
+import kotlin.math.roundToInt
 
 /**
  * Event-driven glue for recipe adapters that vanilla Bukkit does not
@@ -35,15 +38,34 @@ object AnionRecipeListeners : Listener {
 			return
 		}
 
-		val burnTicks = FurnaceFuelAdapter.FUEL_TABLE[anionItem.namespacedKey]
-		if (burnTicks == null) {
+		val profile = FurnaceFuelAdapter.FUEL_TABLE[anionItem.namespacedKey]
+		if (profile == null) {
 			// Anion item, but not a whitelisted fuel: veto the burn.
 			event.isCancelled = true
 			return
 		}
 
 		event.isBurning = true
-		event.burnTime = burnTicks
+		event.burnTime = profile.burnTicks
+	}
+
+	/**
+	 * Scales the cook time of a normal furnace smelt by the
+	 * [FurnaceFuelAdapter.FuelProfile.cookTimeModifier] of whatever Anion fuel
+	 * is currently powering the furnace. Vanilla fuels (and Anion fuels with a
+	 * 1.0 modifier) leave the cook time untouched.
+	 */
+	@EventHandler
+	fun onFurnaceStartSmelt(event: FurnaceStartSmeltEvent) {
+		val furnace = event.block.state as? Furnace ?: return
+		val fuelItem = furnace.inventory.fuel ?: return
+		val anionFuel = fuelItem.toAnionItem() ?: return
+
+		val profile = FurnaceFuelAdapter.FUEL_TABLE[anionFuel.namespacedKey] ?: return
+		if (profile.cookTimeModifier == 1.0) return
+
+		val scaled = (event.totalCookTime * profile.cookTimeModifier).roundToInt().coerceAtLeast(1)
+		event.totalCookTime = scaled
 	}
 
 	/**
