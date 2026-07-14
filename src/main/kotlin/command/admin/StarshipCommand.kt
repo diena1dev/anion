@@ -79,6 +79,23 @@ object StarshipCommand {
         return starship
     }
 
+    @Subcommand
+    fun teleport(
+
+        @Sender sender: Player,
+        x: Int,
+        y: Int,
+        z: Int
+
+    ) {
+
+        val starship = getSelectedStarship(sender)
+
+        if (starship.teleportInWorld(Vec3i(x, y, z))) sender.sendMessage("teleported ship to $x, $y, $z")
+        else sender.sendMessage("unable to teleport ship")
+
+    }
+
     //@Subcommand // TODO: IMPLEMENT
     fun pilot(
 

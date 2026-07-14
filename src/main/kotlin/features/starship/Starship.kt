@@ -118,11 +118,12 @@ class Starship {
     }
 
     // FIXME: just split this function up, it is waaaaaaaaaaay too long
+    /** returns false if unable to move */
     fun move(
 
         vectorToMoveIn: Vec3i,  // Vec3i to move the ship by, relative to current position
 
-    ) {
+    ) : Boolean {
 
         // lock updates
         moving = true
@@ -134,7 +135,7 @@ class Starship {
         // check collision, if true then safe otherwise fail
         if (!StarshipCollision.processCollision(this, vectorToMoveIn)) {
             moving = false // unlock if fail
-            return
+            return false
         }
 
         val riders = collectRiders()
@@ -213,6 +214,8 @@ class Starship {
 
         // unlock updates
         moving = false
+
+        return true
 
     }
 
@@ -403,6 +406,16 @@ class Starship {
         posInNewWorld: Vec3i
 
     ) {
+
+    }
+
+    fun teleportInWorld(
+
+        posInWorldToMoveTo: Vec3i
+
+    ): Boolean {
+
+        return this.move(posInWorldToMoveTo-this.origin)
 
     }
 
