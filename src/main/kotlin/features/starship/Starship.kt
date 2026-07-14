@@ -34,6 +34,10 @@ import java.util.UUID
 /**
  * main coordination class for Starship, StarshipMovement and Starship collision are modules that Starship uses.
  * */
+
+// FIXME: Rotation incorrectly translates entity vectors,
+//        which causes block entities to be lost upon starship rotation
+//        and riding entities to be shifted by a considerable amount.
 class Starship {
 
     companion object {
@@ -45,7 +49,7 @@ class Starship {
     lateinit var level: ServerLevel // nms Level that the ship currently exists in
     lateinit var origin: Vec3i      // approximated center of the starship, what is rotated around
     lateinit var shipAABB: AABB     // ship hitbox
-    var yaw: Double = 0.0           // TODO: autodetect angle of starship based on detection time
+    var yaw: Double = 1.0           // TODO: autodetect angle of starship based on detection time
     var dirty: Boolean = false      // marks if we need to save starship in database
     private var moving = false      // internal check to prevent concurrent modification
 
