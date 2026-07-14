@@ -1,5 +1,5 @@
 package dev.diena.anion.features.machine
 
-interface BasicMachine {
+interface Machine {
     abstract val machineStructure: MachineStructure
 }

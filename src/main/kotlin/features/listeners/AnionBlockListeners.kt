@@ -20,7 +20,7 @@ import org.bukkit.Note
 import org.bukkit.block.Block
 import org.bukkit.block.BlockFace
 import org.bukkit.block.data.BlockData
-import org.bukkit.block.data.type.NoteBlock as NoteBlockData
+import org.bukkit.block.data.type.NoteBlock
 import org.bukkit.craftbukkit.entity.CraftPlayer
 import org.bukkit.event.Event
 import org.bukkit.event.EventHandler
@@ -45,7 +45,7 @@ object AnionBlockListeners : Listener {
 
     // helpers
 
-    private fun noteData(block: Block) = block.blockData as? NoteBlockData
+    private fun noteData(block: Block) = block.blockData as? NoteBlock
 
     private fun anionBlockAt(block: Block) =
         if (block.type != Material.NOTE_BLOCK) null
@@ -93,7 +93,7 @@ object AnionBlockListeners : Listener {
             if (!isAnionBlockItem && AnionBlocks.fromState(data.instrument, data.note.id.toInt()) != null) {
                 val safeNote = (0..24).firstOrNull { n -> AnionBlocks.fromState(data.instrument, n) == null }
                 if (safeNote != null) {
-                    val fixed = data.clone() as NoteBlockData
+                    val fixed = data.clone() as NoteBlock
                     fixed.note = Note(safeNote)
                     block.setBlockData(fixed, false)
                 }
@@ -205,7 +205,7 @@ object AnionBlockListeners : Listener {
             val destination = block.getRelative(event.direction)
 
             fun markIfAnion(target: Block, dataSource: Block = target) {
-                val data = dataSource.blockData as? NoteBlockData ?: return
+                val data = dataSource.blockData as? NoteBlock ?: return
                 if (AnionBlocks.fromState(data.instrument, data.note.id.toInt()) == null) return
                 blocksToFix[target] = data
             }

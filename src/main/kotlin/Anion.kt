@@ -5,6 +5,7 @@ import dev.diena.anion.data.database.AnionDatabase
 import dev.diena.anion.data.database.AnionPersistence
 import dev.diena.anion.features.custom.blocks.AnionBlocks
 import dev.diena.anion.features.custom.items.AnionItems
+import dev.diena.anion.features.machine.MachineStructures
 import dev.diena.anion.features.starship.Starship
 import dev.diena.anion.features.recipes.AnionRecipes
 import io.papermc.paper.plugin.bootstrap.BootstrapContext
@@ -45,6 +46,7 @@ class Anion : JavaPlugin() {
         AnionBlocks
         //AnionGasses
         //AnionEnergies
+        MachineStructures
 	    AnionRecipes
 
         // starship slowTick updates
