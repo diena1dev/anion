@@ -47,10 +47,16 @@ object AnionItems {
 	)
 
 	// blocks
-	val TEST_BLOCK = registerBlock(AnionBlocks.TEST_BLOCK)
-	val URANIUM_ORE = registerBlock(AnionBlocks.URANIUM_ORE)
+	val TEST_BLOCK        = registerBlock(AnionBlocks.TEST_BLOCK)
+	val URANIUM_ORE       = registerBlock(AnionBlocks.URANIUM_ORE)
 	val URANIUM_ORE_BLOCK = registerBlock(AnionBlocks.URANIUM_ORE_BLOCK)
-	val URANIUM_BLOCK = registerBlock(AnionBlocks.URANIUM_BLOCK)
+	val URANIUM_BLOCK     = registerBlock(AnionBlocks.URANIUM_BLOCK)
+
+	val COPPER_MACHINE_CASING   = registerBlock(AnionBlocks.COPPER_MACHINE_CASING)
+	val COPPER_MACHINE_DISPLAY  = registerBlock(AnionBlocks.COPPER_MACHINE_DISPLAY)
+	val COPPER_MACHINE_BUS      = registerBlock(AnionBlocks.COPPER_MACHINE_BUS)
+	val COPPER_MACHINE_VALVE    = registerBlock(AnionBlocks.COPPER_MACHINE_VALVE)
+	val COPPER_MACHINE_DATAPORT = registerBlock(AnionBlocks.COPPER_MACHINE_DATAPORT)
 
 	private fun registerItem(item: AnionItem) = item.also {
 		AnionRegistries.ITEM_REGISTRY.register(AnionRegistryKey(it.namespacedKey.key), it)
