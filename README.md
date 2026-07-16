@@ -97,39 +97,37 @@ WHILE WORKING ON THIS, KEEP THE STRUCTURE OF THE ANIONBLOCK AND ANIONITEM CLASSE
 MACHINES
 ---
 
-BasicMachine
-a machine made up of essential and casing blocks.
+**Structure Checks**
 
-casing blocks: set of blocks that can be interchangeably used for their assigned part in the machine structure.
-as an example, the current codebase uses copper machine casings and casing variants. in gameplay, the casing variants will cost more than basic casing.
-casing variants with i/o ports (energy, fluid, item, gas) will have soft and hard caps for i/o limits. soft caps limit how much a SINGLE port can input or output, while hard caps limit how much ALL COMBINED ports can input or output. this is to allow emergent engineering through the introduction of recipes that take more than a single machine port can handle, causing the player to need to install more machine ports to completely feed the machine's demand.
+Machines in both TERF and Ion both have physical anchors that the machine structure is checked against.
+- TERF uses relative offsets that respect the rotation of the Machine Core
+- Ion uses relative offsets that respect the rotation of the Multiblock's Sign. (Thrusters are a special case, as they are detected upon starship detection, not initialized normally.)
 
-essential blocks: required blocks for the machine to function, and must match the definition of the block exactly.
-as an example: an assembly matrix at the center of an assembler machine, or arc rods in an arc furnace. used as a complimentary feature with casing blocks, as it can: ensure a fixed cost for machines, make detection of unique machines easier, and force specific block palettes in machine structures.
+Notice how both systems use an absolute position in the world with a rotation-aware object- that's not something that's easy to circumvent.
+Ideally, Anion would move away from relative checks for basic machines and just rely upon one-time detection with world listener events-
+But that brings about it's own set of issues, because every time a block is modified in the world, we have to floodfill the surrounding blocks to see if they exist in a machine structure,
+build a map of the found blocks, and compare them against all registered structure sets.
 
-recipe handling: NYI
+However-
+Anion uses RocksDB, a database that *should* be fast enough to handle starship movements and Machine updates concurrently with minimal overhead.
+So instead of using an anchor point in the world with a relative block set we compare against, we can have:
 
----
+```
+BlockSet [Class]
+| - StructureSet [Internal Var] (Mapped collection of blocks to Vec3i local offsets in relation to the BlockSet Origin)
+| - Origin       [Internal Var] (Origin point (where the BlockSet anchor/core is placed) that StructureSet is compared against)
+| - Offset       [Constructor]  (When calling the class (and not the builder functions in the companion object), we can provide an offset to the Origin of the BlockSet)
+\ - Rotation     [Constructor]  (Now, apply a rotation to the BlockSet checks proportionate to the required Rotation to match the StructureSet to the offset Origin.)
+```
 
-ProceduralMachine
-a machine with procedural structure checks.
+BlockSet ia an (objectively) more ergonomic solution to handle the Machine structure check issues. BlockSet also ensures simplicity, because it simply checks if all configured blocks are present in the structure. It does not *care* about ports, or displays, or any other Machine-specific component.
 
-ProceduralMachines have the same base "casing" and "essential" blocks that BasicMachines have, but with the added ability to procedural detect added machine components.
+-# To provide more context on how StructureSet functions:
+StructureSet consists of `slices()`  of assignments of character mappings. For a publicly available example, take a look at Bukkit's ShapedRecipe class, specifically how it uses a builder to construct a recipe, then uses checks in the recipe "shape" iterator to ensure the recipe is valid before registering it.
+Outside of the `slice()` function, the class contains:
+- an `anchor()` function, which takes a character and an Anion or Vanilla (Bukkit) Block and adds it to a mapping list
+- an `assign()` function, that also takes a character and an Anion or Vanilla (Bukkit) Block (This differs from `anchor()` in that multiple assignments can be made to one character to allow for alternate blocks to exist under that same representation. `anchor()` only allows one assignment and one representation in the StructureSet.)
 
-a few examples:
-a tileable battery array that adds to the capacity of the machine based on the amount of batteries connected in series to a side of the machine.
-a long, diagonally tiling set of blocks that starts from the machine base and extends to a hardcoded structure.
-a line of blocks that doesn't follow a set pattern, but must originate at the base of the machine and end at another part of the procedural machines without having any branches in it's path to those points.
-a fluid tank made up of any shape as long as it is a closed shape and under a set size limit. if the tank is broken while the machine has fluid inside of it, the fluid is lost.
+Past the given schema, this is all that BlockSet should contain, as it's only meant to be a convenient and ergonomic way of checking structures.
 
----
-
-CompoundMachine
-a machine made up of BasicMachines and ProceduralMachines
-
-DISCUSS:
-a mainframe machine is planned. some machines have a dataline machine port on them, which allows players to connect the machines to a central mainframe for statistic monitoring, control panel linking (control panels are seperate machines from the machines they control), and a "compute" resource (an ingredient for certain recipes).
-a CompoundMachine would do the work of this mainframe, making it mostly useless, and allowing the ProceduralMachine to replace it. provide input on if it would be wise to drop the idea of CompoundMachine in favor of a ProceduralMachine
-
-the one use case for a CompoundMachine would be for a modular nuclear reactor with multiple subsections,
-but i imagine ProcedualMachine could do that too
+*The last design hurdle for Machine structure sets is a fast iterator to match the surrounding blocks in every rotation and offset for a given structure to it's registered counterparts*
