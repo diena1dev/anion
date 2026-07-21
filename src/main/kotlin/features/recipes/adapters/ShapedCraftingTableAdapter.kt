@@ -23,12 +23,15 @@ import kotlin.collections.iterator
  * @param key     Char -> AnionItem mapping used in [shape]. Whitespace = empty.
  */
 class ShapedCraftingTableAdapter(
+
 	override val recipe: AnionRecipe,
 	val shape: List<String>,
 	val key: Map<Char, AnionItem>,
+
 ) : RecipeAdapter {
 
 	override fun register() {
+
 		val result = recipe.result
 		require(result is AnionResult.Item) {
 			"ShapedCraftingTableAdapter requires an Item result, got $result"
@@ -41,8 +44,8 @@ class ShapedCraftingTableAdapter(
 			bukkitRecipe.setIngredient(char, RecipeChoice.ExactChoice(item.asItemStack()))
 		}
 
-		Bukkit.getServer().addRecipe(bukkitRecipe)
-		Anion.plugin.logger.info("[Recipe] Registered shaped crafting recipe ${recipe.namespacedKey}")
+		Anion.instance.addRecipe(bukkitRecipe)
+
 	}
 
 }

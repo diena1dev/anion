@@ -1,6 +1,7 @@
 package dev.diena.anion.features.custom.blocks
 
 import dev.diena.anion.Anion
+import dev.diena.anion.features.custom.AnionResource
 import net.kyori.adventure.text.Component
 import org.bukkit.Instrument
 import org.bukkit.NamespacedKey
@@ -14,19 +15,21 @@ import org.bukkit.event.player.PlayerInteractEvent
 import org.bukkit.inventory.ItemStack
 
 open class AnionBlock(
+
     displayName: String,
     val instrument: Instrument,
     val note: Int,
     val stacksTo: Int = 64,
     val styledDisplayName: Component = Component.text(displayName),
-    val namespacedKey: NamespacedKey = NamespacedKey(Anion.NAMESPACE, displayName.replace(" ", "_").lowercase()),
+    override val namespacedKey: NamespacedKey = NamespacedKey(Anion.NAMESPACE, displayName.replace(" ", "_").lowercase()),
     val drops: ItemStack? = null,
 
     private val placeHandler: ((block: Block, player: Player?) -> Unit)? = null,
     private val breakHandler: ((block: Block, player: Player?) -> Unit)? = null,
     private val interactHandler: ((event: PlayerInteractEvent) -> Unit)? = null,
     private val neighborChangeHandler: ((block: Block) -> Unit)? = null,
-) {
+
+) : AnionResource {
 
     companion object {
         private val internalBlock = BlockType.NOTE_BLOCK
@@ -50,4 +53,5 @@ open class AnionBlock(
     open fun onNeighborChange(block: Block) { neighborChangeHandler?.invoke(block) }
     open fun onAdd() {}
     open fun onRemove() {}
+
 }
