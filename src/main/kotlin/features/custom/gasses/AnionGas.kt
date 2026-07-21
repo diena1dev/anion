@@ -1,4 +1,12 @@
 package dev.diena.anion.features.custom.gasses
 
-class AnionGas() {
+import dev.diena.anion.features.custom.AnionResource
+import org.bukkit.NamespacedKey
+
+class AnionGas(
+
+	override val namespacedKey: NamespacedKey
+
+) : AnionResource {
+
 }

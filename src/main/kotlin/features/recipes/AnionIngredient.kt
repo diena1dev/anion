@@ -1,5 +1,6 @@
 package dev.diena.anion.features.recipes
 
+import dev.diena.anion.features.custom.AnionResource
 import kotlin.math.min
 
 /**

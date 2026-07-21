@@ -31,22 +31,23 @@ object AnionRecipeListeners : Listener {
 	 */
 	@EventHandler
 	fun onFurnaceBurn(event: FurnaceBurnEvent) {
-		val anionItem = event.fuel.toAnionItem()
 
-		if (anionItem == null) {
-			// vanilla fuel — leave alone.
-			return
-		}
+		// only check anion items as fuel
+		val anionItem = event.fuel.toAnionItem() ?: return
 
 		val profile = FurnaceFuelAdapter.FUEL_TABLE[anionItem.namespacedKey]
 		if (profile == null) {
-			// Anion item, but not a whitelisted fuel: veto the burn.
+
+			// Anion item, but not a whitelisted fuel, cancel the burn.
+			// we do this so burnable item representations don't get mistakenly consumed
 			event.isCancelled = true
 			return
+
 		}
 
 		event.isBurning = true
 		event.burnTime = profile.burnTicks
+
 	}
 
 	/**
@@ -57,6 +58,7 @@ object AnionRecipeListeners : Listener {
 	 */
 	@EventHandler
 	fun onFurnaceStartSmelt(event: FurnaceStartSmeltEvent) {
+
 		val furnace = event.block.state as? Furnace ?: return
 		val fuelItem = furnace.inventory.fuel ?: return
 		val anionFuel = fuelItem.toAnionItem() ?: return
@@ -66,6 +68,7 @@ object AnionRecipeListeners : Listener {
 
 		val scaled = (event.totalCookTime * profile.cookTimeModifier).roundToInt().coerceAtLeast(1)
 		event.totalCookTime = scaled
+
 	}
 
 	/**
@@ -75,10 +78,12 @@ object AnionRecipeListeners : Listener {
 	 */
 	@EventHandler
 	fun onBlockCook(event: BlockCookEvent) {
+
 		val anionItem = event.source.toAnionItem() ?: return
 		if (anionItem.namespacedKey !in FurnaceSmeltAdapter.SMELT_INPUTS) {
 			event.isCancelled = true
 		}
+
 	}
 
 }

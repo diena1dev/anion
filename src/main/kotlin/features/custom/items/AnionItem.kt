@@ -4,6 +4,7 @@ import dev.astralchroma.processor.annotations.Register
 import dev.diena.anion.Anion
 import dev.diena.anion.extensions.set
 import dev.diena.anion.extensions.toAnionItem
+import dev.diena.anion.features.custom.AnionResource
 import io.papermc.paper.datacomponent.DataComponentTypes
 import net.kyori.adventure.text.Component
 import org.bukkit.NamespacedKey
@@ -34,11 +35,11 @@ open class AnionItem(
 	private val itemRepresentation: ItemType,
 	stacksTo: Int = 64,
 	styledDisplayName: Component = Component.text(displayName),
-	val namespacedKey: NamespacedKey = NamespacedKey(Anion.NAMESPACE, displayName.replace(" ", "_").lowercase()),
+	override val namespacedKey: NamespacedKey = NamespacedKey(Anion.NAMESPACE, displayName.replace(" ", "_").lowercase()),
 
 	private val interactHandler: ((PlayerInteractEvent) -> Unit)? = null,
 	private val swapHandler: ((PlayerSwapHandItemsEvent) -> Unit)? = null,
-) {
+) : AnionResource {
 
 	// go-go gadget internal item stack
 	// override with caution
@@ -46,13 +47,15 @@ open class AnionItem(
 
 	// item stack magic
 	init {
+
+		// it can be null, so stop complaining
 		if (internalItemStack != null) {
 			internalItemStack[DataComponentTypes.ITEM_NAME] = styledDisplayName
 			internalItemStack[DataComponentTypes.ITEM_MODEL] = namespacedKey
 			internalItemStack[DataComponentTypes.MAX_STACK_SIZE] = stacksTo
 		}
-	}
 
+	}
 
 	fun asItemStack(quantity: Int = 1): ItemStack {
 		return internalItemStack.asQuantity(quantity)

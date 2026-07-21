@@ -2,13 +2,15 @@ package dev.diena.anion.features.recipes
 
 import dev.diena.anion.Anion
 import org.bukkit.NamespacedKey
+import dev.diena.anion.features.custom.items.AnionItem
+import dev.diena.anion.features.custom.blocks.AnionBlock
 
 /**
  * Generic recipe definition. Purely a data description; execution semantics
  * live in the associated adapter (crafting, furnace, machine, etc).
  *
- * Modeled after [dev.diena.anion.features.custom.items.AnionItem] and
- * [dev.diena.anion.features.custom.blocks.AnionBlock]: an open class with
+ * Modeled after [AnionItem] and
+ * [AnionBlock]: an open class with
  * optional handler lambdas and a namespaced key derived from the display
  * name.
  *
@@ -23,6 +25,7 @@ import org.bukkit.NamespacedKey
  * @param namespacedKey    Optional: Override the derived key.
  */
 open class AnionRecipe(
+
 	val displayName: String,
 	val ingredients: List<AnionIngredient>,
 	val processingTicks: Int,
@@ -32,6 +35,7 @@ open class AnionRecipe(
 	private val startHandler: (() -> Unit)? = null,
 	private val tickHandler: ((progressFraction: Double) -> Unit)? = null,
 	private val completeHandler: (() -> Unit)? = null,
+
 ) {
 
 	open fun onStart() { startHandler?.invoke() }

@@ -19,11 +19,14 @@ import org.bukkit.inventory.ShapelessRecipe
  * @param ingredients  Flat list of AnionItems required. Max 9 (vanilla rule).
  */
 class ShapelessCraftingTableAdapter(
+
 	override val recipe: AnionRecipe,
 	val ingredients: List<AnionItem>,
-) : RecipeAdapter {
+
+	) : RecipeAdapter {
 
 	override fun register() {
+
 		val result = recipe.result
 		require(result is AnionResult.Item) {
 			"ShapelessCraftingTableAdapter requires an Item result, got $result"
@@ -37,8 +40,8 @@ class ShapelessCraftingTableAdapter(
 			bukkitRecipe.addIngredient(RecipeChoice.ExactChoice(item.asItemStack()))
 		}
 
-		Bukkit.getServer().addRecipe(bukkitRecipe)
-		Anion.plugin.logger.info("[Recipe] Registered shapeless crafting recipe ${recipe.namespacedKey}")
+		Anion.instance.addRecipe(bukkitRecipe)
+
 	}
 
 }

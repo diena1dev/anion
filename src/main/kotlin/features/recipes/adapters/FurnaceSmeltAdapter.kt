@@ -19,9 +19,11 @@ import org.bukkit.inventory.RecipeChoice
  * @param experience  Vanilla XP dropped when the smelt completes.
  */
 class FurnaceSmeltAdapter(
+
 	override val recipe: AnionRecipe,
 	val input: AnionItem,
 	val experience: Float = 0.0f,
+
 ) : RecipeAdapter {
 
 	override fun register() {
@@ -38,18 +40,20 @@ class FurnaceSmeltAdapter(
 			recipe.processingTicks,
 		)
 
-		Bukkit.getServer().addRecipe(bukkitRecipe)
+		Anion.instance.addRecipe(bukkitRecipe)
 		SMELT_INPUTS += input.namespacedKey
-		Anion.plugin.logger.info("[Recipe] Registered furnace smelt recipe ${recipe.namespacedKey}")
+
 	}
 
 	companion object {
+
 		/**
 		 * Set of AnionItem keys that Anion has explicitly whitelisted as
 		 * smelt inputs. AnionRecipeListeners cancels any BlockCookEvent
 		 * whose source is an AnionItem that is NOT present here.
 		 */
 		val SMELT_INPUTS: MutableSet<NamespacedKey> = mutableSetOf()
+
 	}
 
 }
