@@ -25,10 +25,12 @@ import org.bukkit.event.inventory.FurnaceBurnEvent
  *                          0.5 = smelts twice as fast, 2.0 = half speed.
  */
 class FurnaceFuelAdapter(
+
 	override val recipe: AnionRecipe,
 	val fuel: AnionItem,
 	val burnTicks: Int,
 	val cookTimeModifier: Double = 1.0,
+
 ) : RecipeAdapter {
 
 	override fun register() {
@@ -40,6 +42,7 @@ class FurnaceFuelAdapter(
 	}
 
 	companion object {
+
 		/**
 		 * Behavior of a registered Anion fuel.
 		 *
@@ -53,6 +56,7 @@ class FurnaceFuelAdapter(
 
 		/** Populated by adapters at registration; read by the listener. */
 		val FUEL_TABLE: MutableMap<NamespacedKey, FuelProfile> = mutableMapOf()
+
 	}
 
 }

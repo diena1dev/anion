@@ -1,4 +1,12 @@
 package dev.diena.anion.features.custom.fluids
 
-class AnionFluid {
+import dev.diena.anion.features.custom.AnionResource
+import org.bukkit.NamespacedKey
+
+class AnionFluid(
+
+	override val namespacedKey: NamespacedKey
+
+) : AnionResource {
+
 }
