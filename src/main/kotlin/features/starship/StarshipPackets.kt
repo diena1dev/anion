@@ -15,35 +15,47 @@ import net.minecraft.world.level.block.state.BlockState
  *
  *  the entire Starship class was written by a human, but this human really hates networking.
  *
+ *  TODO: move iteration/packet generation calls into main starship move loop to prevent duplicate calls
+ *
  * */
 object StarshipPackets {
 
     fun sendSections(
+
         level: ServerLevel,
         newPositions: Set<Vec3i>,
         oldPositions: Set<Vec3i>,
         newBlockMap: Map<Vec3i, BlockState>
+
     ) {
+
         val changes = HashMap<SectionPos, Short2ObjectOpenHashMap<BlockState>>()
 
         for (vec in oldPositions) {
+
             val sec = SectionPos.of(vec.blockPos)
             changes.getOrPut(sec) { Short2ObjectOpenHashMap() }[SectionPos.sectionRelativePos(vec.blockPos)] =
                 Blocks.AIR.defaultBlockState()
+
         }
 
         for (vec in newPositions) {
+
             val sec = SectionPos.of(vec.blockPos)
             changes.getOrPut(sec) { Short2ObjectOpenHashMap() }[SectionPos.sectionRelativePos(vec.blockPos)] =
                 newBlockMap[vec] ?: Blocks.AIR.defaultBlockState()
+
         }
 
         for ((secPos, blockMap) in changes) {
+
             val packet = ClientboundSectionBlocksUpdatePacket(secPos, blockMap)
             level.chunkSource.chunkMap.getPlayers(secPos.chunk(), false).forEach { player ->
                 player.connection.send(packet)
             }
+
         }
+
     }
 
 }
