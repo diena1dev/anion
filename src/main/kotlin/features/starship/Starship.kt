@@ -35,9 +35,6 @@ import java.util.UUID
  * main coordination class for Starship, StarshipMovement and Starship collision are modules that Starship uses.
  * */
 
-// FIXME: Rotation incorrectly translates entity vectors,
-//        which causes block entities to be lost upon starship rotation
-//        and riding entities to be shifted by a considerable amount.
 class Starship {
 
     companion object {
@@ -362,6 +359,13 @@ class Starship {
         // transfer scheduled block/fluid ticks to new positions
         //StarshipTicks.transferTicks(level, blockHashMap.keys, vectorToMoveIn)
 
+        // then load ship BEs
+        for ((vec, nbt) in beMap) {
+            val bs = newBlockMap[vec] ?: continue
+            val newBe = BlockEntity.loadStatic(vec.blockPos, bs, nbt, provider) ?: continue
+            level.setBlockEntity(newBe)
+        }
+
         StarshipPackets.sendSections(level, newBlockMap.keys, blockHashMap.keys, newBlockMap)
 
         blockHashMap = newBlockMap
@@ -445,11 +449,13 @@ class Starship {
 
     }
 
-    /** adds block to starship if block is adjacent to the ship */
+    /** adds block to starship if block is adjacent to the ship. otherwise, silently fails. */
     // FIXME: this currently adds ANY adjacently placed block to the ship ONTO the ship.
     //        in this current state, blocks cannot be placed on the world directly adjacent
     //        to the ship without being added onto it. a more ideal solution would be to ONLY
     //        add a block of the clicked block (in placement) was already part of a starship
+    //
+    // FIXME: return a boolean instead of nothing
     fun addBlock(
 
         block: Block
@@ -472,6 +478,7 @@ class Starship {
 
     }
 
+    /** used for things like pistons */
     fun updateBlock(
 
         block: Block
