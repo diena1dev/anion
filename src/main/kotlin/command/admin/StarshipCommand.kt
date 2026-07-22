@@ -85,13 +85,14 @@ object StarshipCommand {
         @Sender sender: Player,
         x: Int,
         y: Int,
-        z: Int
+        z: Int,
+        preserveVelocity: Boolean = true,
 
     ) {
 
         val starship = getSelectedStarship(sender)
 
-        if (starship.teleportInWorld(Vec3i(x, y, z))) sender.sendMessage("teleported ship to $x, $y, $z")
+        if (starship.teleportInWorld(Vec3i(x, y, z), preserveVelocity)) sender.sendMessage("teleported ship to $x, $y, $z")
         else sender.sendMessage("unable to teleport ship")
 
     }
