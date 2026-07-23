@@ -170,7 +170,7 @@ object StarshipMovement {
 		val newZ = vectorToMoveIn.z.toDouble()
 
 		// acceptable use of another class, since it's going through the Starship class
-		for (entity in starship.hitbox.getEntitiesWithin(starship)) {
+		for (entity in starship.hitbox.getEntitiesWithin()) {
 
 			val bukkitEntity = entity.bukkitEntity
 			if (bukkitEntity is Player) {
@@ -329,7 +329,7 @@ object StarshipMovement {
 
 	) {
 
-		for (entity in starship.hitbox.getEntitiesWithin(starship)) {
+		for (entity in starship.hitbox.getEntitiesWithin()) {
 
 			val entityVec = Vec3i(entity.x.toInt(), entity.y.toInt(), entity.z.toInt())
 			val rotatedVec = starship.origin + rotateVec(entityVec - starship.origin, rotationSteps)
