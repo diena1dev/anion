@@ -13,6 +13,7 @@ import io.papermc.paper.plugin.bootstrap.PluginProviderContext
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents.COMMANDS
 import org.bukkit.Server
 import org.bukkit.plugin.java.JavaPlugin
+import java.util.concurrent.TimeUnit
 
 @Suppress("Unused", "UnstableAPIUsage")
 class AnionBootstrap : PluginBootstrap {
@@ -46,12 +47,17 @@ class Anion : JavaPlugin() {
         //AnionEnergies
 	    AnionRecipes
 
-        // periodic save — flush dirty starships every second
-        server.scheduler.runTaskTimer(this, Runnable {
+        // starship slowTick updates
+        Tasks.scheduleAsync(1, 1, TimeUnit.SECONDS, Runnable {
             for ((uuid, ship) in Starship.loadedStarships) {
+
+                // saving
                 if (ship.dirty) AnionPersistence.saveStarship(uuid, ship)
+
+                // ticking (sync for API safety)
+                Tasks.runSync { ship.slowTick() }
             }
-        }, 20L, 20L)
+        })
 
     }
 

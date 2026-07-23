@@ -45,7 +45,7 @@ class Starship {
     lateinit var hitbox: StarshipHitbox   // ship hitbox
 
     lateinit var velocity: StarshipVelocity
-    var yaw: Double = 0.0        // TODO: autodetect angle of starship based on detection time
+    var yaw: Double = 0.0
 
     var dirty: Boolean = false      // marks if we need to save starship in database
     private var moving = false      // internal check to prevent concurrent modification
@@ -92,6 +92,7 @@ class Starship {
         }
 
         // calculate center of starship
+        // FIXME: RECALCULATE EVERY TIME A BLOCK IS ADDED
         var vectorAddedTo = Vec3i(0, 0, 0)
         for (v in this.blockHashMap.keys) {
 
