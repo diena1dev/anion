@@ -38,6 +38,9 @@ import kotlin.collections.toSet
 @Name("starship")
 object StarshipCommand {
 
+    // used in info command
+    private var currentCVel: Vec3 = Vec3(0.0, 0.0, 0.0)
+
     ////////////////////////////////////////////////
     ///// DATA SUBCOMMANDS (Create, Destroy, Select)
     ////////////////////////////////////////////////
@@ -153,6 +156,27 @@ object StarshipCommand {
 
     }
 
+    @Subcommand
+    fun info(
+
+        @Sender sender: Player
+
+    ) {
+
+        val ship = getSelectedStarship(sender)
+
+        sender.info(
+            "Info" +
+            "\n|- UUID: ${ship.uuid.toString().take(5)}..." +
+            "\n|- Size: ${ship.size}" +
+            "\n|- Velocity: ${ship.velocity.vec3i}" +
+            "\n|- Pos: ${ship.origin}" +
+            "\n|- Level: ${ship.level.bukkitName}" +
+            "\n|- DEBUG CVelocity: $currentCVel"
+        )
+
+    }
+
     //////////////////////////
     ///// MOVEMENT SUBCOMMANDS
     //////////////////////////
@@ -245,6 +269,40 @@ object StarshipCommand {
             ship.velocity.resetVelocity()
 
             sender.info("Reset Velocity to Vec{0.0, 0.0, 0.0}.")
+
+        }
+
+        /** set a constant velocity re-applied every tick, for debugging movement without thrusters */
+        @Subcommand
+        fun setConstant(
+
+            @Sender sender: Player,
+            x: Double,
+            y: Double,
+            z: Double,
+
+        ) {
+
+            val ship = getSelectedStarship(sender)
+            ship.simulator.setDebugConstantVelocity(Vec3(x, y, z))
+            currentCVel = Vec3(x, y, z)
+
+            sender.info("Set debug constant velocity to Vec{$x, $y, $z}. Re-applied every tick until reset.")
+
+        }
+
+        /** stop re-applying the debug constant velocity (does not reset current velocity, see [reset]) */
+        @Subcommand
+        fun resetConstant(
+
+            @Sender sender: Player
+
+        ) {
+
+            val ship = getSelectedStarship(sender)
+            ship.simulator.resetDebugConstantVelocity()
+
+            sender.info("Reset debug constant velocity to Vec{0.0, 0.0, 0.0}.")
 
         }
 

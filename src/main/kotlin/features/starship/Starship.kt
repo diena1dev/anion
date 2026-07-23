@@ -8,6 +8,7 @@ import dev.diena.anion.extensions.minus
 import dev.diena.anion.extensions.plus
 import dev.diena.anion.extensions.rotateRight
 import dev.diena.anion.extensions.vec3i
+import dev.diena.anion.features.starship.simluated.StarshipSimulator
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Vec3i
 import net.minecraft.nbt.CompoundTag
@@ -40,12 +41,14 @@ class Starship {
     }
 
     lateinit var uuid: UUID
-    lateinit var level: ServerLevel       // nms Level that the ship currently exists in
-    lateinit var origin: Vec3i            // approximated center of the starship, what is rotated around
-    lateinit var hitbox: StarshipHitbox   // ship hitbox
+    lateinit var level: ServerLevel           // nms Level that the ship currently exists in
+    lateinit var origin: Vec3i                // approximated center of the starship, what is rotated around
+    lateinit var hitbox: StarshipHitbox       // ship hitbox
+    lateinit var simulator: StarshipSimulator // starship world interaction
 
     lateinit var velocity: StarshipVelocity
     var yaw: Double = 0.0
+    var size: Int = 0
 
     var dirty: Boolean = false      // marks if we need to save starship in database
     private var moving = false      // internal check to prevent concurrent modification
@@ -65,6 +68,14 @@ class Starship {
 
     fun slowTick() {
 
+        // every move tick we need to apply a simulator.... which would be every tick
+        // applying velocity not only mutates our velocity value, it moves the starship too.
+        // this is *fine*, but not ideal, since movement should be done after our simulator layer is complete.
+
+        // simulate starship (for now apply static gravity if not in world ending in _space.)
+        simulator.simulate()
+
+        // applyVelocity in StarshipVelocity calls our Starship.move() class, so we can run Simulator before it and update the velocity values
         velocity.applyVelocity()
 
     }
@@ -81,8 +92,9 @@ class Starship {
 
     ): Starship {
 
-        this.level = (setWorld as CraftWorld).handle // init level
-        this.blockHashMap = hashMapOf()              // init hashmap
+        this.level = (setWorld as CraftWorld).handle           // init level
+        this.blockHashMap = hashMapOf()                        // init hashmap
+        this.simulator = StarshipSimulator.new(this) // init simulator
 
         for (b in blockPosSet) {
 
@@ -104,6 +116,9 @@ class Starship {
         this.hitbox = StarshipHitbox.new(this)
         this.velocity = StarshipVelocity.new(this)
         this.yaw = 1.0
+        this.size = blockPosSet.size
+
+        this.simulator.calculateTotalStarshipMass() // calculate initial starship mass
 
         return this
 
@@ -127,6 +142,7 @@ class Starship {
         this.blockHashMap = blocks
         this.hitbox = StarshipHitbox.new(this)
         this.velocity = StarshipVelocity.new(this) // FIXME: SAVE VELOCITY ON SHIP UNLOAD
+        this.simulator = StarshipSimulator.new(this) // FIXME: Save Simulator on unload.
 
         return this
 
@@ -145,7 +161,8 @@ class Starship {
 
         this.moving = true
 
-        if (!StarshipCollision.processMoveCollision(vectorToMoveIn, this)) {
+        val (canMove, _) = StarshipCollision.processMoveCollision(vectorToMoveIn, this)
+        if (!canMove) {
 
             this.moving = false
             return false
@@ -241,6 +258,8 @@ class Starship {
 
         }
 
+        this.simulator.removeStarshipMass(block)
+
         this.hitbox.rebuildHitbox()
         this.dirty = true
         return true
@@ -272,6 +291,8 @@ class Starship {
             this.blockHashMap[block.vec3i] = (block as CraftBlock).blockState
             this.hitbox.rebuildHitbox()
             this.dirty = true
+
+            this.simulator.removeStarshipMass(block)
 
             return true
 

@@ -10,7 +10,8 @@ import org.bukkit.block.BlockFace
 object StarshipCollision {
 
 	/**
-	 * [processMoveCollision] returns a Boolean if the provided Starship can be moved in the provided Vec3i.
+	 * [processMoveCollision] returns whether the provided Starship can be moved by the full [vectorToMoveIn],
+	 * paired with the largest safe sub-vector it can actually move (equal to [vectorToMoveIn] itself when clean).
 	 *
 	 * @param starship       The Starship being moved.
 	 * @param vectorToMoveIn The Vec3i to move the starship in.
@@ -21,11 +22,20 @@ object StarshipCollision {
 		vectorToMoveIn: Vec3i,
 		starship: Starship,
 
-	): Boolean {
+	): Pair<Boolean, Vec3i> {
+
+		// fast path: full vector clean, don't bother marching.
+		if (isClean(vectorToMoveIn, starship)) return true to vectorToMoveIn
+
+		return false to marchToCollision(vectorToMoveIn, starship)
+
+	}
+
+	/** true if none of the starship's blocks would land in a non-air, non-starship block after moving by [vectorToMoveIn]. */
+	private fun isClean(vectorToMoveIn: Vec3i, starship: Starship): Boolean {
 
 		// this takes our old hash map and shifts values in the new block map,
 		// checking to see if any of the moved blocks are not air.
-		// TODO: do not cancel blocked movement, move as close as possible without clipping through blocks.
 		// TODO: LOW PRIORITY: research building a vector matrix with either a 0 or 1 for if a
 		//       given vector contains a block, then utilize java's vector optimizations to quickly compute that.
 		for (vec in starship.blockHashMap.keys) {
@@ -42,8 +52,34 @@ object StarshipCollision {
 
 		}
 
-		// if all blocks can be moved to safely, return true.
 		return true
+
+	}
+
+	/** marches [vectorToMoveIn] one lattice step at a time and returns the last sub-vector that was still clean.
+	 *  this is what lets a high-velocity move (e.g. 20 blocks/tick) stop 10 blocks out instead of tunneling
+	 *  through the endpoint-only check straight to a clean destination cell. */
+	private fun marchToCollision(vectorToMoveIn: Vec3i, starship: Starship): Vec3i {
+
+		val steps = maxOf(kotlin.math.abs(vectorToMoveIn.x), kotlin.math.abs(vectorToMoveIn.y), kotlin.math.abs(vectorToMoveIn.z))
+		if (steps == 0) return Vec3i.ZERO
+
+		var lastClean = Vec3i.ZERO
+
+		for (i in 1..steps) {
+
+			val stepVec = Vec3i(
+				(vectorToMoveIn.x * i) / steps,
+				(vectorToMoveIn.y * i) / steps,
+				(vectorToMoveIn.z * i) / steps,
+			)
+
+			if (!isClean(stepVec, starship)) break
+			lastClean = stepVec
+
+		}
+
+		return lastClean
 
 	}
 

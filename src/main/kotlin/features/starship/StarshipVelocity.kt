@@ -54,6 +54,18 @@ class StarshipVelocity private constructor() {
 
 	}
 
+	/** current velocity truncated to whole blocks, used for movement/collision. */
+	val vec3i get() = this.velocity.vec3i
+
+	/** overwrite velocity directly. used by [dev.diena.anion.features.starship.simluated.StarshipSimulator]
+	 *  to clamp velocity down when a collision check finds the ship can't move its full intended distance. */
+	fun setVelocity(vec: Vec3) : Vec3 {
+
+		this.velocity = vec
+		return this.velocity
+
+	}
+
 	fun resetVelocity() : Vec3 {
 
 		this.velocity = Vec3(0.0, 0.0, 0.0)
