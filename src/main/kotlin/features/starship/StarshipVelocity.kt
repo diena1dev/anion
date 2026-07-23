@@ -84,6 +84,10 @@ class StarshipVelocity private constructor() {
 
 	) {
 
+		// don't execute move if we're not going to move
+		val moveCheck = this.starship.origin+this.velocity.vec3i
+		if (this.starship.origin == moveCheck) return
+
 		starship.move(this.velocity.vec3i)
 
 	}
