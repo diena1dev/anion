@@ -44,12 +44,30 @@ class Starship {
     lateinit var origin: Vec3i            // approximated center of the starship, what is rotated around
     lateinit var hitbox: StarshipHitbox   // ship hitbox
 
-    var yaw: Double = 1.0           // TODO: autodetect angle of starship based on detection time
+    lateinit var velocity: StarshipVelocity
+    var yaw: Double = 0.0        // TODO: autodetect angle of starship based on detection time
+
     var dirty: Boolean = false      // marks if we need to save starship in database
     private var moving = false      // internal check to prevent concurrent modification
 
     /** Represents the blocks that make up a ship. Readable publicly, writable privately. */
     lateinit var blockHashMap: HashMap<Vec3i, BlockState> private set // nms BlockState
+
+    //////////////////////////////////////
+    ///// TICK OPERATIONS (SlowTick, Tick)
+    //////////////////////////////////////
+
+    fun tick() {
+
+        // NO-OP atm
+
+    }
+
+    fun slowTick() {
+
+        velocity.applyVelocity()
+
+    }
 
     /////////////////////////////////////////////////
     ///// DATA OPERATIONS (Creation, Loading, Saving)
@@ -83,6 +101,8 @@ class Starship {
 
         this.origin = vectorAddedTo/blockHashMap.size
         this.hitbox = StarshipHitbox.new(this)
+        this.velocity = StarshipVelocity.new(this)
+        this.yaw = 1.0
 
         return this
 
@@ -200,8 +220,9 @@ class Starship {
 
     ) : Boolean {
 
-        if (this.moving) return false // fail if we're moving
-        if ((block.world as CraftWorld).handle != this.level) {
+        if (this.blockHashMap[block.vec3i] == null) return false // fail if removing block not on starship
+        if (this.moving) return false                            // fail if we're moving
+        if ((block.world as CraftWorld).handle != this.level) {  // fail if removing block that is in another level (impossible?)
             throw IllegalStateException("you cannot remove a block from a ship from another level!")
         }
 
@@ -235,15 +256,14 @@ class Starship {
     ) : Boolean {
 
         if (this.moving) return false
-        if ((block.world as CraftWorld).handle != this.level) {
-            throw IllegalStateException("you cannot add a block to a ship from another level!")
-        }
 
         // only check blocks adjacent to the placed block
         for (b in block.adjacentBlocks) {
 
-            // if not in entry continue, if in no entries do not add block.
-            if (this.blockHashMap[b.vec3i] == null) continue
+            if (this.blockHashMap[b.vec3i] == null) continue        // if not in entry continue, if in no entries do not add block.
+            if ((block.world as CraftWorld).handle != this.level) { // fail if adding block that is in another level (impossible?)
+                throw IllegalStateException("you cannot add a block to a ship from another level!")
+            }
 
             // if at least one adjacent block was found, add it to the ship and break the loop
             this.blockHashMap[block.vec3i] = (block as CraftBlock).blockState

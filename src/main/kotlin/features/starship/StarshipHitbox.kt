@@ -22,9 +22,7 @@ class StarshipHitbox private constructor() {
 			val instance = StarshipHitbox()
 
 			instance.starship = starship
-
-			// initialize our nonexistent hitbox first
-			instance.rebuildHitbox()
+			instance.rebuildHitbox() // initialize our nonexistent hitbox first
 
 			return instance
 
@@ -33,14 +31,10 @@ class StarshipHitbox private constructor() {
 	}
 
 	/** returns a list of nms entities */
-	fun getEntitiesWithin(
-
-		starship: Starship
-
-	) : List<Entity> {
+	fun getEntitiesWithin() : List<Entity> {
 
 		// grab vanilla entities from the AABB functions
-		val foundEntities = starship.level.getEntities(null as Entity?, this.aabb) {
+		val foundEntities = this.starship.level.getEntities(null as Entity?, this.aabb) {
 
 			entity ->
 
@@ -49,7 +43,7 @@ class StarshipHitbox private constructor() {
 			// so apparently you can just do this and it works, thanks kotlin
 			for (x in -1..1) for (y in -1..1) for (z in -1..1) {
 
-				if (starship.blockHashMap.containsKey(Vec3i(bp.x + x, bp.y + y, bp.z + z))) return@getEntities true
+				if (this.starship.blockHashMap.containsKey(Vec3i(bp.x + x, bp.y + y, bp.z + z))) return@getEntities true
 
 			}
 

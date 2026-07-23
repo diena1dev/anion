@@ -129,6 +129,7 @@ inline operator fun Vec3i.div(other: Vec3i) = Vec3i(x / other.x, y / other.y, z 
 inline operator fun Vec3i.div(other: Int) = Vec3i(x / other, y / other, z / other)
 
 inline val Vec3i.blockPos get() = BlockPos(x, y, z)
+inline val Vec3.vec3i get() = Vec3i(x.toInt(), y.toInt(), z.toInt())
 
 fun BlockFace.rotateRight() = when (this) {
     BlockFace.NORTH -> BlockFace.EAST
