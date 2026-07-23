@@ -1,6 +1,7 @@
 package dev.diena.anion.features.starship
 
 import dev.diena.anion.extensions.blockPos
+import dev.diena.anion.extensions.minus
 import dev.diena.anion.extensions.plus
 import dev.diena.anion.extensions.rotateRight
 import net.minecraft.core.Vec3i
@@ -90,15 +91,18 @@ object StarshipCollision {
 
 	): Boolean {
 
-		val oldYaw = starship.yaw                                  // alias to starship's current yaw
-		starship.yaw = ((oldYaw + byAngle % 360) + 360) % 360      // modulo to wraparound whatever angle we get
-		if (oldYaw.toFace() == starship.yaw.toFace()) return true // do not bother checking if yaw difference was not large enough
+		// do NOT mutate starship.yaw here; partial-yaw accumulation is owned by StarshipMovement.rotate.
+		// compute the prospective yaw locally so this stays a pure predicate.
+		val oldYaw = starship.yaw                                 // alias to starship's current yaw
+		val newYaw = ((oldYaw + byAngle % 360) + 360) % 360       // modulo to wraparound whatever angle we get
+		if (oldYaw.toFace() == newYaw.toFace()) return true       // do not bother checking if yaw difference was not large enough
 
-		val steps = stepsFromTo(oldYaw.toFace(), starship.yaw.toFace())
+		val steps = stepsFromTo(oldYaw.toFace(), newYaw.toFace())
 
 		for (vec in starship.blockHashMap.keys) {
 
-			val vecToMoveTo = rotateVec(vec, steps)
+			// rotate about the ship origin
+			val vecToMoveTo = starship.origin + rotateVec(vec - starship.origin, steps)
 
 			// if block to move to does already exist in ship, skip recheck check
 			if (starship.blockHashMap[vecToMoveTo] == null) {
