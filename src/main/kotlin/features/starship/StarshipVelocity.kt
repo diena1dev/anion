@@ -54,7 +54,12 @@ class StarshipVelocity private constructor() {
 
 	}
 
-	fun resetVelocity() : Vec3 = Vec3(0.0, 0.0, 0.0)
+	fun resetVelocity() : Vec3 {
+
+		this.velocity = Vec3(0.0, 0.0, 0.0)
+		return Vec3(0.0, 0.0, 0.0)
+
+	}
 
 	/////////////////////////////////////////////
 	///// MOVEMENT FUNCTIONS (Rotation, Movement)
