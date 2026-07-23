@@ -31,9 +31,11 @@ class StarshipVelocity private constructor() {
 
 	}
 
-	fun applyVelocity(
+	////////////////////
+	///// DATA FUNCTIONS
+	////////////////////
 
-	) {
+	fun applyVelocity() {
 
 		applyMovement(starship) // apply movement to the starship based on
 		applyRotation() // NYI, no-op
@@ -45,9 +47,18 @@ class StarshipVelocity private constructor() {
 
 		vec: Vec3,
 
-	) : Vec3 = this.velocity.plus(vec)
+	) : Vec3 {
+
+		this.velocity = this.velocity.plus(vec)
+		return this.velocity
+
+	}
 
 	fun resetVelocity() : Vec3 = Vec3(0.0, 0.0, 0.0)
+
+	/////////////////////////////////////////////
+	///// MOVEMENT FUNCTIONS (Rotation, Movement)
+	/////////////////////////////////////////////
 
 	/** apply movement based on relative velocity */
 	private fun applyMovement(
@@ -63,6 +74,8 @@ class StarshipVelocity private constructor() {
 	/** apply rotation velocity */
 	// TODO: IMPLEMENT ROTATIONAL VELOCITY
 	private fun applyRotation() {
+
+		// NO-OP (NYI)
 
 	}
 

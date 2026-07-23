@@ -125,6 +125,7 @@ class Starship {
         this.yaw = yaw
         this.blockHashMap = blocks
         this.hitbox = StarshipHitbox.new(this)
+        this.velocity = StarshipVelocity.new(this) // FIXME: SAVE VELOCITY ON SHIP UNLOAD
 
         return this
 
@@ -205,6 +206,7 @@ class Starship {
 
     ): Boolean {
 
+        if (!preserveVelocity) velocity.resetVelocity()
         return this.move(posInWorldToMoveTo-this.origin)
 
     }

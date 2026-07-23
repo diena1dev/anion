@@ -38,52 +38,12 @@ import kotlin.collections.toSet
 @Name("starship")
 object StarshipCommand {
 
-    @Subcommand
-    fun select(
-
-        @Sender sender: Player
-
-    ) {
-
-        val distanceMap: MutableMap<UUID, Int> = mutableMapOf()
-        val sVec = sender.location.block.vec3i
-
-        for ((u,s) in Starship.loadedStarships) {
-            distanceMap[u] = s.origin.distSqr(sVec).toInt()
-        }
-
-        val smallestKey: UUID = distanceMap.minByOrNull { it.value }?.key ?: return
-
-        sender.persistentDataContainer.set(
-            NamespacedKey(Anion.NAMESPACE, "selected_starship"),
-            PersistentDataType.STRING,
-            smallestKey.toString()
-        )
-
-        sender.info("Selected starship [${smallestKey.toString().take(5)}...] at ${Starship.loadedStarships[smallestKey]?.origin}.")
-
-    }
+    ////////////////////////////////////////////////
+    ///// DATA SUBCOMMANDS (Create, Destroy, Select)
+    ////////////////////////////////////////////////
 
     @Subcommand
-    fun teleport(
-
-        @Sender sender: Player,
-        x: Int,
-        y: Int,
-        z: Int,
-        preserveVelocity: Boolean = true,
-
-    ) {
-
-        val starship = getSelectedStarship(sender)
-
-        if (starship.teleportInWorld(Vec3i(x, y, z), preserveVelocity)) sender.sendMessage("teleported ship to $x, $y, $z")
-        else sender.sendMessage("unable to teleport ship")
-
-    }
-
-    @Subcommand
-    fun detect(
+    fun create(
 
         @Sender sender: Player
 
@@ -107,8 +67,10 @@ object StarshipCommand {
 
         while (queue.isNotEmpty()) {
             if (visited.size > 50_000) {
-                sender.sendMessage("don't stand on terrain, detection exceeded 50,000 blocks")
+
+                sender.info("Detection Failed! (Exceeded 50,000 blocks). Are you standing on any terrain?")
                 return
+
             }
 
             val current = queue.removeFirst()
@@ -138,7 +100,7 @@ object StarshipCommand {
 
     /** remove starship from all starship related things (very helpful note i know :3) */
     @Subcommand
-    fun remove(
+    fun destroy(
 
         @Sender sender: Player,
         confirm: Boolean = false,
@@ -147,7 +109,11 @@ object StarshipCommand {
 
         if (!confirm) {
 
-            sender.info("WARNING: THIS WILL RENDER YOUR SHIP UNABLE TO MOVE!\n           To confirm, add 'true' to the end of this command.")
+            sender.info(
+                "WARNING: THIS WILL STOP YOUR SHIP FROM MOVING!" +
+                "\nNo blocks will be removed by executing this command." +
+                "\nTo confirm, add 'true' to the end of this command."
+            )
             return
 
         }
@@ -157,9 +123,39 @@ object StarshipCommand {
         AnionPersistence.deleteStarship(starship.uuid)
         Starship.loadedStarships.remove(starship.uuid)
 
-        sender.info("Removed ship from tick list and dropped from database.")
+        sender.info("Removed starship from tick list and dropped from database.")
 
     }
+
+    @Subcommand
+    fun select(
+
+        @Sender sender: Player
+
+    ) {
+
+        val distanceMap: MutableMap<UUID, Int> = mutableMapOf()
+        val sVec = sender.location.block.vec3i
+
+        for ((u,s) in Starship.loadedStarships) {
+            distanceMap[u] = s.origin.distSqr(sVec).toInt()
+        }
+
+        val smallestKey: UUID = distanceMap.minByOrNull { it.value }?.key ?: return
+
+        sender.persistentDataContainer.set(
+            NamespacedKey(Anion.NAMESPACE, "selected_starship"),
+            PersistentDataType.STRING,
+            smallestKey.toString()
+        )
+
+        sender.info("Selected starship [${smallestKey.toString().take(5)}...] at ${Starship.loadedStarships[smallestKey]?.origin}.")
+
+    }
+
+    //////////////////////////
+    ///// MOVEMENT SUBCOMMANDS
+    //////////////////////////
 
     /** move ship in given direction */
     @Subcommand
@@ -177,7 +173,7 @@ object StarshipCommand {
         )
 
         if (moveResult) return
-        sender.info("Failed to move starship by provided Vec3i($x, $y, $z)!")
+        sender.info("Failed to move starship by provided Vec3i{$x, $y, $z}!")
 
     }
 
@@ -192,7 +188,28 @@ object StarshipCommand {
         val ship = getSelectedStarship(sender)
         ship.rotate(rotation)
 
-        sender.info("Applied $rotation degrees to starship yaw. Current Yaw: ${ship.yaw}")
+        sender.info("Applied $rotation degrees to starship yaw. Current Yaw: ${ship.yaw} degrees")
+
+    }
+
+    @Subcommand
+    fun teleport(
+
+        @Sender sender: Player,
+        x: Int,
+        y: Int,
+        z: Int,
+        preserveVelocity: Boolean = true,
+
+        ) {
+
+        val starship = getSelectedStarship(sender)
+
+        if (starship.teleportInWorld(Vec3i(x, y, z), preserveVelocity)) {
+            sender.info("Teleported starship to Vec3i{$x, $y, $z}.")
+        } else {
+            sender.info("Failed to teleport starship by provided Vec3i{$x, $y, $z}!")
+        }
 
     }
 
@@ -213,7 +230,7 @@ object StarshipCommand {
             val ship = getSelectedStarship(sender)
             val newVelocity = ship.velocity.addVelocity(Vec3(x, y, z))
 
-            sender.info("Added Vec($x, $y, $z) to Velocity. Current Velocity: $newVelocity.")
+            sender.info("Added Vec{$x, $y, $z} to Velocity. Current Velocity: $newVelocity.")
 
         }
 
@@ -227,19 +244,21 @@ object StarshipCommand {
             val ship = getSelectedStarship(sender)
             ship.velocity.resetVelocity()
 
-            sender.info("Reset Velocity to Vec(0.0, 0.0, 0.0).")
+            sender.info("Reset Velocity to Vec{0.0, 0.0, 0.0}.")
 
         }
 
     }
 
+    //////////////////////
     ///// HELPER FUNCTIONS
+    //////////////////////
 
     private fun Player.info(message: String) {
 
         this.sendMessage(
             Component.text("[Starship] ").color(TextColor.color(Color.AQUA.asARGB()))
-                .append(Component.text(message))
+                .append(Component.text(message).color(TextColor.color(Color.WHITE.asARGB())))
         )
 
     }
@@ -248,14 +267,17 @@ object StarshipCommand {
     private fun getSelectedStarship(
         sender: Player
     ): Starship {
+
         val starship = Starship.loadedStarships[UUID.fromString(sender.persistentDataContainer.get(
             NamespacedKey(Anion.NAMESPACE, "selected_starship"),
             PersistentDataType.STRING
         ))]
 
         if (starship == null) {
-            sender.sendMessage("no starship found in selected starship entry")
-            throw Exception("no starship found in selected starship entry")
+
+            sender.info("Stored UUID for the selected starship not found in active starships. Make sure your starship is in loaded chunks!")
+            throw IllegalStateException("Stored UUID for selected starship not found in active starships.")
+
         }
 
         return starship
