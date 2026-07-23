@@ -6,7 +6,7 @@ import net.minecraft.world.phys.Vec3
 
 class StarshipVelocity private constructor() {
 
-	private lateinit var velocity: Vec3
+	lateinit var velocity: Vec3 private set
 	private lateinit var starship: Starship
 
 	companion object {

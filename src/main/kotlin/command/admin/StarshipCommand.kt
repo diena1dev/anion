@@ -1,7 +1,9 @@
 package dev.diena.anion.command.admin
 
+import com.destroystokyo.paper.event.server.ServerTickEndEvent
 import dev.astralchroma.processor.annotations.Command
 import dev.astralchroma.processor.annotations.Name
+import dev.astralchroma.processor.annotations.Register
 import dev.astralchroma.processor.annotations.Sender
 import dev.astralchroma.processor.annotations.Subcommand
 import dev.diena.anion.Anion
@@ -18,6 +20,8 @@ import org.bukkit.NamespacedKey
 import org.bukkit.block.Block
 import org.bukkit.block.BlockFace
 import org.bukkit.entity.Player
+import org.bukkit.event.EventHandler
+import org.bukkit.event.Listener
 import org.bukkit.persistence.PersistentDataType
 import java.util.UUID
 import kotlin.collections.ArrayDeque
@@ -40,6 +44,32 @@ object StarshipCommand {
 
     // used in info command
     private var currentCVel: Vec3 = Vec3(0.0, 0.0, 0.0)
+
+    @Register
+    object DebugStarshipListeners : Listener {
+
+        private var lastTick = -1
+
+        @EventHandler
+        fun onServerTick(event: ServerTickEndEvent) {
+
+            if (lastTick > event.tickNumber) return
+
+            lastTick = event.tickNumber+5
+
+            Anion.instance.onlinePlayers.forEach { player ->
+
+                val ship = getSelectedStarship(player) ?: return
+
+                player.sendActionBar(
+                    Component.text("Pos: ${ship.origin} | Vel: ${ship.velocity.velocity} | CVel: ${currentCVel} | Level: ${ship.level.bukkitName}")
+                )
+
+            }
+
+        }
+
+    }
 
     ////////////////////////////////////////////////
     ///// DATA SUBCOMMANDS (Create, Destroy, Select)
@@ -123,7 +153,7 @@ object StarshipCommand {
 
         val starship = getSelectedStarship(sender)
 
-        AnionPersistence.deleteStarship(starship.uuid)
+        AnionPersistence.deleteStarship(starship?.uuid ?: return)
         Starship.loadedStarships.remove(starship.uuid)
 
         sender.info("Removed starship from tick list and dropped from database.")
@@ -163,13 +193,13 @@ object StarshipCommand {
 
     ) {
 
-        val ship = getSelectedStarship(sender)
+        val ship = getSelectedStarship(sender) ?: return
 
         sender.info(
             "Info" +
             "\n|- UUID: ${ship.uuid.toString().take(5)}..." +
             "\n|- Size: ${ship.size}" +
-            "\n|- Velocity: ${ship.velocity.vec3i}" +
+            "\n|- Velocity: ${ship.velocity.velocity}" +
             "\n|- Pos: ${ship.origin}" +
             "\n|- Level: ${ship.level.bukkitName}" +
             "\n|- DEBUG CVelocity: $currentCVel"
@@ -192,11 +222,11 @@ object StarshipCommand {
 
     ) {
 
-        val moveResult = getSelectedStarship(sender).move(
+        val moveResult = getSelectedStarship(sender)?.move(
             Vec3i(x, y, z)
         )
 
-        if (moveResult) return
+        if (moveResult ?: return) return
         sender.info("Failed to move starship by provided Vec3i{$x, $y, $z}!")
 
     }
@@ -209,7 +239,7 @@ object StarshipCommand {
 
     ) {
 
-        val ship = getSelectedStarship(sender)
+        val ship = getSelectedStarship(sender) ?: return
         ship.rotate(rotation)
 
         sender.info("Applied $rotation degrees to starship yaw. Current Yaw: ${ship.yaw} degrees")
@@ -227,7 +257,7 @@ object StarshipCommand {
 
         ) {
 
-        val starship = getSelectedStarship(sender)
+        val starship = getSelectedStarship(sender) ?: return
 
         if (starship.teleportInWorld(Vec3i(x, y, z), preserveVelocity)) {
             sender.info("Teleported starship to Vec3i{$x, $y, $z}.")
@@ -251,7 +281,7 @@ object StarshipCommand {
 
         ) {
 
-            val ship = getSelectedStarship(sender)
+            val ship = getSelectedStarship(sender) ?: return
             val newVelocity = ship.velocity.addVelocity(Vec3(x, y, z))
 
             sender.info("Added Vec{$x, $y, $z} to Velocity. Current Velocity: $newVelocity.")
@@ -265,7 +295,7 @@ object StarshipCommand {
 
         ) {
 
-            val ship = getSelectedStarship(sender)
+            val ship = getSelectedStarship(sender) ?: return
             ship.velocity.resetVelocity()
 
             sender.info("Reset Velocity to Vec{0.0, 0.0, 0.0}.")
@@ -283,7 +313,7 @@ object StarshipCommand {
 
         ) {
 
-            val ship = getSelectedStarship(sender)
+            val ship = getSelectedStarship(sender) ?: return
             ship.simulator.setDebugConstantVelocity(Vec3(x, y, z))
             currentCVel = Vec3(x, y, z)
 
@@ -299,7 +329,7 @@ object StarshipCommand {
 
         ) {
 
-            val ship = getSelectedStarship(sender)
+            val ship = getSelectedStarship(sender) ?: return
             ship.simulator.resetDebugConstantVelocity()
 
             sender.info("Reset debug constant velocity to Vec{0.0, 0.0, 0.0}.")
@@ -324,7 +354,7 @@ object StarshipCommand {
     // shhhh it can be messy
     private fun getSelectedStarship(
         sender: Player
-    ): Starship {
+    ): Starship? {
 
         val starship = Starship.loadedStarships[UUID.fromString(sender.persistentDataContainer.get(
             NamespacedKey(Anion.NAMESPACE, "selected_starship"),
@@ -332,10 +362,7 @@ object StarshipCommand {
         ))]
 
         if (starship == null) {
-
             sender.info("Stored UUID for the selected starship not found in active starships. Make sure your starship is in loaded chunks!")
-            throw IllegalStateException("Stored UUID for selected starship not found in active starships.")
-
         }
 
         return starship

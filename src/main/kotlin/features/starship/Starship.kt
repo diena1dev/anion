@@ -33,6 +33,7 @@ import org.bukkit.entity.Player
 import java.util.UUID
 
 /** represents a collection of simulated blocks. logic and functionality split off into subclasses. */
+// FIXME: Starship yaw can exist in states between what rotate the ship, while starship position is clamped to integer values and is never changed if velocity is below 1 unit.
 class Starship {
 
     companion object {
