@@ -1,5 +1,7 @@
 package dev.diena.anion.features.machine
 
-interface Machine {
-    abstract val machineStructure: MachineStructure
+abstract class Machine {
+
+    abstract val blockSet: BlockSet
+
 }

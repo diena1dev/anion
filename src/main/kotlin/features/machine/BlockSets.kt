@@ -1,16 +1,15 @@
 package dev.diena.anion.features.machine
 
-import dev.diena.anion.data.registry.AnionRegistryKey
-import dev.diena.anion.data.registry.registries.AnionRegistries
 import dev.diena.anion.features.custom.blocks.AnionBlocks
 import org.bukkit.block.BlockType
 
+// TODO: REMOVE FILE
 // contains registered MachineStructure checks and adds them to the registry
-object MachineStructures {
+object BlockSets {
 
 	// this would form a structure check for basically a uranium-cell-battery-looking thing
-	val BASIC_TEST_MACHINE = registerMachineStructure(
-		MachineStructure.new("basic_test_machine")
+	val BASIC_TEST_MACHINE =
+		BlockSet.new("basic_test_machine")
 			.core('C', AnionBlocks.COPPER_MACHINE_DISPLAY)
 			.assign('I', AnionBlocks.COPPER_MACHINE_CASING)
 
@@ -40,16 +39,5 @@ object MachineStructures {
 				"III"
 			)
 			.build()
-		)
-
-	private fun registerMachineStructure(machineStructure: MachineStructure): MachineStructure {
-
-		AnionRegistries.MACHINE_STRUCTURE_REGISTRY.register(
-			AnionRegistryKey(machineStructure.name.lowercase().replace(' ', '_')),
-			machineStructure
-		)
-
-		return machineStructure
-	}
 
 }

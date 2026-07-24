@@ -5,13 +5,12 @@ import dev.diena.anion.features.custom.blocks.AnionBlock.Companion.getBlockState
 import net.minecraft.core.Vec3i
 import org.bukkit.block.BlockState
 import org.bukkit.block.BlockType
-import org.bukkit.inventory.ShapedRecipe
 
 /**
  * Structure of a Machine! Defines the bounds and the origin point of the Machine's structure.
  * The origin point is used in when assembling a Machine with a wrench, usually occupied by a Machine "Core" tiered block.
  * */
-open class MachineStructure private constructor(
+open class BlockSet private constructor(
 
     val name: String,
     val blockMap: Map<Vec3i, BlockState>,
@@ -55,12 +54,12 @@ open class MachineStructure private constructor(
          * */
 
         /** run final checks and return structure */
-        fun build(): MachineStructure {
+        fun build(): BlockSet {
 
             if (!hasCoreBlock) throw IllegalStateException("attempted to build a MachineStructure without a core assignment. fix your registrations!")
             if (this.coreBlock == null) throw IllegalStateException("coreBlock was never initialized!")
 
-            return MachineStructure(
+            return BlockSet(
                 this.name,
                 this.blockMap,
                 this.coreBlock as Pair<Vec3i, AnionBlock>
