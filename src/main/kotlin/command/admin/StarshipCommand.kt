@@ -57,12 +57,12 @@ object StarshipCommand {
 
             lastTick = event.tickNumber+5
 
-            Anion.instance.onlinePlayers.forEach { player ->
+            for (player in Anion.instance.onlinePlayers) {
 
-                val ship = getSelectedStarship(player) ?: return
+                val ship = getSelectedStarship(player, false) ?: continue
 
                 player.sendActionBar(
-                    Component.text("Pos: ${ship.origin} | Vel: ${ship.velocity.velocity} | CVel: ${currentCVel} | Level: ${ship.level.bukkitName}")
+                    Component.text("Pos: ${ship.origin} | Vel: ${ship.velocity.velocity} | CVel: $currentCVel | Level: ${ship.level.bukkitName}")
                 )
 
             }
@@ -183,6 +183,23 @@ object StarshipCommand {
         )
 
         sender.info("Selected starship [${smallestKey.toString().take(5)}...] at ${Starship.loadedStarships[smallestKey]?.origin}.")
+
+    }
+
+    @Subcommand
+    fun unselect(
+
+        @Sender sender: Player
+
+    ) {
+
+        sender.persistentDataContainer.set(
+            NamespacedKey(Anion.NAMESPACE, "selected_starship"),
+            PersistentDataType.STRING,
+            UUID.randomUUID().toString()
+        )
+
+        sender.info("Unselected starship.")
 
     }
 
@@ -353,7 +370,8 @@ object StarshipCommand {
 
     // shhhh it can be messy
     private fun getSelectedStarship(
-        sender: Player
+        sender: Player,
+        message: Boolean = true,
     ): Starship? {
 
         val starship = Starship.loadedStarships[UUID.fromString(sender.persistentDataContainer.get(
@@ -361,7 +379,7 @@ object StarshipCommand {
             PersistentDataType.STRING
         ))]
 
-        if (starship == null) {
+        if (starship == null && message) {
             sender.info("Stored UUID for the selected starship not found in active starships. Make sure your starship is in loaded chunks!")
         }
 
