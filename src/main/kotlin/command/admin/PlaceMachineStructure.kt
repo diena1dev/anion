@@ -23,16 +23,15 @@ object PlaceMachineStructure {
 
 	) {
 
-		val machineStructure = AnionRegistries.MACHINE_STRUCTURE_REGISTRY.getValue(AnionRegistryKey(machineKey)) ?: return
+		val machineBlocks = AnionRegistries.MACHINE_TYPE_REGISTRY.getValue(AnionRegistryKey(machineKey))?.invoke()?.blockSet ?: return
 
 		sender.sendMessage("e")
 
 		val forward = sender.location.direction
-		val actualForward = forward.normalize()*2
 
 		sender.sendMessage("$forward")
 
-		for ((pos, block) in machineStructure.blockMap) {
+		for ((pos, block) in machineBlocks.blockMap) {
 
 			sender.world
 				.setBlockData((forward*2+sender.location.toVector()+Vector(pos.x, pos.y, pos.z)), block.blockData)
@@ -42,3 +41,4 @@ object PlaceMachineStructure {
 	}
 
 }
+
