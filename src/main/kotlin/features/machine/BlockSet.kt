@@ -1,5 +1,6 @@
 package dev.diena.anion.features.machine
 
+import dev.diena.anion.extensions.minus
 import dev.diena.anion.features.custom.blocks.AnionBlock
 import dev.diena.anion.features.custom.blocks.AnionBlock.Companion.getBlockState
 import net.minecraft.core.Vec3i
@@ -14,7 +15,6 @@ open class BlockSet private constructor(
 
     val name: String,
     val blockMap: Map<Vec3i, BlockState>,
-    val coreBlock: Pair<Vec3i, AnionBlock>,
 
 ) {
 
@@ -35,7 +35,9 @@ open class BlockSet private constructor(
         private var blockMap: MutableMap<Vec3i, BlockState> = mutableMapOf()
         private var charCustomRepresentations: MutableMap<Char, AnionBlock> = mutableMapOf()
         private var charVanillaRepresentations: MutableMap<Char, BlockType> = mutableMapOf()
-        private var coreBlock: Pair<Vec3i, AnionBlock>? = null
+        private var coreChar: Char? = null
+        private var coreAnionBlock: AnionBlock? = null
+        private var coreOffset: Vec3i? = null
 
         // machine structure definition
         var width: Int = 0
@@ -57,12 +59,15 @@ open class BlockSet private constructor(
         fun build(): BlockSet {
 
             if (!hasCoreBlock) throw IllegalStateException("attempted to build a MachineStructure without a core assignment. fix your registrations!")
-            if (this.coreBlock == null) throw IllegalStateException("coreBlock was never initialized!")
+            val offset = this.coreOffset ?: throw IllegalStateException("coreBlock was never initialized!")
+
+            // re-center every entry so the core's own cell lands on (0, 0, 0) — that's the
+            // pivot assemble()/isIntact() actually measure every other offset against.
+            val recentered = blockMap.mapKeys { (pos, _) -> pos - offset }
 
             return BlockSet(
                 this.name,
-                this.blockMap,
-                this.coreBlock as Pair<Vec3i, AnionBlock>
+                recentered
             )
 
         }
@@ -70,11 +75,11 @@ open class BlockSet private constructor(
         /** Assign Machine Core position */
         fun core(char: Char, block: AnionBlock): Builder {
 
-            if (coreBlock != null) throw IllegalStateException("duplicate core registration in machine structure")
+            if (coreChar != null) throw IllegalStateException("duplicate core registration in machine structure")
             charCustomRepresentations[char] = block
 
-            // set relative pos to (0, 0, 0) and log the AnionBlock used as the core.
-            coreBlock = Pair(Vec3i(0, 0, 0), block)
+            coreChar = char
+            coreAnionBlock = block
             return this
 
         }
@@ -120,6 +125,8 @@ open class BlockSet private constructor(
 
                     var mappedBlock: BlockState? = null
 
+                    if (char == ' ') continue
+
 	                // if mapped block exists, assign it
                     mappedBlock = charVanillaRepresentations[char]?.createBlockData()?.createBlockState()
                     if (mappedBlock != null) {
@@ -131,19 +138,14 @@ open class BlockSet private constructor(
                     mappedBlock = charCustomRepresentations[char]?.getBlockState()
                     if (mappedBlock == null) throw IllegalStateException("block mapping missing for TODO FINISH THIS")
 
-                    val coreBlockState = coreBlock?.second?.getBlockState()
-
-                    // if duplicate coreBlock throw, else set coreBlock to true if blockState = coreBlock
-                    if (hasCoreBlock && mappedBlock == coreBlockState)
-                        throw IllegalStateException("duplicate core block assignment in structure")
-                    else if (mappedBlock == coreBlockState)
+                    // record where the core actually sits in the raw grid so build() can
+                    // re-center the whole structure around it.
+                    if (char == coreChar) {
+                        if (hasCoreBlock) throw IllegalStateException("duplicate core block assignment in structure")
                         hasCoreBlock = true
+                        coreOffset = Vec3i(localX, this.height, localY)
+                    }
 
-                    // TODO: height goes up per sliced layer.
-                    //       we need to fetch the offset from the core block position in the schema:
-                    //       for this to work we either need to cache the found width and length and
-                    //       base our offset coordinates off of that, or find where the core is in relation
-                    //       to the rest of the machine.
                     // now finally assign the blockmap
                     blockMap[Vec3i(localX, this.height, localY)] = mappedBlock
 
