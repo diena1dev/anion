@@ -9,6 +9,6 @@ object AnionRegistryKeys {
     object ANION_GAS_REGISTRY : AnionRegistryKey("gas_registry") {}
     object ANION_ENERGY_REGISTRY : AnionRegistryKey("energy_registry") {}
 
-    object MACHINE_STRUCTURE_REGISTRY : AnionRegistryKey("machine_structure_registry")
+    object MACHINE_TYPE_REGISTRY : AnionRegistryKey("machine_type_registry")
     object ANION_RECIPE_REGISTRY : AnionRegistryKey("recipe_registry") {}
 }

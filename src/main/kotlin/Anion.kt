@@ -5,6 +5,8 @@ import dev.diena.anion.data.database.AnionDatabase
 import dev.diena.anion.data.database.AnionPersistence
 import dev.diena.anion.features.custom.blocks.AnionBlocks
 import dev.diena.anion.features.custom.items.AnionItems
+import dev.diena.anion.features.machine.AnionMachines
+import dev.diena.anion.features.machine.Machine
 import dev.diena.anion.features.starship.Starship
 import dev.diena.anion.features.recipes.AnionRecipes
 import io.papermc.paper.plugin.bootstrap.BootstrapContext
@@ -46,6 +48,7 @@ class Anion : JavaPlugin() {
         //AnionGasses
         //AnionEnergies
 	    AnionRecipes
+        AnionMachines
 
         // starship slowTick updates
         Tasks.scheduleAsync(1, 1, TimeUnit.SECONDS, Runnable {
@@ -57,6 +60,16 @@ class Anion : JavaPlugin() {
                 // ticking (sync for API safety)
                 Tasks.runSync { ship.slowTick() }
             }
+        })
+
+        // machine tick updates (every game tick)
+        Tasks.scheduleAsync(0, 50, TimeUnit.MILLISECONDS, Runnable {
+            for (machine in Machine.activeMachines.values) machine.runTick()
+        })
+
+        // machine slowTick updates (structure check + slowTick, once a second)
+        Tasks.scheduleAsync(1, 1, TimeUnit.SECONDS, Runnable {
+            for (machine in Machine.activeMachines.values) machine.runSlowTick()
         })
 
     }
