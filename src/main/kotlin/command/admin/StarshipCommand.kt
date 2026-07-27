@@ -377,7 +377,7 @@ object StarshipCommand {
         val starship = Starship.loadedStarships[UUID.fromString(sender.persistentDataContainer.get(
             NamespacedKey(Anion.NAMESPACE, "selected_starship"),
             PersistentDataType.STRING
-        ))]
+        ) ?: UUID.randomUUID().toString())]
 
         if (starship == null && message) {
             sender.info("Stored UUID for the selected starship not found in active starships. Make sure your starship is in loaded chunks!")
