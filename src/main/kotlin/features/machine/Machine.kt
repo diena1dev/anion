@@ -4,6 +4,7 @@ import dev.diena.anion.Anion
 import dev.diena.anion.Tasks
 import dev.diena.anion.extensions.plus
 import dev.diena.anion.extensions.rotate
+import org.bukkit.craftbukkit.block.data.CraftBlockData
 import dev.diena.anion.features.custom.AnionResource
 import net.minecraft.core.Vec3i
 import net.minecraft.server.level.ServerLevel
@@ -106,7 +107,11 @@ abstract class Machine(
     //       this could be used for tanks draining if a tank wall is broken, although specific impl is up to the dev.
     open fun isIntact(): Boolean {
         val set = blockSet ?: return true
-        return set.blockMap.all { (offset, expected) -> blockAt(offset).blockData.matches(expected.blockData) }
+        return set.blockMap.all { (offset, expected) ->
+            val expectedNms = (expected.blockData as CraftBlockData).state.rotate(rotation)
+            val actualNms = (blockAt(offset).blockData as CraftBlockData).state
+            actualNms == expectedNms
+        }
     }
 
     /** Called on Machine Disassembly */

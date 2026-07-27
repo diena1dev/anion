@@ -160,6 +160,12 @@ inline fun Vec3i.rotate(rotation: Rotation): Vec3i =
 		Rotation.NONE -> this
 	}
 
+/** Rotate [point] around [origin] by [rotation]. */
+fun Vec3i.rotateAround(origin: Vec3i, rotation: Rotation): Vec3i {
+    val relative = this - origin
+    return origin + relative.rotate(rotation)
+}
+
 inline val Block.blockPos get() = BlockPos(x, y, z)
 inline val Block.vec3i get() = Vec3i(x, y, z)
 inline val Block.adjacentBlocks get() = run {
