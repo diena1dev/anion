@@ -14,7 +14,8 @@ import org.bukkit.block.BlockType
 open class BlockSet private constructor(
 
     val name: String,
-    val blockMap: Map<Vec3i, BlockState>,
+    /** every acceptable block variant per offset — a cell matches if the world block equals ANY entry */
+    val blockMap: Map<Vec3i, List<BlockState>>,
 
 ) {
 
@@ -32,9 +33,10 @@ open class BlockSet private constructor(
     ) {
 
         // internal values
-        private var blockMap: MutableMap<Vec3i, BlockState> = mutableMapOf()
-        private var charCustomRepresentations: MutableMap<Char, AnionBlock> = mutableMapOf()
-        private var charVanillaRepresentations: MutableMap<Char, BlockType> = mutableMapOf()
+        private var blockMap: MutableMap<Vec3i, MutableList<BlockState>> = mutableMapOf()
+        // multiple blocks can be assigned to the same char — any of them is accepted at that position
+        private var charCustomRepresentations: MutableMap<Char, MutableList<AnionBlock>> = mutableMapOf()
+        private var charVanillaRepresentations: MutableMap<Char, MutableList<BlockType>> = mutableMapOf()
         private var coreChar: Char? = null
         private var coreAnionBlock: AnionBlock? = null
         private var coreOffset: Vec3i? = null
@@ -76,7 +78,7 @@ open class BlockSet private constructor(
         fun core(char: Char, block: AnionBlock): Builder {
 
             if (coreChar != null) throw IllegalStateException("duplicate core registration in machine structure")
-            charCustomRepresentations[char] = block
+            charCustomRepresentations.getOrPut(char) { mutableListOf() }.add(block)
 
             coreChar = char
             coreAnionBlock = block
@@ -84,18 +86,18 @@ open class BlockSet private constructor(
 
         }
 
-        /** Assign AnionBlock */
+        /** Assign AnionBlock. Call multiple times on the same char to accept any of several block variants there. */
         fun assign(char: Char, block: AnionBlock): Builder {
 
-            charCustomRepresentations[char] = block
+            charCustomRepresentations.getOrPut(char) { mutableListOf() }.add(block)
             return this
 
         }
 
-        /** Assign Vanilla (Bukkit) Block */
+        /** Assign Vanilla (Bukkit) Block. Call multiple times on the same char to accept any of several block variants there. */
         fun assign(char: Char, block: BlockType): Builder {
 
-            charVanillaRepresentations[char] = block
+            charVanillaRepresentations.getOrPut(char) { mutableListOf() }.add(block)
             return this
 
         }
@@ -123,20 +125,20 @@ open class BlockSet private constructor(
                 // width (y)
                 for ((localY, char) in wEntry.toCharArray().iterator().withIndex()) {
 
-                    var mappedBlock: BlockState? = null
-
                     if (char == ' ') continue
 
-	                // if mapped block exists, assign it
-                    mappedBlock = charVanillaRepresentations[char]?.createBlockData()?.createBlockState()
-                    if (mappedBlock != null) {
-                        blockMap[Vec3i(localX, this.height, localY)] = mappedBlock
-                        continue
+                    // gather every acceptable variant for this char — vanilla and custom can coexist
+                    val variants = mutableListOf<BlockState>()
+
+                    charVanillaRepresentations[char]?.forEach { blockType ->
+                        variants += blockType.createBlockData().createBlockState()
                     }
 
-                    // if mapped block did not exist, see if a vanilla representation exists
-                    mappedBlock = charCustomRepresentations[char]?.getBlockState()
-                    if (mappedBlock == null) throw IllegalStateException("block mapping missing for TODO FINISH THIS")
+                    charCustomRepresentations[char]?.forEach { anionBlock ->
+                        anionBlock.getBlockState()?.let { variants += it }
+                    }
+
+                    if (variants.isEmpty()) throw IllegalStateException("block mapping missing for char '$char'")
 
                     // record where the core actually sits in the raw grid so build() can
                     // re-center the whole structure around it.
@@ -147,7 +149,7 @@ open class BlockSet private constructor(
                     }
 
                     // now finally assign the blockmap
-                    blockMap[Vec3i(localX, this.height, localY)] = mappedBlock
+                    blockMap[Vec3i(localX, this.height, localY)] = variants
 
                 }
 

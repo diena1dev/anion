@@ -72,6 +72,7 @@ import java.util.concurrent.ConcurrentHashMap
 // abstract is must override
 // fun is a static callback that cannot be changed
 // open functions can have super calls that still use the original logic + whatever other things you add
+/** IMPORTANT: **Do not** access any lateinit vars from outside of functions. */
 abstract class Machine(
 
     displayName: String,    // self-explanatory
@@ -107,10 +108,12 @@ abstract class Machine(
     //       this could be used for tanks draining if a tank wall is broken, although specific impl is up to the dev.
     open fun isIntact(): Boolean {
         val set = blockSet ?: return true
-        return set.blockMap.all { (offset, expected) ->
-            val expectedNms = (expected.blockData as CraftBlockData).state.rotate(rotation)
+        return set.blockMap.all { (offset, expectedVariants) ->
             val actualNms = (blockAt(offset).blockData as CraftBlockData).state
-            actualNms == expectedNms
+            expectedVariants.any { expected ->
+                val expectedNms = (expected.blockData as CraftBlockData).state.rotate(rotation)
+                actualNms == expectedNms
+            }
         }
     }
 

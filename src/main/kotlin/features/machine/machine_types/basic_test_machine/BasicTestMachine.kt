@@ -1,5 +1,8 @@
 package features.machine.machine_types.basic_test_machine
 
+import dev.diena.anion.extensions.plus
+import dev.diena.anion.extensions.rotateAround
+import dev.diena.anion.features.custom.blocks.AnionBlock
 import dev.diena.anion.features.custom.blocks.AnionBlocks
 import dev.diena.anion.features.machine.BlockSet
 import dev.diena.anion.features.machine.Machine
@@ -10,11 +13,13 @@ import org.bukkit.block.BlockType
 
 val BASIC_TEST_MACHINE =
 		BlockSet.new("basic_test_machine")
-			.core('C', AnionBlocks.COPPER_MACHINE_DISPLAY)
-			.assign('I', AnionBlocks.COPPER_MACHINE_CASING)
+			.core('C', AnionBlocks.TEST_BLOCK)
 
-			.assign('B', AnionBlocks.COPPER_MACHINE_BUS)
-			.assign('V', AnionBlocks.COPPER_MACHINE_VALVE)
+			.assign('I', AnionBlocks.COPPER_MACHINE_CASING)
+			.assign('I', AnionBlocks.COPPER_MACHINE_BUS)
+			.assign('I', AnionBlocks.COPPER_MACHINE_VALVE)
+			.assign('I', AnionBlocks.COPPER_MACHINE_DISPLAY)
+			.assign('I', AnionBlocks.COPPER_MACHINE_DATAPORT)
 
 			.assign('G', BlockType.WAXED_COPPER_GRATE)
 			.assign('U', AnionBlocks.URANIUM_BLOCK)
@@ -25,7 +30,7 @@ val BASIC_TEST_MACHINE =
 			)
 			.slice(
 				"IGI",
-				"VUB",
+				"IUI",
 				"IGI"
 			)
 			.slice(
@@ -45,21 +50,32 @@ class BasicTestMachine : Machine("Basic Test Machine", BASIC_TEST_MACHINE) {
 
 	val relativeSmokeOffset = Vec3i(0, 5, 0)
 
+	lateinit var locationOffset: Location
+
 	override fun tick() {
-		// NO-OP
+		Particle.CAMPFIRE_SIGNAL_SMOKE.builder()
+			.location(this.locationOffset)
+			.offset(0.0, 1.5, 0.0)
+			.count(0)
+			.extra(0.1)
+			.spawn()
 	}
 
 	override fun slowTick() {
+		// NO-OP
+	}
 
-		val locationOffest = Location(
+	override fun onAssemble() {
+		val offset = relativeSmokeOffset+this.origin
+
+		this.locationOffset = Location(
 			this.level.world,
-			relativeSmokeOffset.x.toDouble(),
-			relativeSmokeOffset.y.toDouble(),
-			relativeSmokeOffset.z.toDouble()
-		)
+			offset.x.toDouble()-0.5,
+			offset.y.toDouble(),
+			offset.z.toDouble()+0.5,
+		).rotateAround(this.origin, this.rotation) // FIXME: this is broken!
 
-		this.level.world.spawnParticle(Particle.LARGE_SMOKE, locationOffest, 0)
-
+		super.onAssemble()
 	}
 
 }

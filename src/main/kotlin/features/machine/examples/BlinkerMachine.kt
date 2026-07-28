@@ -10,7 +10,7 @@ import org.bukkit.block.data.Lightable
 
 val BLINKER_MACHINE =
     BlockSet.new("blinker_machine")
-        .core('C', AnionBlocks.URANIUM_BLOCK)
+        .core('C', AnionBlocks.TEST_BLOCK)
         .assign('I', AnionBlocks.COPPER_MACHINE_CASING)
         .assign('B', BlockType.IRON_BLOCK)
 

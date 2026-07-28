@@ -5,6 +5,7 @@ import dev.astralchroma.processor.annotations.Name
 import dev.astralchroma.processor.annotations.Sender
 import dev.astralchroma.processor.annotations.Subcommand
 import dev.diena.anion.extensions.plus
+import dev.diena.anion.extensions.rotate
 import dev.diena.anion.extensions.vec3i
 import dev.diena.anion.features.machine.AnionMachines
 import dev.diena.anion.features.machine.examples.BlinkerMachine
@@ -65,13 +66,15 @@ object MachineCommand {
             val machine = machine.invoke()
             val blockSet = machine.blockSet ?: continue
 
-            val matches = blockSet.blockMap.all { (offset, expected) ->
+            val matches = blockSet.blockMap.all { (offset, expectedVariants) ->
 
-                val offsetFromOrigin = offset+origin
+                val offsetFromOrigin = origin+offset.rotate(rotation)
 
-                val expectedNms = (expected.blockData as CraftBlockData).state.rotate(rotation)
                 val actualNms = (level.world.getBlockAt(offsetFromOrigin.x, offsetFromOrigin.y, offsetFromOrigin.z).blockData as CraftBlockData).state
-                actualNms == expectedNms
+                expectedVariants.any { expected ->
+                    val expectedNms = (expected.blockData as CraftBlockData).state.rotate(rotation)
+                    actualNms == expectedNms
+                }
 
             }
 
@@ -79,9 +82,14 @@ object MachineCommand {
 
             // if we find at least one match, we go for that and then break
             machine.assemble(level, origin, rotation)
-            break
+            sender.info("Assembled ${machine::class.simpleName} at $origin. Intact: ${machine.intact}")
+
+            return // exit whole function
 
         }
+
+        // this only fires if the early return isn't called
+        sender.info("Unable to assemble Machine at $origin.")
 
     }
 

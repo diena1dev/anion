@@ -31,10 +31,11 @@ object PlaceMachineStructure {
 
 		sender.sendMessage("$forward")
 
-		for ((pos, block) in machineBlocks.blockMap) {
+		for ((pos, variants) in machineBlocks.blockMap) {
 
+			// multiple variants can be valid at a cell — just place the first as a representative
 			sender.world
-				.setBlockData((forward*2+sender.location.toVector()+Vector(pos.x, pos.y, pos.z)), block.blockData)
+				.setBlockData((forward*2+sender.location.toVector()+Vector(pos.x, pos.y, pos.z)), variants.first().blockData)
 
 		}
 

@@ -166,6 +166,23 @@ fun Vec3i.rotateAround(origin: Vec3i, rotation: Rotation): Vec3i {
     return origin + relative.rotate(rotation)
 }
 
+/** Rotate [Location] around [origin] by [rotation]. World/yaw/pitch preserved. */
+fun Location.rotateAround(origin: Vec3i, rotation: Rotation): Location {
+
+    val relativeX = x - origin.x
+    val relativeZ = z - origin.z
+
+    val (rotatedX, rotatedZ) = when (rotation) {
+        Rotation.CLOCKWISE_90 -> -relativeZ to relativeX
+        Rotation.CLOCKWISE_180 -> -relativeX to -relativeZ
+        Rotation.COUNTERCLOCKWISE_90 -> relativeZ to -relativeX
+        Rotation.NONE -> relativeX to relativeZ
+    }
+
+    return Location(world, origin.x + rotatedX, y, origin.z + rotatedZ, yaw, pitch)
+
+}
+
 inline val Block.blockPos get() = BlockPos(x, y, z)
 inline val Block.vec3i get() = Vec3i(x, y, z)
 inline val Block.adjacentBlocks get() = run {
