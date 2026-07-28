@@ -3,7 +3,6 @@ package dev.diena.anion.features.starship
 import dev.diena.anion.extensions.blockPos
 import dev.diena.anion.extensions.minus
 import dev.diena.anion.extensions.plus
-import dev.diena.anion.extensions.rotateRight
 import net.minecraft.core.Vec3i
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.world.entity.PositionMoveRotation
@@ -13,7 +12,6 @@ import net.minecraft.world.level.block.Rotation
 import net.minecraft.world.level.block.entity.BlockEntity
 import net.minecraft.world.level.block.state.BlockState
 import net.minecraft.world.phys.Vec3
-import org.bukkit.block.BlockFace
 import org.bukkit.craftbukkit.entity.CraftPlayer
 import org.bukkit.entity.Player
 import kotlin.collections.component1
@@ -42,22 +40,18 @@ object StarshipMovement {
 
 	}
 
+	/** rewrites the world for a rotation of [rotationSteps] clockwise quarter turns, 1..3.
+	 *  yaw is owned by [Starship.rotate], which resolves the step count and skips this entirely at 0. */
 	fun rotate(
 
-		byAngle: Float,
+		rotationSteps: Int,
 		starship: Starship,
 
 	) : HashMap<Vec3i, BlockState> {
 
-		val oldYaw = starship.yaw                                                  // alias to starship's current yaw
-		starship.yaw = ((oldYaw + byAngle % 360) + 360) % 360                      // modulo to wraparound whatever angle we get
-		if (oldYaw.toFace() == starship.yaw.toFace()) return starship.blockHashMap // do not rotate if yaw difference was not large enough
-
-		val steps = stepsFromTo(oldYaw.toFace(), starship.yaw.toFace())
-
-		val beBlockMap = rotateBlockEntities(steps, starship)
-		val newBlockMap = rotateBlocks(steps, starship, beBlockMap)
-		rotateEntities(steps, starship)
+		val beBlockMap = rotateBlockEntities(rotationSteps, starship)
+		val newBlockMap = rotateBlocks(rotationSteps, starship, beBlockMap)
+		rotateEntities(rotationSteps, starship)
 
 		return newBlockMap
 
@@ -197,24 +191,6 @@ object StarshipMovement {
 	///////////
 
 	// ROTATION HELPERS START
-
-	private fun Double.toFace(): BlockFace = when (this) {
-
-		in 0.0..90.0 -> BlockFace.SOUTH
-		in 90.0..180.0 -> BlockFace.EAST
-		in 180.0..270.0 -> BlockFace.NORTH
-		in 270.0..360.0 -> BlockFace.WEST
-		else -> throw IllegalStateException("what the fuck did you do")
-
-	}
-
-	private fun stepsFromTo(from: BlockFace, to: BlockFace): Int {
-
-		var steps = 0; var cur = from
-		while (cur != to && steps < 4) { cur = cur.rotateRight(); steps++ }
-		return steps
-
-	}
 
 	private fun rotateVec(rel: Vec3i, steps: Int): Vec3i {
 

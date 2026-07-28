@@ -3,9 +3,9 @@ package dev.diena.anion.features.starship
 import dev.diena.anion.extensions.blockPos
 import dev.diena.anion.extensions.minus
 import dev.diena.anion.extensions.plus
-import dev.diena.anion.extensions.rotateRight
+import dev.diena.anion.extensions.stepsFromTo
+import dev.diena.anion.extensions.toFace
 import net.minecraft.core.Vec3i
-import org.bukkit.block.BlockFace
 
 object StarshipCollision {
 
@@ -85,24 +85,6 @@ object StarshipCollision {
 
 	// ROTATION HELPERS START
 
-	private fun Double.toFace(): BlockFace = when (this) {
-
-		in 0.0..90.0 -> BlockFace.SOUTH
-		in 90.0..180.0 -> BlockFace.EAST
-		in 180.0..270.0 -> BlockFace.NORTH
-		in 270.0..360.0 -> BlockFace.WEST
-		else -> throw IllegalStateException("what the fuck did you do")
-
-	}
-
-	private fun stepsFromTo(from: BlockFace, to: BlockFace): Int {
-
-		var steps = 0; var cur = from
-		while (cur != to && steps < 4) { cur = cur.rotateRight(); steps++ }
-		return steps
-
-	}
-
 	private fun rotateVec(rel: Vec3i, steps: Int): Vec3i {
 
 		var x = rel.x; var z = rel.z
@@ -127,7 +109,7 @@ object StarshipCollision {
 
 	): Boolean {
 
-		// do NOT mutate starship.yaw here; partial-yaw accumulation is owned by StarshipMovement.rotate.
+		// do NOT mutate starship.yaw here; partial-yaw accumulation is owned by Starship.rotate.
 		// compute the prospective yaw locally so this stays a pure predicate.
 		val oldYaw = starship.yaw                                 // alias to starship's current yaw
 		val newYaw = ((oldYaw + byAngle % 360) + 360) % 360       // modulo to wraparound whatever angle we get

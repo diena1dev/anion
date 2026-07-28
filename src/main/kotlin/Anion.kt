@@ -69,7 +69,14 @@ class Anion : JavaPlugin() {
 
         // machine slowTick updates (structure check + slowTick, once a second)
         Tasks.scheduleAsync(1, 1, TimeUnit.SECONDS, Runnable {
-            for (machine in Machine.activeMachines.values) machine.runSlowTick()
+            for ((uuid, machine) in Machine.activeMachines) {
+
+                // saving
+                if (machine.dirty) AnionPersistence.saveMachine(uuid, machine)
+
+                machine.runSlowTick()
+
+            }
         })
 
     }

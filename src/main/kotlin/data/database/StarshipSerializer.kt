@@ -47,7 +47,9 @@ object StarshipSerializer {
             dos.write(arr)
         }
 
-        // machines not currently implemented
+        // machines are stored per-instance in their own column family and are never referenced from
+        // here: ownership is derivable from blockHashMap, so MachineSerializer needs no back-link.
+        // the count stays pinned at 0 purely to keep the on-disk layout stable.
         dos.writeInt(0)
 
         dos.flush()
@@ -91,7 +93,8 @@ object StarshipSerializer {
             blocks[absVec] = blockState
         }
 
-        // machines not currently implemented
+        // always 0, see serialize() — machines re-attach themselves via Starship.starshipAt /
+        // StarshipMachines.rebuild() rather than being listed here.
         val machineRefCount = dis.readInt()
         repeat(machineRefCount) { dis.readLong() }
 

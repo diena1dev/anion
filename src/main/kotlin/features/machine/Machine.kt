@@ -2,12 +2,14 @@ package dev.diena.anion.features.machine
 
 import dev.diena.anion.Anion
 import dev.diena.anion.Tasks
+import dev.diena.anion.data.database.AnionPersistence
 import dev.diena.anion.extensions.plus
 import dev.diena.anion.extensions.rotate
 import org.bukkit.craftbukkit.block.data.CraftBlockData
 import dev.diena.anion.features.custom.AnionResource
 import dev.diena.anion.features.starship.Starship
 import net.minecraft.core.Vec3i
+import net.minecraft.nbt.CompoundTag
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.level.block.Rotation
 import org.bukkit.NamespacedKey
@@ -45,8 +47,10 @@ import java.util.concurrent.ConcurrentHashMap
 //| [FINAL PIPELINE — fun, base implements, nobody overrides]
 //|- assemble(level: ServerLevel, origin: Vec3i, rotation: Rotation): Machine  // register, init helpers, persist, onAssemble()
 //|- load(uuid: UUID, level: ServerLevel, origin: Vec3i, rotation: Rotation, tag: CompoundTag): Machine
+//|                              // db restore: bind, loadState(tag), register, onAssemble()
 //|- disassemble()               // onDisassemble(), display.shutdown(), data.unlinkAll(), deregister, delete save
 //|- relocate(newOrigin: Vec3i, addedRotation: Rotation)  // ship-driven move/rotate, then onRelocate()
+//|- revalidate()                // forced structure re-check, called once a carrier move settles
 //|- runTick()                   // ticker entry: if (intact) tick()
 //|- runSlowTick()               // ticker entry: intact = isIntact(); if (intact) slowTick(); display.flush()
 //|
@@ -64,7 +68,9 @@ import java.util.concurrent.ConcurrentHashMap
 //|                               tank returns broken-wall vectors)
 //|- onAssemble()       open      extra init not covered by pipeline (buffers/ports are automatic)
 //|- onDisassemble()    open      extra teardown: flush recipes, destroy buffers, shutdown attached entities
-//\- onRelocate()       open      fix up cached absolute positions after a ship moved this machine
+//|- onRelocate()       open      fix up cached absolute positions after a ship moved this machine
+//|- saveState(tag)     open      write mutable state that cannot be re-derived (progress, extension, ...)
+//\- loadState(tag)     open      read it back. runs after bind(), before registration
 //
 // subclass adds ONLY: (1) family config as constructor vals (doorWidth, doorMaterial, ...)
 //                     (2) mutable behavior state (extension: Int, progress: Int, ...)
@@ -98,7 +104,7 @@ abstract class Machine(
     lateinit var origin: Vec3i
     var rotation: Rotation = Rotation.NONE; protected set
     var intact: Boolean = false; protected set
-    var dirty = false; protected set
+    var dirty = false; internal set // cleared by AnionPersistence once the machine is written
 
     /** ship this Machine's core block sits on, null if grounded. owned by [StarshipMachines]. */
     // origin stays absolute even while attached — localToWorld() runs per-block per-isIntact(), so it
@@ -139,6 +145,18 @@ abstract class Machine(
 
     }
 
+    /** Writes this Machine's own mutable state into [tag]. Base state (origin, rotation, type) is automatic. */
+    // only write what cannot be re-derived: progress counters, door extension, buffered amounts. never
+    // world blocks — the world is the source of truth and is already saved by the server.
+    open fun saveState(tag: CompoundTag) {
+
+    }
+
+    /** Reads back whatever [saveState] wrote. [tag] is empty for a machine saved before this type had state. */
+    open fun loadState(tag: CompoundTag) {
+
+    }
+
     /** Called after the Machine has been moved or rotated by the ship carrying it. */
     // recommended use: fix up anything caching an absolute position that the base cannot know about
     // (display entities, spawned particles' anchors). blockSet offsets need no fixup — they resolve
@@ -150,16 +168,24 @@ abstract class Machine(
     /** Registers a freshly placed Machine and gates its tick loop behind an initial intact check. */
     fun assemble(level: ServerLevel, origin: Vec3i, rotation: Rotation = Rotation.NONE): Machine {
 
-        this.uuid = UUID.randomUUID()
-        this.level = level
-        this.origin = origin
-        this.rotation = rotation
+        bind(UUID.randomUUID(), level, origin, rotation)
+        activate()
 
-        activeMachines[uuid] = this
-        Starship.starshipAt(level, origin)?.machines?.attach(this) // claimed if the core landed on a ship
-        intact = isIntact()
+        markDirty() // never been written to the database, so the save loop has to pick it up
 
-        onAssemble()
+        return this
+
+    }
+
+    /** Restores a Machine from the database. [tag] is whatever this type's [saveState] last wrote. */
+    fun load(uuid: UUID, level: ServerLevel, origin: Vec3i, rotation: Rotation, tag: CompoundTag): Machine {
+
+        // bind before loadState so a subclass restoring world-facing state can already resolve
+        // level/origin/rotation, and activate after it so onAssemble() sees a fully restored machine.
+        bind(uuid, level, origin, rotation)
+        loadState(tag)
+        activate()
+
         return this
 
     }
@@ -170,6 +196,28 @@ abstract class Machine(
         onDisassemble()
         starship?.machines?.detach(this)
         activeMachines.remove(uuid)
+        AnionPersistence.deleteMachine(uuid) // destroyed, not unloaded — the save goes with it
+
+    }
+
+    /** identity assignment, shared by assemble() and load(). */
+    private fun bind(uuid: UUID, level: ServerLevel, origin: Vec3i, rotation: Rotation) {
+
+        this.uuid = uuid
+        this.level = level
+        this.origin = origin
+        this.rotation = rotation
+
+    }
+
+    /** registration tail, shared by assemble() and load(). */
+    private fun activate() {
+
+        activeMachines[uuid] = this
+        Starship.starshipAt(level, origin)?.machines?.attach(this) // claimed if the core sits on a ship
+        intact = isIntact()
+
+        onAssemble()
 
     }
 
@@ -189,6 +237,8 @@ abstract class Machine(
     /** Ticker entry point, called every game tick. */
     fun runTick() {
 
+        if (starship?.moving == true) return // carrier is mid-rewrite, every world read would be torn
+
         if (intact) tick() // if it's intact instantly run tick()
 
     }
@@ -196,9 +246,20 @@ abstract class Machine(
     /** Ticker entry point, called every second. Re-checks structure before allowing slowTick(). */
     fun runSlowTick() {
 
+        if (starship?.moving == true) return
+
         // TODO: only update when marked as dirty, not every tick!
         intact = isIntact()    // every slowTick we recalculate the entire structure
         if (intact) slowTick() // if it's intact we tick
+
+    }
+
+    /** Re-runs the structure check immediately rather than waiting out the next slowTick. */
+    // called by the carrier ship once a move settles, so a machine is not left reading as broken for
+    // up to a second after riding a move it survived perfectly well.
+    fun revalidate() {
+
+        intact = isIntact()
 
     }
 
@@ -216,8 +277,10 @@ abstract class Machine(
     /** World write at [offset], resolved through [localToWorld]. Committed sync. */
     protected fun setBlockAt(offset: Vec3i, blockData: BlockData) {
 
-        val pos = localToWorld(offset)
-        Tasks.runSync { level.world.getBlockAt(pos.x, pos.y, pos.z).blockData = blockData }
+        Tasks.runSync {
+            val pos = localToWorld(offset)
+            level.world.getBlockAt(pos.x, pos.y, pos.z).blockData = blockData
+        }
 
     }
 

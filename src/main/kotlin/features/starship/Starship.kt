@@ -7,6 +7,9 @@ import dev.diena.anion.extensions.div
 import dev.diena.anion.extensions.minus
 import dev.diena.anion.extensions.plus
 import dev.diena.anion.extensions.rotateRight
+import dev.diena.anion.extensions.rotationOf
+import dev.diena.anion.extensions.stepsFromTo
+import dev.diena.anion.extensions.toFace
 import dev.diena.anion.extensions.vec3i
 import dev.diena.anion.features.starship.simluated.StarshipSimulator
 import net.minecraft.core.BlockPos
@@ -58,7 +61,11 @@ class Starship {
     var size: Int = 0
 
     var dirty: Boolean = false      // marks if we need to save starship in database
-    private var moving = false      // internal check to prevent concurrent modification
+
+    // moves run on the main thread, machines tick on the async pool — this is read from there, so it
+    // has to be volatile or a machine can sit on a stale copy indefinitely.
+    /** true while a move/rotate is rewriting the world. carried machines skip their ticks. */
+    @Volatile var moving = false; private set
 
     /** Represents the blocks that make up a ship. Readable publicly, writable privately. */
     lateinit var blockHashMap: HashMap<Vec3i, BlockState> private set // nms BlockState
@@ -155,8 +162,8 @@ class Starship {
         this.simulator = StarshipSimulator.new(this) // FIXME: Save Simulator on unload.
         this.machines = StarshipMachines.new(this)
 
-        // TODO: machines are not persisted yet, so this only re-claims machines that are still active
-        //       in memory. once the machines column family is wired up, load them here first.
+        // machines load on their own chunk, which may come up before or after this ship — rebuild()
+        // catches the ones already in memory, and any that load later claim this ship themselves.
         this.machines.rebuild()
 
         return this
@@ -186,9 +193,12 @@ class Starship {
 
 	    this.origin += vectorToMoveIn                  // translate origin
         this.blockHashMap = StarshipMovement.move(vectorToMoveIn, this)
+        this.machines.translate(vectorToMoveIn) // carry machines along, after the world is rewritten
         this.hitbox.moveHitbox(vectorToMoveIn) // translate hitbox
         this.dirty = true
         this.moving = false
+
+        this.machines.revalidate() // machines are only unfrozen now, so re-check against the settled world
 
         return true
 
@@ -203,23 +213,47 @@ class Starship {
 
         this.moving = true
 
-        if (!StarshipCollision.processRotationCollision(byAmount.toFloat(), this)) {
+        // narrowed once and reused: the collision check has to resolve the exact same face the yaw
+        // update below does, and Float vs Double rounding can disagree right on a face boundary.
+        val byAngle = byAmount.toFloat()
+
+        if (!StarshipCollision.processRotationCollision(byAngle, this)) {
 
             this.moving = false
             return false
 
         }
 
+        // yaw lives here, not in StarshipMovement — that class only rewrites blocks, and the machine
+        // transform has to be driven off the exact same step count the blocks were rotated by.
+        val oldYaw = this.yaw
+        this.yaw = ((oldYaw + byAngle % 360) + 360) % 360 // modulo to wraparound whatever angle we get
+        val steps = stepsFromTo(oldYaw.toFace(), this.yaw.toFace())
+
+        // sub-face yaw change: nothing in the world moves, but the new yaw still has to be persisted
+        if (steps == 0) {
+
+            this.dirty = true
+            this.moving = false
+            return true
+
+        }
+
         // origin is unchanged
-        this.blockHashMap = StarshipMovement.rotate(byAmount.toFloat(), this)
+        this.blockHashMap = StarshipMovement.rotate(steps, this)
+        this.machines.rotate(rotationOf(steps)) // same steps as the blocks, so machines land with them
         this.hitbox.rebuildHitbox() // recompute hitbox
         this.dirty = true
         this.moving = false
+
+        this.machines.revalidate()
 
         return true
 
     }
 
+    // TODO: carried machines need their level reassigned here, not just their origin — relocate() only
+    //       moves them within a level. see StarshipMachines.
     fun changeWorld(
 
         newWorld: World,

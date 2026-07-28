@@ -151,6 +151,28 @@ fun BlockFace.rotateLeft() = when (this) {
     else -> throw NotImplementedError("non-cartesian faces are not supported")
 }
 
+/** Quantises a yaw in degrees down to the cardinal face it currently reads as. */
+// NOTE: the bounds overlap, so an exact 90/180/270 resolves to the lower face. preserved from the
+// three private copies this replaced — do not "fix" it without checking the rotation path still lines up.
+fun Double.toFace(): BlockFace = when (this) {
+
+    in 0.0..90.0 -> BlockFace.SOUTH
+    in 90.0..180.0 -> BlockFace.EAST
+    in 180.0..270.0 -> BlockFace.NORTH
+    in 270.0..360.0 -> BlockFace.WEST
+    else -> throw IllegalStateException("what the fuck did you do")
+
+}
+
+/** Clockwise quarter turns needed to get [from] onto [to]. 0 when they already match. */
+fun stepsFromTo(from: BlockFace, to: BlockFace): Int {
+
+    var steps = 0; var cur = from
+    while (cur != to && steps < 4) { cur = cur.rotateRight(); steps++ }
+    return steps
+
+}
+
 /** Rotate given vector by 90 degrees. */
 inline fun Vec3i.rotate(rotation: Rotation): Vec3i =
 	when (rotation) {

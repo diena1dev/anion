@@ -1,8 +1,5 @@
 package features.machine.machine_types.basic_test_machine
 
-import dev.diena.anion.extensions.plus
-import dev.diena.anion.extensions.rotateAround
-import dev.diena.anion.features.custom.blocks.AnionBlock
 import dev.diena.anion.features.custom.blocks.AnionBlocks
 import dev.diena.anion.features.machine.BlockSet
 import dev.diena.anion.features.machine.Machine
@@ -66,16 +63,26 @@ class BasicTestMachine : Machine("Basic Test Machine", BASIC_TEST_MACHINE) {
 	}
 
 	override fun onAssemble() {
-		val offset = relativeSmokeOffset+this.origin
-
-		this.locationOffset = Location(
-			this.level.world,
-			offset.x.toDouble()-0.5,
-			offset.y.toDouble(),
-			offset.z.toDouble()+0.5,
-		).rotateAround(this.origin, this.rotation) // FIXME: this is broken!
-
+		this.locationOffset = smokeLocation()
 		super.onAssemble()
+	}
+
+	override fun onRelocate() {
+		this.locationOffset = smokeLocation()
+		super.onRelocate()
+	}
+
+	private fun smokeLocation(): Location {
+
+		val pos = localToWorld(relativeSmokeOffset)
+
+		return Location(
+			this.level.world,
+			pos.x + 0.5,
+			pos.y.toDouble(),
+			pos.z + 0.5,
+		)
+
 	}
 
 }
