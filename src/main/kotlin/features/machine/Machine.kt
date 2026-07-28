@@ -6,6 +6,7 @@ import dev.diena.anion.extensions.plus
 import dev.diena.anion.extensions.rotate
 import org.bukkit.craftbukkit.block.data.CraftBlockData
 import dev.diena.anion.features.custom.AnionResource
+import dev.diena.anion.features.starship.Starship
 import net.minecraft.core.Vec3i
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.level.block.Rotation
@@ -31,6 +32,7 @@ import java.util.concurrent.ConcurrentHashMap
 //|- rotation: Rotation          = NONE                  // solved during assembly wrench-check
 //|- intact: Boolean             = false; protected set  // cached slowTick structure result, gates tick()
 //|- dirty: Boolean              = false                 // persistence flag, cleared on save
+//|- starship: Starship?         = null; internal set    // carrier ship, null if grounded. owned by StarshipMachines
 //|
 //| [HELPERS — val, owned by base, initialized by assemble()/load() via Helper.new(this)]
 //|- display: MachineDisplay     lateinit  // .line(key, Component) / .clearLine(key), flushed sync each slowTick
@@ -44,6 +46,7 @@ import java.util.concurrent.ConcurrentHashMap
 //|- assemble(level: ServerLevel, origin: Vec3i, rotation: Rotation): Machine  // register, init helpers, persist, onAssemble()
 //|- load(uuid: UUID, level: ServerLevel, origin: Vec3i, rotation: Rotation, tag: CompoundTag): Machine
 //|- disassemble()               // onDisassemble(), display.shutdown(), data.unlinkAll(), deregister, delete save
+//|- relocate(newOrigin: Vec3i, addedRotation: Rotation)  // ship-driven move/rotate, then onRelocate()
 //|- runTick()                   // ticker entry: if (intact) tick()
 //|- runSlowTick()               // ticker entry: intact = isIntact(); if (intact) slowTick(); display.flush()
 //|
@@ -60,7 +63,8 @@ import java.util.concurrent.ConcurrentHashMap
 //|                               override for dynamic structures (door checks its own extension state,
 //|                               tank returns broken-wall vectors)
 //|- onAssemble()       open      extra init not covered by pipeline (buffers/ports are automatic)
-//\- onDisassemble()    open      extra teardown: flush recipes, destroy buffers, shutdown attached entities
+//|- onDisassemble()    open      extra teardown: flush recipes, destroy buffers, shutdown attached entities
+//\- onRelocate()       open      fix up cached absolute positions after a ship moved this machine
 //
 // subclass adds ONLY: (1) family config as constructor vals (doorWidth, doorMaterial, ...)
 //                     (2) mutable behavior state (extension: Int, progress: Int, ...)
@@ -96,6 +100,11 @@ abstract class Machine(
     var intact: Boolean = false; protected set
     var dirty = false; protected set
 
+    /** ship this Machine's core block sits on, null if grounded. owned by [StarshipMachines]. */
+    // origin stays absolute even while attached — localToWorld() runs per-block per-isIntact(), so it
+    // must never have to resolve through the ship. the ship pushes transforms down via relocate().
+    var starship: Starship? = null; internal set
+
     /** ASYNC! Called every game tick. */
     abstract fun tick()
     /** ASYNC! Called every second. Agnostic of game tickrate, be wary of world state desyncs. */
@@ -130,6 +139,14 @@ abstract class Machine(
 
     }
 
+    /** Called after the Machine has been moved or rotated by the ship carrying it. */
+    // recommended use: fix up anything caching an absolute position that the base cannot know about
+    // (display entities, spawned particles' anchors). blockSet offsets need no fixup — they resolve
+    // through localToWorld() against the already-updated origin/rotation.
+    open fun onRelocate() {
+
+    }
+
     /** Registers a freshly placed Machine and gates its tick loop behind an initial intact check. */
     fun assemble(level: ServerLevel, origin: Vec3i, rotation: Rotation = Rotation.NONE): Machine {
 
@@ -139,6 +156,7 @@ abstract class Machine(
         this.rotation = rotation
 
         activeMachines[uuid] = this
+        Starship.starshipAt(level, origin)?.machines?.attach(this) // claimed if the core landed on a ship
         intact = isIntact()
 
         onAssemble()
@@ -150,7 +168,21 @@ abstract class Machine(
     fun disassemble() {
 
         onDisassemble()
+        starship?.machines?.detach(this)
         activeMachines.remove(uuid)
+
+    }
+
+    /** Moves this Machine to [newOrigin] and composes [addedRotation] onto its own. Ship-driven only. */
+    // base owns this the same way it owns assemble(): it is the single writer of origin/rotation after
+    // assembly, so no subclass can move itself out from under the structure check.
+    fun relocate(newOrigin: Vec3i, addedRotation: Rotation) {
+
+        origin = newOrigin
+        rotation += addedRotation
+
+        onRelocate()
+        markDirty()
 
     }
 

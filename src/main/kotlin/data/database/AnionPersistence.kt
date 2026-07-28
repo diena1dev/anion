@@ -25,11 +25,12 @@ object AnionPersistence {
     fun unloadStarship(uuid: UUID) {
         val ship = Starship.loadedStarships.remove(uuid) ?: return
         saveStarship(uuid, ship)
+        ship.machines.detachAll() // machines outlive the ship object, don't leave them holding it
     }
 
     fun deleteStarship(uuid: UUID) {
         AnionDatabase.delete(AnionDatabase.starships, uuidToBytes(uuid))
-        Starship.loadedStarships.remove(uuid)
+        Starship.loadedStarships.remove(uuid)?.machines?.detachAll()
     }
 
     /**

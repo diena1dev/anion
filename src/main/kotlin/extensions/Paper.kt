@@ -166,6 +166,25 @@ fun Vec3i.rotateAround(origin: Vec3i, rotation: Rotation): Vec3i {
     return origin + relative.rotate(rotation)
 }
 
+/** Clockwise quarter turns this [Rotation] represents, 0..3. */
+val Rotation.quarterTurns: Int get() = when (this) {
+    Rotation.NONE -> 0
+    Rotation.CLOCKWISE_90 -> 1
+    Rotation.CLOCKWISE_180 -> 2
+    Rotation.COUNTERCLOCKWISE_90 -> 3
+}
+
+/** [Rotation] for a count of clockwise quarter turns. Wraps, negatives included. */
+fun rotationOf(quarterTurns: Int): Rotation = when (((quarterTurns % 4) + 4) % 4) {
+    0 -> Rotation.NONE
+    1 -> Rotation.CLOCKWISE_90
+    2 -> Rotation.CLOCKWISE_180
+    else -> Rotation.COUNTERCLOCKWISE_90
+}
+
+/** Compose two rotations. Rotations about the same axis commute, so order is irrelevant. */
+operator fun Rotation.plus(other: Rotation): Rotation = rotationOf(this.quarterTurns + other.quarterTurns)
+
 /** Rotate [Location] around [origin] by [rotation]. World/yaw/pitch preserved. */
 fun Location.rotateAround(origin: Vec3i, rotation: Rotation): Location {
 

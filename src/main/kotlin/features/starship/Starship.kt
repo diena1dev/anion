@@ -40,6 +40,10 @@ class Starship {
     companion object {
         /** all loaded and active ships on the server */
         val loadedStarships: MutableMap<UUID, Starship> = ConcurrentHashMap()
+
+        /** the loaded ship occupying [vec] in [level], if any. used to claim freshly assembled machines. */
+        fun starshipAt(level: ServerLevel, vec: Vec3i): Starship? =
+            loadedStarships.values.firstOrNull { it.level == level && it.blockHashMap.containsKey(vec) }
     }
 
     lateinit var uuid: UUID
@@ -47,6 +51,7 @@ class Starship {
     lateinit var origin: Vec3i                // approximated center of the starship, what is rotated around
     lateinit var hitbox: StarshipHitbox       // ship hitbox
     lateinit var simulator: StarshipSimulator // starship world interaction
+    lateinit var machines: StarshipMachines   // machines carried by this ship
 
     lateinit var velocity: StarshipVelocity
     var yaw: Double = 0.0
@@ -117,8 +122,11 @@ class Starship {
         this.origin = vectorAddedTo/blockHashMap.size
         this.hitbox = StarshipHitbox.new(this)
         this.velocity = StarshipVelocity.new(this)
+        this.machines = StarshipMachines.new(this)
         this.yaw = 1.0
         this.size = blockPosSet.size
+
+        this.machines.rebuild() // claim any machine already assembled inside the detected blocks
 
         this.simulator.calculateTotalStarshipMass() // calculate initial starship mass
 
@@ -145,6 +153,11 @@ class Starship {
         this.hitbox = StarshipHitbox.new(this)
         this.velocity = StarshipVelocity.new(this) // FIXME: SAVE VELOCITY ON SHIP UNLOAD
         this.simulator = StarshipSimulator.new(this) // FIXME: Save Simulator on unload.
+        this.machines = StarshipMachines.new(this)
+
+        // TODO: machines are not persisted yet, so this only re-claims machines that are still active
+        //       in memory. once the machines column family is wired up, load them here first.
+        this.machines.rebuild()
 
         return this
 
@@ -250,9 +263,14 @@ class Starship {
 
         this.blockHashMap.remove(block.vec3i)
 
+        // a machine that just lost its core block has no anchor left to be found by — tear it down.
+        // machines losing a non-core block need no handling here, isIntact() catches those.
+        this.machines.coreAt(block.vec3i)?.disassemble()
+
         // deregister and remove ship if all blocks gone
         if (blockHashMap.isEmpty()) {
 
+            this.machines.detachAll()
             loadedStarships.remove(this.uuid)
             AnionPersistence.deleteStarship(this.uuid)
 
