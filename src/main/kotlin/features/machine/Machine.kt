@@ -47,7 +47,8 @@ import java.util.concurrent.ConcurrentHashMap
 //| [FINAL PIPELINE — fun, base implements, nobody overrides]
 //|- assemble(level: ServerLevel, origin: Vec3i, rotation: Rotation): Machine  // register, init helpers, persist, onAssemble()
 //|- load(uuid: UUID, level: ServerLevel, origin: Vec3i, rotation: Rotation, tag: CompoundTag): Machine
-//|                              // db restore: bind, loadState(tag), register, onAssemble()
+//|                              // db restore: bind, loadFrom(tag), register, onAssemble()
+//|- saveTo(tag: CompoundTag)    // full save payload: base component state + saveState(tag). serializer-only
 //|- disassemble()               // onDisassemble(), display.shutdown(), data.unlinkAll(), deregister, delete save
 //|- relocate(newOrigin: Vec3i, addedRotation: Rotation)  // ship-driven move/rotate, then onRelocate()
 //|- revalidate()                // forced structure re-check, called once a carrier move settles
@@ -180,13 +181,29 @@ abstract class Machine(
     /** Restores a Machine from the database. [tag] is whatever this type's [saveState] last wrote. */
     fun load(uuid: UUID, level: ServerLevel, origin: Vec3i, rotation: Rotation, tag: CompoundTag): Machine {
 
-        // bind before loadState so a subclass restoring world-facing state can already resolve
+        // bind before loadFrom so a subclass restoring world-facing state can already resolve
         // level/origin/rotation, and activate after it so onAssemble() sees a fully restored machine.
         bind(uuid, level, origin, rotation)
-        loadState(tag)
+        loadFrom(tag)
         activate()
 
         return this
+
+    }
+
+    /** Full save payload: base-owned component state, then the type's own [saveState]. */
+    internal fun saveTo(tag: CompoundTag) {
+
+        // no base components carry state yet (buffers land here); ports are always re-derived.
+
+        saveState(tag)
+
+    }
+
+    /** Counterpart to [saveTo]. Runs after bind(), before registration. */
+    private fun loadFrom(tag: CompoundTag) {
+
+        loadState(tag)
 
     }
 
