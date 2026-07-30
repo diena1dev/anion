@@ -23,22 +23,24 @@ import java.util.concurrent.ConcurrentHashMap
 //|
 //| [CONSTRUCTOR — type config. val, immutable. one set of values per registered machine type]
 //|- displayName: String
-//|- blockSet: BlockSet                                  // structure definition, compared at origin+rotation
+//|- blockSet: BlockSet?                                 // structure definition, compared at origin+rotation.
+//|                                                      // null for machines that don't describe themselves as a
+//|                                                      // fixed block layout — they own isIntact() instead
 //|- namespacedKey: NamespacedKey = adaptedFromDisplayName // AnionResource impl, used as machine-type registry key
-//|- dataChannels: Map<NamespacedKey, DataChannel<*>>?   // must specify opt-out with null, all get/set methods have null handlers
+//|- dataChannels: Map<NamespacedKey, DataChannel<*>>?   // PLANNED. must specify opt-out with null, all get/set methods have null handlers
 //|
 //| [INSTANCE STATE — var, owned by base. written ONLY by assemble()/load()/pipeline, subclasses read]
 //|- uuid: UUID                  lateinit                // identity in activeMachines + database
 //|- level: ServerLevel          lateinit
 //|- origin: Vec3i               lateinit                // core block world pos, rotation pivot
 //|- rotation: Rotation          = NONE                  // solved during assembly wrench-check
-//|- intact: Boolean             = false; protected set  // cached slowTick structure result, gates tick()
+//|- intact: Boolean             = false; protected set  // cached structure result, gates tick(). written by
+//|                                                      // activate(), every slowTick, and revalidate()
 //|- dirty: Boolean              = false                 // persistence flag, cleared on save
 //|- starship: Starship?         = null; internal set    // carrier ship, null if grounded. owned by StarshipMachines
 //|
 //| [HELPERS — val, owned by base, initialized by assemble()/load() via Helper.new(this)]
-//|- display: MachineDisplay     lateinit  // .line(key, Component) / .clearLine(key), flushed sync each slowTick
-//|- data: MachineData           lateinit  // .get(channel) / .set(channel, value) / .link(machine) / .unlink(machine)
+//|- data: MachineData           lateinit  // PLANNED. .get(channel) / .set(channel, value) / .link(machine) / .unlink(machine)
 // TODO: data is going to work differently than this, data aaaaaaaaaaaaaa
 //       is going to send out a signal along a line, whatever grabs that signal can use it
 //       for an example a mainframe can use the signal that gets emitted and reroute it based
@@ -48,12 +50,15 @@ import java.util.concurrent.ConcurrentHashMap
 //|- assemble(level: ServerLevel, origin: Vec3i, rotation: Rotation): Machine  // register, init helpers, persist, onAssemble()
 //|- load(uuid: UUID, level: ServerLevel, origin: Vec3i, rotation: Rotation, tag: CompoundTag): Machine
 //|                              // db restore: bind, loadFrom(tag), register, onAssemble()
-//|- saveTo(tag: CompoundTag)    // full save payload: base component state + saveState(tag). serializer-only
-//|- disassemble()               // onDisassemble(), display.shutdown(), data.unlinkAll(), deregister, delete save
+//|- saveTo(tag: CompoundTag)    // full save payload: base component state + saveState(tag). serializer-only.
+//|                              // buffers land here once they exist: a buffer holds any Resource, so each one
+//|                              // encodes resource key + amount and the whole block is variable-length. NBT
+//|                              // absorbs that without a MACHINES_VERSION bump — never widen the fixed header for it
+//|- disassemble()               // onDisassemble(), data.unlinkAll(), detach from carrier, deregister, delete save
 //|- relocate(newOrigin: Vec3i, addedRotation: Rotation)  // ship-driven move/rotate, then onRelocate()
 //|- revalidate()                // forced structure re-check, called once a carrier move settles
-//|- runTick()                   // ticker entry: if (intact) tick()
-//|- runSlowTick()               // ticker entry: intact = isIntact(); if (intact) slowTick(); display.flush()
+//|- runTick()                   // ticker entry: bail if carrier is mid-move, else if (intact) tick()
+//|- runSlowTick()               // ticker entry: bail if carrier is mid-move, else intact = isIntact(); if (intact) slowTick()
 //|
 //| [PROTECTED UTILS — fun, subclasses call, never override]
 //|- localToWorld(offset: Vec3i): Vec3i                  // origin-relative, rotation-applied
@@ -64,9 +69,9 @@ import java.util.concurrent.ConcurrentHashMap
 //| [HOOKS — subclasses implement/override]
 //|- tick()             abstract  ASYNC! every game tick, only runs while intact
 //|- slowTick()         abstract  ASYNC! every second, tickrate-agnostic, wary of desyncs
-//|- isIntact(): Boolean open     default = blockSet vs world at origin+rotation.
+//|- isIntact(): Boolean open     default = blockSet vs world at origin+rotation, always true if blockSet is null.
 //|                               override for dynamic structures (door checks its own extension state,
-//|                               tank returns broken-wall vectors)
+//|                               tank returns broken-wall vectors) and for every blockSet-less machine
 //|- onAssemble()       open      extra init not covered by pipeline (buffers/ports are automatic)
 //|- onDisassemble()    open      extra teardown: flush recipes, destroy buffers, shutdown attached entities
 //|- onRelocate()       open      fix up cached absolute positions after a ship moved this machine
@@ -194,7 +199,10 @@ abstract class Machine(
     /** Full save payload: base-owned component state, then the type's own [saveState]. */
     internal fun saveTo(tag: CompoundTag) {
 
-        // no base components carry state yet (buffers land here); ports are always re-derived.
+        // no base components carry state yet; ports are always re-derived.
+        // buffers land here: each one writes the Resource it holds plus that resource's amount, so the
+        // payload is variable-length by count and by resource type. that is exactly why this is a
+        // CompoundTag and not more fields on MachineSerializer's fixed header.
 
         saveState(tag)
 
