@@ -3,6 +3,7 @@ package dev.diena.anion.features.machine
 import dev.diena.anion.Anion
 import dev.diena.anion.Tasks
 import dev.diena.anion.data.database.AnionPersistence
+import dev.diena.anion.extensions.blockPos
 import dev.diena.anion.extensions.plus
 import dev.diena.anion.extensions.rotate
 import org.bukkit.craftbukkit.block.data.CraftBlockData
@@ -13,7 +14,7 @@ import net.minecraft.nbt.CompoundTag
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.level.block.Rotation
 import org.bukkit.NamespacedKey
-import org.bukkit.block.BlockState
+import net.minecraft.world.level.block.state.BlockState
 import org.bukkit.block.data.BlockData
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -108,6 +109,8 @@ abstract class Machine(
     lateinit var uuid: UUID
     lateinit var level: ServerLevel
     lateinit var origin: Vec3i
+    lateinit var machineStructureBlocks: MutableMap<Vec3i, BlockState> // collection of present blocks in a machine
+
     var rotation: Rotation = Rotation.NONE; protected set
     var intact: Boolean = false; protected set
     var dirty = false; internal set // cleared by AnionPersistence once the machine is written
@@ -128,14 +131,23 @@ abstract class Machine(
     // TODO: hybrid result type for isIntact, returns a boolean and then a list of not intact vectors.
     //       this could be used for tanks draining if a tank wall is broken, although specific impl is up to the dev.
     open fun isIntact(): Boolean {
-        val set = blockSet ?: return true
+
+        val set = this.blockSet ?: return true
         return set.blockMap.all { (offset, expectedVariants) ->
-            val actualNms = (blockAt(offset).blockData as CraftBlockData).state
+
+            val actualNms = blockAt(offset)
             expectedVariants.any { expected ->
                 val expectedNms = (expected.blockData as CraftBlockData).state.rotate(rotation)
-                actualNms == expectedNms
+                val matches = (actualNms == expectedNms)
+
+                if (matches) this.machineStructureBlocks[offset] = actualNms
+
+                return matches
+
             }
+
         }
+
     }
 
     /** Called on Machine Disassembly */
@@ -295,7 +307,8 @@ abstract class Machine(
     protected fun blockAt(offset: Vec3i): BlockState {
 
         val pos = localToWorld(offset)
-        return level.world.getBlockAt(pos.x, pos.y, pos.z).state
+
+        return level.getBlockState(pos.blockPos)
 
     }
 
