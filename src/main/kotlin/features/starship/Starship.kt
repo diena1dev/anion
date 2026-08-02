@@ -1,5 +1,6 @@
 package dev.diena.anion.features.starship
 
+import dev.diena.anion.Tasks
 import dev.diena.anion.data.database.AnionPersistence
 import dev.diena.anion.extensions.adjacentBlocks
 import dev.diena.anion.extensions.blockPos
@@ -23,6 +24,7 @@ import net.minecraft.world.level.block.entity.BlockEntity
 import net.minecraft.world.level.block.state.BlockState
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.Vec3
+import org.bukkit.Material
 import org.bukkit.World
 import org.bukkit.block.Block
 import org.bukkit.block.BlockFace
@@ -121,6 +123,11 @@ class Starship {
         this.size = blockPosSet.size
 
         this.simulator.calculateTotalStarshipMass() // calculate initial starship mass
+
+        // register + persist the freshly built ship so callers cannot forget to (and desync the world).
+        this.uuid = UUID.randomUUID()
+        loadedStarships[this.uuid] = this
+        AnionPersistence.saveStarship(this.uuid, this)
 
         return this
 
@@ -268,6 +275,56 @@ class Starship {
 
     }
 
+    /**
+     * Checks asynchronously whether the most recent block removal split this ship into
+     * disconnected sections, and if so spawns the smaller detached island as its own [Starship].
+     *
+     * @param removedPos position of the block that was just removed.
+     */
+    fun checkForSplit(removedPos: Vec3i) {
+
+        // snapshot on the main thread: blockHashMap is mutated & reassigned by move/rotate/add/remove,
+        // so the async job must never read the live map directly.
+        val snapshot = HashSet(this.blockHashMap.keys)
+
+        Tasks.runAsync {
+
+            val detached = StarshipSplit.detachedComponents(snapshot, removedPos)
+            if (detached.isEmpty()) return@runAsync
+
+            Tasks.runSync {
+
+                // FIXME: this is a guard to prevent the ship from duplicating blocks if an async floodfill
+                //        happens in the middle of a ship moving. what should happen is it splits on the next
+                //        possible tick, NOT cancelling the task.
+                if (this.moving) return@runSync
+                if (detached.any { island -> island.any { this.blockHashMap[it] == null } }) return@runSync
+
+                for (island in detached) spawnDetachedShip(island)
+
+            }
+
+        }
+
+    }
+
+    /** strips [detached] off this ship and re-registers it as an independent [Starship]. main thread only. */
+    private fun spawnDetachedShip(detached: Set<Vec3i>) {
+
+        // strip the detached blocks off this ship
+        for (pos in detached) this.blockHashMap.remove(pos)
+        this.size = this.blockHashMap.size
+        this.simulator.calculateTotalStarshipMass()
+        this.hitbox.rebuildHitbox()
+        this.dirty = true
+
+        // build the new ship from the detached block set (world states re-read here on the main thread).
+        // create() assigns the uuid, registers it in loadedStarships, and persists it.
+        val blockPosSet = detached.mapTo(HashSet()) { BlockPos(it.x, it.y, it.z) }
+        Starship().create(blockPosSet, this.level.world)
+
+    }
+
     /** adds block to starship if block is adjacent to the ship. returns a boolean based on the result. */
     // FIXME: this currently adds ANY adjacently placed block to the ship ONTO the ship.
     //        in this current state, blocks cannot be placed on the world directly adjacent
@@ -280,6 +337,9 @@ class Starship {
     ) : Boolean {
 
         if (this.moving) return false
+
+        // blacklisted blocks go here
+        if (block.type == Material.AIR) return false
 
         // only check blocks adjacent to the placed block
         for (b in block.adjacentBlocks) {
@@ -294,7 +354,7 @@ class Starship {
             this.hitbox.rebuildHitbox()
             this.dirty = true
 
-            this.simulator.removeStarshipMass(block)
+            this.simulator.addStarshipMass(block)
 
             return true
 
@@ -313,6 +373,9 @@ class Starship {
     ) : Boolean {
 
         if (this.moving) return false
+
+        // blacklisted blocks go here
+        if (block.type == Material.AIR) return false
 
         for (b in block.adjacentBlocks) {
 

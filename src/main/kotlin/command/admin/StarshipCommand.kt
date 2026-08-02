@@ -118,11 +118,7 @@ object StarshipCommand {
         }
 
         val locations = visited.map { it.location.blockPos }.toSet()
-        val uuid = UUID.randomUUID()
-        val ship = Starship().create(locations, sender.world)
-        ship.uuid = uuid
-        Starship.loadedStarships[uuid] = ship
-        AnionPersistence.saveStarship(uuid, ship)
+        val ship = Starship().create(locations, sender.world) // assigns uuid, registers, and persists
 
         sender.info("Detected ${visited.size} blocks and created starship at ${ship.origin}.")
 
