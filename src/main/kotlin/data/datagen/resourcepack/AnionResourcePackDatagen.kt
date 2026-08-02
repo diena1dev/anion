@@ -3,6 +3,7 @@ package dev.diena.anion.data.datagen.resourcepack
 import com.google.gson.GsonBuilder
 import com.google.gson.JsonObject
 import dev.diena.anion.data.registry.registries.AnionRegistries
+import dev.diena.anion.features.custom.blocks.AnionNoteblockCustomBlock
 import net.minecraft.world.level.block.state.properties.NoteBlockInstrument
 import org.bukkit.craftbukkit.block.data.CraftBlockData
 import java.io.File
@@ -118,10 +119,12 @@ class AnionResourcePackDatagen(private val outputDir: File) {
         blockstatesDir.mkdirs()
 
         // (serialized instrument name, note 0-24) model identifier
-        val anionStateModels: Map<Pair<String, Int>, String> = AnionRegistries.BLOCK_REGISTRY.all.values.associate { block ->
-            val nmsInstrument = CraftBlockData.toVanilla(block.instrument, NoteBlockInstrument::class.java)
-            (nmsInstrument.serializedName to block.note) to "anion:block/${block.namespacedKey.key}"
-        }
+        val anionStateModels: Map<Pair<String, Int>, String> = AnionRegistries.BLOCK_REGISTRY.all.values
+            .filterIsInstance<AnionNoteblockCustomBlock>()
+            .associate { block ->
+                val nmsInstrument = CraftBlockData.toVanilla(block.instrument, NoteBlockInstrument::class.java)
+                (nmsInstrument.serializedName to block.note) to "anion:block/${block.namespacedKey.key}"
+            }
 
         val variants = JsonObject()
         for (instrument in NoteBlockInstrument.entries) {

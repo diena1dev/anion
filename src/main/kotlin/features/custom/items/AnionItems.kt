@@ -2,8 +2,9 @@ package dev.diena.anion.features.custom.items
 
 import dev.diena.anion.data.registry.AnionRegistryKey
 import dev.diena.anion.data.registry.registries.AnionRegistries
-import dev.diena.anion.features.custom.blocks.AnionBlock
 import dev.diena.anion.features.custom.blocks.AnionBlocks
+import dev.diena.anion.features.custom.blocks.AnionMushroomCustomBlock
+import dev.diena.anion.features.custom.blocks.AnionNoteblockCustomBlock
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.TextColor
 import org.bukkit.Color
@@ -51,14 +52,25 @@ object AnionItems {
 	val URANIUM_ORE = registerBlock(AnionBlocks.URANIUM_ORE)
 	val URANIUM_ORE_BLOCK = registerBlock(AnionBlocks.URANIUM_ORE_BLOCK)
 	val URANIUM_BLOCK = registerBlock(AnionBlocks.URANIUM_BLOCK)
+	val TEST_MUSHROOM_BLOCK = registerBlock(AnionBlocks.TEST_MUSHROOM_BLOCK)
 
 	private fun registerItem(item: AnionItem) = item.also {
 		AnionRegistries.ITEM_REGISTRY.register(AnionRegistryKey(it.namespacedKey.key), it)
 	}
 
-	// placeholder, see the 26.1 vanilla jar's Item class for the planned structure.
-	private fun registerBlock(block: AnionBlock): AnionItem {
+	private fun registerBlock(block: AnionNoteblockCustomBlock): AnionItem {
 		val blockItem = AnionBlockItem(block)
+
+		AnionRegistries.ITEM_REGISTRY.register(
+			AnionRegistryKey(block.namespacedKey.key),
+			blockItem
+		)
+
+		return blockItem
+	}
+
+	private fun registerBlock(block: AnionMushroomCustomBlock): AnionItem {
+		val blockItem = AnionMushroomBlockItem(block)
 
 		AnionRegistries.ITEM_REGISTRY.register(
 			AnionRegistryKey(block.namespacedKey.key),

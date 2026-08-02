@@ -9,11 +9,9 @@ import org.bukkit.entity.Player
 import org.bukkit.event.player.PlayerInteractEvent
 import org.bukkit.inventory.ItemStack
 
-open class AnionBlock(
+abstract class AnionBlock(
+
     displayName: String,
-    val instrument: Instrument,
-    val note: Int,
-    val stacksTo: Int = 64,
     val styledDisplayName: Component = Component.text(displayName),
     val namespacedKey: NamespacedKey = NamespacedKey(Anion.NAMESPACE, displayName.replace(" ", "_").lowercase()),
     val drops: ItemStack? = null,
@@ -22,10 +20,8 @@ open class AnionBlock(
     private val breakHandler: ((block: Block, player: Player?) -> Unit)? = null,
     private val interactHandler: ((event: PlayerInteractEvent) -> Unit)? = null,
     private val neighborChangeHandler: ((block: Block) -> Unit)? = null,
+
 ) {
-    init {
-        if (note !in 0..24) throw IllegalStateException("note must be 0–24, got $note for ${this.namespacedKey}")
-    }
 
     open fun onPlace(block: Block, player: Player?) { placeHandler?.invoke(block, player) }
     open fun onBreak(block: Block, player: Player?) { breakHandler?.invoke(block, player) }
@@ -33,4 +29,5 @@ open class AnionBlock(
     open fun onNeighborChange(block: Block) { neighborChangeHandler?.invoke(block) }
     open fun onAdd() {}
     open fun onRemove() {}
+
 }

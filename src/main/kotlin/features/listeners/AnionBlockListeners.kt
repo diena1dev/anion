@@ -5,8 +5,12 @@ import dev.astralchroma.processor.annotations.Register
 import dev.diena.anion.data.registry.AnionRegistryKey
 import dev.diena.anion.data.registry.registries.AnionRegistries
 import dev.diena.anion.extensions.toAnionItem
+import dev.diena.anion.features.custom.blocks.AnionBlock
 import dev.diena.anion.features.custom.blocks.AnionBlocks
+import dev.diena.anion.features.custom.blocks.AnionMushroomCustomBlock
+import dev.diena.anion.features.custom.blocks.MushroomType
 import dev.diena.anion.features.custom.items.AnionBlockItem
+import dev.diena.anion.features.custom.items.AnionMushroomBlockItem
 import io.papermc.paper.event.player.PlayerPickBlockEvent
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Direction
@@ -20,6 +24,7 @@ import org.bukkit.Note
 import org.bukkit.block.Block
 import org.bukkit.block.BlockFace
 import org.bukkit.block.data.BlockData
+import org.bukkit.block.data.MultipleFacing
 import org.bukkit.block.data.type.NoteBlock as NoteBlockData
 import org.bukkit.craftbukkit.entity.CraftPlayer
 import org.bukkit.event.Event
@@ -47,9 +52,30 @@ object AnionBlockListeners : Listener {
 
     private fun noteData(block: Block) = block.blockData as? NoteBlockData
 
-    private fun anionBlockAt(block: Block) =
-        if (block.type != Material.NOTE_BLOCK) null
-        else noteData(block)?.let { AnionBlocks.fromState(it.instrument, it.note.id.toInt()) }
+    private val MUSHROOM_FACES = listOf(
+        BlockFace.UP, BlockFace.DOWN, BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST
+    )
+
+    private fun mushroomTypeOf(material: Material): MushroomType? = when (material) {
+        Material.BROWN_MUSHROOM_BLOCK -> MushroomType.BROWN
+        Material.RED_MUSHROOM_BLOCK -> MushroomType.RED
+        else -> null
+    }
+
+    private fun mushroomData(block: Block) = block.blockData as? MultipleFacing
+
+    private fun mushroomFaces(data: MultipleFacing): Set<BlockFace> =
+        MUSHROOM_FACES.filterTo(mutableSetOf()) { data.hasFace(it) }
+
+    private fun anionMushroomBlockAt(block: Block): AnionMushroomCustomBlock? {
+        val type = mushroomTypeOf(block.type) ?: return null
+        val data = mushroomData(block) ?: return null
+        return AnionBlocks.fromMushroomState(type, mushroomFaces(data))
+    }
+
+    private fun anionBlockAt(block: Block): AnionBlock? =
+        if (block.type == Material.NOTE_BLOCK) noteData(block)?.let { AnionBlocks.fromNoteblockState(it.instrument, it.note.id.toInt()) }
+        else anionMushroomBlockAt(block)
 
     private fun simulateItemUse(event: PlayerInteractEvent) {
         val hand = event.hand ?: return
@@ -90,11 +116,33 @@ object AnionBlockListeners : Listener {
 
             // Vanilla note block whose auto-detected instrument+note collides with a registered state:
             // reset note to first safe value so the placement doesn't create a phantom AnionBlock.
-            if (!isAnionBlockItem && AnionBlocks.fromState(data.instrument, data.note.id.toInt()) != null) {
-                val safeNote = (0..24).firstOrNull { n -> AnionBlocks.fromState(data.instrument, n) == null }
+            if (!isAnionBlockItem && AnionBlocks.fromNoteblockState(data.instrument, data.note.id.toInt()) != null) {
+                val safeNote = (0..24).firstOrNull { n -> AnionBlocks.fromNoteblockState(data.instrument, n) == null }
                 if (safeNote != null) {
                     val fixed = data.clone() as NoteBlockData
                     fixed.note = Note(safeNote)
+                    block.setBlockData(fixed, false)
+                }
+                return
+            }
+        }
+
+        val mushroomType = mushroomTypeOf(block.type)
+        if (mushroomType != null) {
+            val data = mushroomData(block) ?: return
+            val isAnionMushroomItem = event.itemInHand.toAnionItem() is AnionMushroomBlockItem
+            val faces = mushroomFaces(data)
+
+            // Vanilla mushroom block whose neighbor-derived face shape collides with a registered
+            // state: reset to the first free state so the placement doesn't create a phantom AnionBlock.
+            if (!isAnionMushroomItem && AnionBlocks.fromMushroomState(mushroomType, faces) != null) {
+                val safeState = (1..64).firstOrNull { s ->
+                    AnionBlocks.fromMushroomState(mushroomType, AnionMushroomCustomBlock.decodeState(s)) == null
+                }
+                if (safeState != null) {
+                    val fixed = data.clone() as MultipleFacing
+                    val safeFaces = AnionMushroomCustomBlock.decodeState(safeState)
+                    MUSHROOM_FACES.forEach { face -> fixed.setFace(face, face in safeFaces) }
                     block.setBlockData(fixed, false)
                 }
                 return
@@ -130,7 +178,7 @@ object AnionBlockListeners : Listener {
         val data = noteData(block) ?: return
         val note = data.note.id.toInt()
 
-        val anionBlock = AnionBlocks.fromState(data.instrument, note)
+        val anionBlock = AnionBlocks.fromNoteblockState(data.instrument, note)
         if (anionBlock != null) {
             if (event.action == Action.RIGHT_CLICK_BLOCK) {
                 // item usage defined by NMS, cancel paper events here
@@ -145,7 +193,7 @@ object AnionBlockListeners : Listener {
         // prevent right-click cycling into a registered AnionBlock
         if (event.action == Action.RIGHT_CLICK_BLOCK) {
             val nextNote = (note + 1) % 25
-            if (AnionBlocks.fromState(data.instrument, nextNote) != null) {
+            if (AnionBlocks.fromNoteblockState(data.instrument, nextNote) != null) {
                 event.isCancelled = true
             }
         }
@@ -153,7 +201,7 @@ object AnionBlockListeners : Listener {
 
     @EventHandler
     fun onNotePlay(event: NotePlayEvent) {
-        if (AnionBlocks.fromState(event.instrument, event.note.id.toInt()) != null) {
+        if (AnionBlocks.fromNoteblockState(event.instrument, event.note.id.toInt()) != null) {
             event.isCancelled = true
         }
     }
@@ -168,7 +216,7 @@ object AnionBlockListeners : Listener {
 
         if (block.type == Material.NOTE_BLOCK) {
             val data = noteData(block) ?: return
-            val anionBlock = AnionBlocks.fromState(data.instrument, data.note.id.toInt())
+            val anionBlock = AnionBlocks.fromNoteblockState(data.instrument, data.note.id.toInt())
             if (anionBlock != null) {
                 event.isCancelled = true
                 anionBlock.onNeighborChange(block)
@@ -176,8 +224,19 @@ object AnionBlockListeners : Listener {
             }
 
             val nextNote = (data.note.id.toInt() + 1) % 25
-            if (AnionBlocks.fromState(data.instrument, nextNote) != null) {
+            if (AnionBlocks.fromNoteblockState(data.instrument, nextNote) != null) {
                 event.isCancelled = true
+                return
+            }
+        }
+
+        val mushroomType = mushroomTypeOf(block.type)
+        if (mushroomType != null) {
+            val anionBlock = anionMushroomBlockAt(block)
+            if (anionBlock != null) {
+                // Prevent vanilla's neighbor-based face auto-connect from reshaping a registered state.
+                event.isCancelled = true
+                anionBlock.onNeighborChange(block)
                 return
             }
         }
@@ -206,7 +265,7 @@ object AnionBlockListeners : Listener {
 
             fun markIfAnion(target: Block, dataSource: Block = target) {
                 val data = dataSource.blockData as? NoteBlockData ?: return
-                if (AnionBlocks.fromState(data.instrument, data.note.id.toInt()) == null) return
+                if (AnionBlocks.fromNoteblockState(data.instrument, data.note.id.toInt()) == null) return
                 blocksToFix[target] = data
             }
 

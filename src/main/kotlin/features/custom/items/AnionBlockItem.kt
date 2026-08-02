@@ -1,6 +1,6 @@
 package dev.diena.anion.features.custom.items
 
-import dev.diena.anion.features.custom.blocks.AnionBlock
+import dev.diena.anion.features.custom.blocks.AnionNoteblockCustomBlock
 import net.minecraft.core.component.DataComponents
 import net.minecraft.world.item.component.BlockItemStateProperties
 import net.minecraft.world.level.block.NoteBlock
@@ -10,7 +10,7 @@ import org.bukkit.craftbukkit.inventory.CraftItemStack
 import org.bukkit.inventory.ItemType
 
 @Suppress("UnstableApiUsage")
-class AnionBlockItem(val anionBlock: AnionBlock, val stacksTo: Int = anionBlock.stacksTo) : AnionItem(
+class AnionBlockItem(val anionBlock: AnionNoteblockCustomBlock, val stacksTo: Int = anionBlock.stacksTo) : AnionItem(
     displayName = anionBlock.namespacedKey.key,
     itemRepresentation = ItemType.NOTE_BLOCK,
     styledDisplayName = anionBlock.styledDisplayName,
