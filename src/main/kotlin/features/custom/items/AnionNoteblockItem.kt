@@ -10,13 +10,16 @@ import org.bukkit.craftbukkit.inventory.CraftItemStack
 import org.bukkit.inventory.ItemType
 
 @Suppress("UnstableApiUsage")
-class AnionBlockItem(val anionBlock: AnionNoteblockCustomBlock, val stacksTo: Int = anionBlock.stacksTo) : AnionItem(
+class AnionNoteblockItem(val anionBlock: AnionNoteblockCustomBlock, val stacksTo: Int = anionBlock.stacksTo) : AnionItem(
+
     displayName = anionBlock.namespacedKey.key,
     itemRepresentation = ItemType.NOTE_BLOCK,
     styledDisplayName = anionBlock.styledDisplayName,
     namespacedKey = anionBlock.namespacedKey,
     stacksTo = stacksTo
+
 ) {
+
     init {
         val nmsInstrument = CraftBlockData.toVanilla(anionBlock.instrument, NoteBlockInstrument::class.java)
         val blockStateProps = BlockItemStateProperties.EMPTY
@@ -24,4 +27,5 @@ class AnionBlockItem(val anionBlock: AnionNoteblockCustomBlock, val stacksTo: In
             .with(NoteBlock.NOTE, anionBlock.note)
         CraftItemStack.unwrap(internalItemStack).set(DataComponents.BLOCK_STATE, blockStateProps)
     }
+
 }

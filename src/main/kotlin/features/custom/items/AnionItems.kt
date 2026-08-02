@@ -59,7 +59,7 @@ object AnionItems {
 	}
 
 	private fun registerBlock(block: AnionNoteblockCustomBlock): AnionItem {
-		val blockItem = AnionBlockItem(block)
+		val blockItem = AnionNoteblockItem(block)
 
 		AnionRegistries.ITEM_REGISTRY.register(
 			AnionRegistryKey(block.namespacedKey.key),

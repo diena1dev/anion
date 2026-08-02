@@ -9,7 +9,7 @@ import dev.diena.anion.features.custom.blocks.AnionBlock
 import dev.diena.anion.features.custom.blocks.AnionBlocks
 import dev.diena.anion.features.custom.blocks.AnionMushroomCustomBlock
 import dev.diena.anion.features.custom.blocks.MushroomType
-import dev.diena.anion.features.custom.items.AnionBlockItem
+import dev.diena.anion.features.custom.items.AnionNoteblockItem
 import dev.diena.anion.features.custom.items.AnionMushroomBlockItem
 import io.papermc.paper.event.player.PlayerPickBlockEvent
 import net.minecraft.core.BlockPos
@@ -112,7 +112,7 @@ object AnionBlockListeners : Listener {
 
         if (block.type == Material.NOTE_BLOCK) {
             val data = noteData(block) ?: return
-            val isAnionBlockItem = event.itemInHand.toAnionItem() is AnionBlockItem
+            val isAnionBlockItem = event.itemInHand.toAnionItem() is AnionNoteblockItem
 
             // Vanilla note block whose auto-detected instrument+note collides with a registered state:
             // reset note to first safe value so the placement doesn't create a phantom AnionBlock.
@@ -300,7 +300,7 @@ object AnionBlockListeners : Listener {
         event.isCancelled = true
 
         val registryItem = AnionRegistries.ITEM_REGISTRY.getValue(AnionRegistryKey(anionBlock.namespacedKey.key))
-            as? AnionBlockItem ?: return
+            as? AnionNoteblockItem ?: return
         val inventory = event.player.inventory
 
         var earliestEmpty: Int? = null
@@ -311,7 +311,7 @@ object AnionBlockListeners : Listener {
                 if (earliestEmpty == null) earliestEmpty = slot
                 continue
             }
-            val found = (stack.toAnionItem() as? AnionBlockItem)?.anionBlock == anionBlock
+            val found = (stack.toAnionItem() as? AnionNoteblockItem)?.anionBlock == anionBlock
             if (!found) continue
 
             if (slot < 9) {
