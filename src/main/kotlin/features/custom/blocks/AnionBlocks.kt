@@ -8,7 +8,7 @@ import org.bukkit.block.BlockFace
 
 object AnionBlocks {
 
-	private val byState: MutableMap<Pair<Instrument, Int>, AnionNoteblockCustomBlock> = mutableMapOf()
+	private val byNoteblockState: MutableMap<Pair<Instrument, Int>, AnionNoteblockCustomBlock> = mutableMapOf()
 	private val byMushroomState: MutableMap<Pair<MushroomType, Set<BlockFace>>, AnionMushroomCustomBlock> = mutableMapOf()
 
 	val TEST_BLOCK = registerBlock(
@@ -53,14 +53,14 @@ object AnionBlocks {
 	)
 
 	fun fromNoteblockState(instrument: Instrument, note: Int): AnionNoteblockCustomBlock? =
-		byState[instrument to note]
+		byNoteblockState[instrument to note]
 
 	fun fromMushroomState(mushroomType: MushroomType, faces: Set<BlockFace>): AnionMushroomCustomBlock? =
 		byMushroomState[mushroomType to faces]
 
 	private fun registerBlock(block: AnionNoteblockCustomBlock): AnionNoteblockCustomBlock {
 		val key = block.instrument to block.note
-		byState[key] = block
+		byNoteblockState[key] = block
 
 		AnionRegistries.BLOCK_REGISTRY.register(
 			AnionRegistryKey(block.namespacedKey.key),

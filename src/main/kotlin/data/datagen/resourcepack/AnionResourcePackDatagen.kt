@@ -3,8 +3,11 @@ package dev.diena.anion.data.datagen.resourcepack
 import com.google.gson.GsonBuilder
 import com.google.gson.JsonObject
 import dev.diena.anion.data.registry.registries.AnionRegistries
+import dev.diena.anion.features.custom.blocks.AnionMushroomCustomBlock
 import dev.diena.anion.features.custom.blocks.AnionNoteblockCustomBlock
+import dev.diena.anion.features.custom.blocks.MushroomType
 import net.minecraft.world.level.block.state.properties.NoteBlockInstrument
+import org.bukkit.block.BlockFace
 import org.bukkit.craftbukkit.block.data.CraftBlockData
 import java.io.File
 import java.util.Base64
@@ -30,6 +33,7 @@ class AnionResourcePackDatagen(private val outputDir: File) {
         writeItemModels(packRoot)
         writeTextures(packRoot)
         writeNoteBlockOverrides(packRoot)
+        writeMushroomBlockOverrides(packRoot)
         writeBlockAndBlockItemModels(packRoot)
     }
 
@@ -139,6 +143,49 @@ class AnionResourcePackDatagen(private val outputDir: File) {
 
         val blockstateJson = JsonObject().apply { add("variants", variants) }
         File(blockstatesDir, "note_block.json").writeText(gson.toJson(blockstateJson))
+    }
+
+    private val mushroomFaceNames = listOf(
+        "up" to BlockFace.UP,
+        "down" to BlockFace.DOWN,
+        "north" to BlockFace.NORTH,
+        "south" to BlockFace.SOUTH,
+        "east" to BlockFace.EAST,
+        "west" to BlockFace.WEST,
+    )
+
+    /**
+     * Emits assets/minecraft/blockstates/{brown,red}_mushroom_block.json covering all 64 face-combination
+     * states. Registered AnionMushroomCustomBlock states → anion:block/<key>; all others fall back to the
+     * plain vanilla model (same simplification note_block.json makes for unregistered states).
+     */
+    private fun writeMushroomBlockOverrides(packRoot: File) {
+        val blockstatesDir = File(packRoot, "assets/minecraft/blockstates")
+        blockstatesDir.mkdirs()
+
+        val mushroomStateModels: Map<Pair<MushroomType, Set<BlockFace>>, String> = AnionRegistries.BLOCK_REGISTRY.all.values
+            .filterIsInstance<AnionMushroomCustomBlock>()
+            .associate { block -> (block.mushroomType to block.faces) to "anion:block/${block.namespacedKey.key}" }
+
+        for (mushroomType in MushroomType.entries) {
+            val fallbackModel = "minecraft:block/${mushroomType.name.lowercase()}_mushroom_block"
+
+            val multipart = com.google.gson.JsonArray()
+            for (state in 1..64) {
+                val faces = AnionMushroomCustomBlock.decodeState(state)
+                val model = mushroomStateModels[mushroomType to faces] ?: fallbackModel
+
+                multipart.add(JsonObject().apply {
+                    add("apply", JsonObject().apply { addProperty("model", model) })
+                    add("when", JsonObject().apply {
+                        mushroomFaceNames.forEach { (name, face) -> addProperty(name, face in faces) }
+                    })
+                })
+            }
+
+            val blockstateJson = JsonObject().apply { add("multipart", multipart) }
+            File(blockstatesDir, "${mushroomType.name.lowercase()}_mushroom_block.json").writeText(gson.toJson(blockstateJson))
+        }
     }
 
 }
