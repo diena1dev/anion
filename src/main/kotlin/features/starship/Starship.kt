@@ -7,31 +7,17 @@ import dev.diena.anion.extensions.blockPos
 import dev.diena.anion.extensions.div
 import dev.diena.anion.extensions.minus
 import dev.diena.anion.extensions.plus
-import dev.diena.anion.extensions.rotateRight
 import dev.diena.anion.extensions.vec3i
 import dev.diena.anion.features.starship.simluated.StarshipSimulator
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Vec3i
-import net.minecraft.nbt.CompoundTag
 import net.minecraft.server.level.ServerLevel
-import net.minecraft.world.entity.Entity
-import net.minecraft.world.entity.PositionMoveRotation
-import net.minecraft.world.entity.Relative
-import net.minecraft.world.item.Items
-import net.minecraft.world.level.block.Blocks
-import net.minecraft.world.level.block.Rotation
-import net.minecraft.world.level.block.entity.BlockEntity
 import net.minecraft.world.level.block.state.BlockState
-import net.minecraft.world.phys.AABB
-import net.minecraft.world.phys.Vec3
 import org.bukkit.Material
 import org.bukkit.World
 import org.bukkit.block.Block
-import org.bukkit.block.BlockFace
 import org.bukkit.craftbukkit.CraftWorld
 import org.bukkit.craftbukkit.block.CraftBlock
-import org.bukkit.craftbukkit.entity.CraftPlayer
-import org.bukkit.entity.Player
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
@@ -257,6 +243,9 @@ class Starship {
 
         this.blockHashMap.remove(block.vec3i)
 
+        // TODO: move this out of removeBlock
+        this.checkForSplit(block.vec3i)
+
         // deregister and remove ship if all blocks gone
         if (blockHashMap.isEmpty()) {
 
@@ -272,56 +261,6 @@ class Starship {
         this.hitbox.rebuildHitbox()
         this.dirty = true
         return true
-
-    }
-
-    /**
-     * Checks asynchronously whether the most recent block removal split this ship into
-     * disconnected sections, and if so spawns the smaller detached island as its own [Starship].
-     *
-     * @param removedPos position of the block that was just removed.
-     */
-    fun checkForSplit(removedPos: Vec3i) {
-
-        // snapshot on the main thread: blockHashMap is mutated & reassigned by move/rotate/add/remove,
-        // so the async job must never read the live map directly.
-        val snapshot = HashSet(this.blockHashMap.keys)
-
-        Tasks.runAsync {
-
-            val detached = StarshipSplit.detachedComponents(snapshot, removedPos)
-            if (detached.isEmpty()) return@runAsync
-
-            Tasks.runSync {
-
-                // FIXME: this is a guard to prevent the ship from duplicating blocks if an async floodfill
-                //        happens in the middle of a ship moving. what should happen is it splits on the next
-                //        possible tick, NOT cancelling the task.
-                if (this.moving) return@runSync
-                if (detached.any { island -> island.any { this.blockHashMap[it] == null } }) return@runSync
-
-                for (island in detached) spawnDetachedShip(island)
-
-            }
-
-        }
-
-    }
-
-    /** strips [detached] off this ship and re-registers it as an independent [Starship]. main thread only. */
-    private fun spawnDetachedShip(detached: Set<Vec3i>) {
-
-        // strip the detached blocks off this ship
-        for (pos in detached) this.blockHashMap.remove(pos)
-        this.size = this.blockHashMap.size
-        this.simulator.calculateTotalStarshipMass()
-        this.hitbox.rebuildHitbox()
-        this.dirty = true
-
-        // build the new ship from the detached block set (world states re-read here on the main thread).
-        // create() assigns the uuid, registers it in loadedStarships, and persists it.
-        val blockPosSet = detached.mapTo(HashSet()) { BlockPos(it.x, it.y, it.z) }
-        Starship().create(blockPosSet, this.level.world)
 
     }
 
@@ -392,6 +331,60 @@ class Starship {
         }
 
         return false
+
+    }
+
+    //////////////////
+    ///// MISC HELPERS
+    //////////////////
+
+    /**
+     * Checks asynchronously whether the most recent block removal split this ship into
+     * disconnected sections, and if so spawns the smaller detached island as its own [Starship].
+     *
+     * @param removedPos position of the block that was just removed.
+     */
+    fun checkForSplit(removedPos: Vec3i) {
+
+        // snapshot on the main thread: blockHashMap is mutated & reassigned by move/rotate/add/remove,
+        // so the async job must never read the live map directly.
+        val snapshot = HashSet(this.blockHashMap.keys)
+
+        Tasks.runAsync {
+
+            val detached = StarshipSplit.detachedComponents(snapshot, removedPos)
+            if (detached.isEmpty()) return@runAsync
+
+            Tasks.runSync {
+
+                // FIXME: this is a guard to prevent the ship from duplicating blocks if an async floodfill
+                //        happens in the middle of a ship moving. what should happen is it splits on the next
+                //        possible tick, NOT cancelling the task.
+                if (this.moving) return@runSync
+                if (detached.any { island -> island.any { this.blockHashMap[it] == null } }) return@runSync
+
+                for (island in detached) spawnDetachedShip(island)
+
+            }
+
+        }
+
+    }
+
+    /** strips [detached] off this ship and re-registers it as an independent [Starship]. main thread only. */
+    private fun spawnDetachedShip(detached: Set<Vec3i>) {
+
+        // strip the detached blocks off this ship
+        for (pos in detached) this.blockHashMap.remove(pos)
+        this.size = this.blockHashMap.size
+        this.simulator.calculateTotalStarshipMass()
+        this.hitbox.rebuildHitbox()
+        this.dirty = true
+
+        // build the new ship from the detached block set (world states re-read here on the main thread).
+        // create() assigns the uuid, registers it in loadedStarships, and persists it.
+        val blockPosSet = detached.mapTo(HashSet()) { BlockPos(it.x, it.y, it.z) }
+        Starship().create(blockPosSet, this.level.world)
 
     }
 
