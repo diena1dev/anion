@@ -41,24 +41,28 @@ object AnionStarshipListeners: Listener {
 	}
 
 	// construction listeners start
-	@EventHandler
+	@EventHandler(ignoreCancelled = true)
 	fun onBlockPlace(event: BlockPlaceEvent) {
+
+		if (Starship.applyingWorldChanges) return
 
 		val blockPlaced = event.blockPlaced
 
-		Starship.loadedStarships.values.forEach { starship ->
+		// first ship to claim it owns it; a block belongs to exactly one starship
+		Starship.loadedStarships.values.firstOrNull { starship ->
 			starship.addBlock(blockPlaced)
 		}
 
 	}
 
-	@EventHandler
+	@EventHandler(ignoreCancelled = true)
 	fun onBlockBreak(event: BlockBreakEvent) {
+
+		if (Starship.applyingWorldChanges) return
 
 		val blockBroken = event.block
 
-		Starship.loadedStarships.values.forEach {
-			starship ->
+		Starship.loadedStarships.values.firstOrNull { starship ->
 			starship.removeBlock(blockBroken)
 		}
 
@@ -67,10 +71,14 @@ object AnionStarshipListeners: Listener {
 	@EventHandler
 	fun onBlockPhysics(event: BlockPhysicsEvent) {
 
+		// starship movement writes blocks with UPDATE_NEIGHBORS, which fires this event for every neighbour of
+		// every cell the ship lands on. handling those makes ships absorb each other's blocks — see
+		// [Starship.applyingWorldChanges].
+		if (Starship.applyingWorldChanges) return
+
 		val block = event.block
 
-		Starship.loadedStarships.values.forEach {
-			starship ->
+		Starship.loadedStarships.values.firstOrNull { starship ->
 			starship.updateBlock(block)
 		}
 

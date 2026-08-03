@@ -57,8 +57,10 @@ class StarshipSimulator private constructor() {
 
 	fun simulate() {
 
+		// forces first, then latch the whole-block step they produced, then clamp that step to what actually fits.
 		applyPlanetGravity()
 		applyDebugConstantVelocity()
+		this.starship.velocity.beginTick()
 		clampVelocityToCollision()
 
 	}
@@ -116,7 +118,7 @@ class StarshipSimulator private constructor() {
 	 *  and a fast-moving ship could tunnel past a collision that's within its full velocity but not adjacent. */
 	private fun clampVelocityToCollision() {
 
-		val intendedMove = this.starship.velocity.vec3i
+		val intendedMove = this.starship.velocity.pendingStep
 		if (intendedMove == Vec3i.ZERO) return
 
 		val (canMoveFull, safeDistance) = StarshipCollision.processMoveCollision(intendedMove, this.starship)
@@ -124,7 +126,7 @@ class StarshipSimulator private constructor() {
 
 		// TODO: this is where hit-transfer belongs (deal damage/mass-transfer to the block or starship
 		//       we collided with, proportional to the velocity we didn't get to use).
-		this.starship.velocity.setVelocity(Vec3(safeDistance.x.toDouble(), safeDistance.y.toDouble(), safeDistance.z.toDouble()))
+		this.starship.velocity.clampStep(safeDistance)
 
 	}
 
@@ -133,14 +135,20 @@ class StarshipSimulator private constructor() {
 	//////////////////////
 
 	// TODO: breakout into single function call so we don't iterate over the same array twice (merge mass adding logic into starship detection loop)
+	/** recomputes mass from scratch. must not accumulate onto the previous value: this is called again after a
+	 *  split strips blocks off the ship, where accumulating would grow the mass of a ship that just got smaller. */
 	fun calculateTotalStarshipMass() {
+
+		var total = 0
 
 		this.starship.blockHashMap.forEach { (_, state) ->
 
 			val simulatedBlock = BlockLists.getSimulatedBlock(state.bukkitMaterial.asBlockType() ?: BlockType.AIR)
-			starshipMass += simulatedBlock.mass
+			total += simulatedBlock.mass
 
 		}
+
+		this.starshipMass = total
 
 	}
 

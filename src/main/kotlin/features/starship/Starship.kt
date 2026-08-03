@@ -28,6 +28,33 @@ class Starship {
     companion object {
         /** all loaded and active ships on the server */
         val loadedStarships: MutableMap<UUID, Starship> = ConcurrentHashMap()
+
+        /** true while a starship is writing its blocks into the world.
+         *
+         *  [StarshipMovement] writes moved blocks with the UPDATE_NEIGHBORS flag, which synchronously fires
+         *  BlockPhysicsEvent for every neighbour of every cell the ship lands on. those events are the ship's
+         *  own movement echoing back, not player construction, and letting them reach [addBlock]/[updateBlock]
+         *  makes ships steal each other's blocks: when two ships end up face-adjacent, each one sees a physics
+         *  event on a cell next to its own blocks and claims it, after which both maps contain the same
+         *  positions and every subsequent move has them stamping over each other.
+         *
+         *  main thread only — movement and block events both run there. */
+        var applyingWorldChanges: Boolean = false
+            private set
+
+        /** the loaded ship in [level] that owns [pos], or null if no ship does. */
+        fun starshipAt(level: ServerLevel, pos: Vec3i): Starship? =
+            loadedStarships.values.firstOrNull { it.level == level && it.blockHashMap[pos] != null }
+
+        /** runs [block] with [applyingWorldChanges] set, so block events it provokes are ignored by ships. */
+        fun <T> writingToWorld(block: () -> T): T {
+
+            val previous = applyingWorldChanges
+            applyingWorldChanges = true
+
+            try { return block() } finally { applyingWorldChanges = previous }
+
+        }
     }
 
     lateinit var uuid: UUID
@@ -165,7 +192,7 @@ class Starship {
         }
 
 	    this.origin += vectorToMoveIn                  // translate origin
-        this.blockHashMap = StarshipMovement.move(vectorToMoveIn, this)
+        this.blockHashMap = writingToWorld { StarshipMovement.move(vectorToMoveIn, this) }
         this.hitbox.moveHitbox(vectorToMoveIn) // translate hitbox
         this.dirty = true
         this.moving = false
@@ -191,7 +218,7 @@ class Starship {
         }
 
         // origin is unchanged
-        this.blockHashMap = StarshipMovement.rotate(byAmount.toFloat(), this)
+        this.blockHashMap = writingToWorld { StarshipMovement.rotate(byAmount.toFloat(), this) }
         this.hitbox.rebuildHitbox() // recompute hitbox
         this.dirty = true
         this.moving = false
@@ -276,9 +303,15 @@ class Starship {
     ) : Boolean {
 
         if (this.moving) return false
+        if (applyingWorldChanges) return false // a ship's own world writes must never grow another ship
 
         // blacklisted blocks go here
         if (block.type == Material.AIR) return false
+
+        // a block can only ever belong to one ship. without this two face-adjacent ships both claim the same
+        // cell and then stamp over each other on every move.
+        val owner = starshipAt((block.world as CraftWorld).handle, block.vec3i)
+        if (owner != null && owner !== this) return false
 
         // only check blocks adjacent to the placed block
         for (b in block.adjacentBlocks) {
@@ -303,8 +336,15 @@ class Starship {
 
     }
 
-    // TODO: combine/refactor updateBlock with addBlock as the functions are literally identical
-    /** used for things like pistons. returns a boolean based on the result. */
+    /**
+     * Refreshes the stored state of a block the ship *already owns*. Used for things like pistons.
+     *
+     * This deliberately does not add new blocks, unlike [addBlock]. It is driven by BlockPhysicsEvent,
+     * which fires for cells the ship does not own — its own neighbours, terrain it just landed on, and the
+     * hull of an adjacent ship. Adding on any of those is how a ship absorbs the world and its neighbours,
+     * ending up with map entries whose world blocks belong to someone else. Genuine construction goes
+     * through [addBlock]. Returns a boolean based on the result.
+     */
     fun updateBlock(
 
         block: Block
@@ -312,25 +352,19 @@ class Starship {
     ) : Boolean {
 
         if (this.moving) return false
+        if (applyingWorldChanges) return false // a ship's own world writes must never mutate any ship
 
-        // blacklisted blocks go here
+        if ((block.world as CraftWorld).handle != this.level) return false
+        if (this.blockHashMap[block.vec3i] == null) return false // not ours: do not claim it
+
+        // blacklisted blocks go here. a block turning to air is a removal, which is removeBlock's job.
         if (block.type == Material.AIR) return false
 
-        for (b in block.adjacentBlocks) {
+        // position is unchanged, so the hitbox does not need rebuilding
+        this.blockHashMap[block.vec3i] = (block as CraftBlock).blockState
+        this.dirty = true
 
-            // if not in entry continue, if in no entries do not add block.
-            if (blockHashMap[b.vec3i] == null) continue
-
-            // if at least one adjacent block was found, add it to the ship
-            this.blockHashMap[block.vec3i] = (block as CraftBlock).blockState
-            this.hitbox.rebuildHitbox()
-            this.dirty = true
-
-            return true
-
-        }
-
-        return false
+        return true
 
     }
 
@@ -348,22 +382,37 @@ class Starship {
 
         // snapshot on the main thread: blockHashMap is mutated & reassigned by move/rotate/add/remove,
         // so the async job must never read the live map directly.
-        val snapshot = HashSet(this.blockHashMap.keys)
+        //
+        // the snapshot is taken in ship-local space (relative to origin) rather than world space. slowTick
+        // translates the whole ship on the main thread while this job is in flight, so any world coordinate
+        // captured here is stale by the time the result lands — and stale coordinates are not detectable after
+        // the fact, because a ship shifted by one block still occupies most of the cells it used to. applying a
+        // stale island would strip live blocks off this ship's map (leaving orphaned blocks in the world) and
+        // hand the new ship a block set that overlaps this one, after which both ships write over each other.
+        // local coordinates survive translation, so the result is rebased onto the current origin on apply.
+        val originAtSnapshot = this.origin
+        val yawAtSnapshot = this.yaw
+        val snapshot = this.blockHashMap.keys.mapTo(HashSet()) { it - originAtSnapshot }
+        val removedLocal = removedPos - originAtSnapshot
 
         Tasks.runAsync {
 
-            val detached = StarshipSplit.detachedComponents(snapshot, removedPos)
+            val detached = StarshipSplit.detachedComponents(snapshot, removedLocal)
             if (detached.isEmpty()) return@runAsync
 
             Tasks.runSync {
 
-                // FIXME: this is a guard to prevent the ship from duplicating blocks if an async floodfill
-                //        happens in the middle of a ship moving. what should happen is it splits on the next
-                //        possible tick, NOT cancelling the task.
-                if (this.moving) return@runSync
-                if (detached.any { island -> island.any { this.blockHashMap[it] == null } }) return@runSync
+                // rotation remaps local coordinates, so a rotated ship invalidates the snapshot outright.
+                // dropping the result is safe: the next block removal re-runs the check against fresh geometry.
+                if (this.yaw != yawAtSnapshot) return@runSync
 
-                for (island in detached) spawnDetachedShip(island)
+                val rebased = detached.map { island -> island.mapTo(HashSet()) { it + this.origin } }
+
+                // blocks may still have been added/removed while the floodfill ran; bail if the island no
+                // longer matches what this ship actually owns.
+                if (rebased.any { island -> island.any { this.blockHashMap[it] == null } }) return@runSync
+
+                for (island in rebased) spawnDetachedShip(island)
 
             }
 

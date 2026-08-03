@@ -131,6 +131,14 @@ inline operator fun Vec3i.div(other: Int) = Vec3i(x / other, y / other, z / othe
 inline val Vec3i.blockPos get() = BlockPos(x, y, z)
 inline val Vec3.vec3i get() = Vec3i(x.toInt(), y.toInt(), z.toInt())
 
+/** [vec3i] truncates toward zero, so -0.5 and 0.5 both land on 0 and negative motion is biased upward.
+ *  this rounds consistently downward, which is what block-lattice coordinates want. */
+inline val Vec3.floorVec3i get() = Vec3i(
+    kotlin.math.floor(x).toInt(),
+    kotlin.math.floor(y).toInt(),
+    kotlin.math.floor(z).toInt(),
+)
+
 fun BlockFace.rotateRight() = when (this) {
     BlockFace.NORTH -> BlockFace.EAST
     BlockFace.EAST -> BlockFace.SOUTH
