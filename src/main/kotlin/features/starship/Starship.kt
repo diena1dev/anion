@@ -22,7 +22,9 @@ import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
 /** represents a collection of simulated blocks. logic and functionality split off into subclasses. */
-// FIXME: Starship yaw can exist in states between what rotate the ship, while starship position is clamped to integer values and is never changed if velocity is below 1 unit.
+// FIXME: Starship yaw can exist in states between what rotate the ship,
+//        while starship position is clamped to integer values and is never changed if velocity is below 1 unit.
+//        Update starship Position to support partial moves (so starships can still move at <=1 block a second)
 class Starship {
 
     companion object {
@@ -433,7 +435,9 @@ class Starship {
         // build the new ship from the detached block set (world states re-read here on the main thread).
         // create() assigns the uuid, registers it in loadedStarships, and persists it.
         val blockPosSet = detached.mapTo(HashSet()) { BlockPos(it.x, it.y, it.z) }
-        Starship().create(blockPosSet, this.level.world)
+        val createdStarship = Starship().create(blockPosSet, this.level.world)
+
+        createdStarship.velocity = this.velocity
 
     }
 
