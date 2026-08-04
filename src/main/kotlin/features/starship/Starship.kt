@@ -437,7 +437,10 @@ class Starship {
         val blockPosSet = detached.mapTo(HashSet()) { BlockPos(it.x, it.y, it.z) }
         val createdStarship = Starship().create(blockPosSet, this.level.world)
 
-        createdStarship.velocity = this.velocity
+        // inherit the parent's momentum by VALUE. create() already gave the child its own StarshipVelocity
+        // (back-referencing the child); assigning this.velocity here instead would alias the parent's instance
+        // and the child would drive the parent's movement, never its own — leaving the piece frozen in space.
+        createdStarship.velocity.inheritFrom(this.velocity)
 
     }
 

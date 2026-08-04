@@ -5,7 +5,6 @@ import dev.diena.anion.features.starship.StarshipCollision
 import net.minecraft.core.Vec3i
 import net.minecraft.world.phys.Vec3
 import net.minecraft.world.level.block.state.BlockState
-import org.bukkit.Bukkit
 import org.bukkit.block.Block
 import org.bukkit.block.BlockType
 
@@ -26,13 +25,16 @@ class StarshipSimulator private constructor() {
 	lateinit var starship: Starship
 	var starshipMass: Int = 0
 
-	/** debug-only: constant velocity re-applied every 20 ticks, standing in for thrusters until those exist. */
+	/**
+	 *  debug-only: constant velocity re-applied every slowTick, standing in for thrusters until those exist.
+	 *  applied on the same cadence as [applyPlanetGravity] so the two can cancel exactly (a +0.5 debug against
+	 *  -0.5 gravity holds a ship suspended).
+	 */
 	private var debugConstantVelocity: Vec3 = Vec3.ZERO
 
-	/** game tick [debugConstantVelocity] was last applied on; -1 forces an immediate apply. slowTick runs off
-	 *  a real-time (1s) async scheduler, which can drift from the actual 20-tick server cadence under lag,
-	 *  so we track elapsed game ticks ourselves instead of trusting "once per slowTick" to mean "every 20 ticks". */
-	private var lastDebugVelocityTick: Int = -1
+	/** the debug constant velocity this ship is actually re-applying. read-only; mutate via
+	 *  [setDebugConstantVelocity] / [resetDebugConstantVelocity]. */
+	val debugVelocity: Vec3 get() = this.debugConstantVelocity
 
 	companion object {
 
@@ -84,11 +86,10 @@ class StarshipSimulator private constructor() {
 	///// VELOCITY SOURCES (Thrusters, Debug Velocity)
 	//////////////////////////////////////////////////
 
-	/** set the debug constant velocity, re-applied every 20 ticks until reset. for testing movement without thrusters. */
+	/** set the debug constant velocity, re-applied every slowTick until reset. for testing movement without thrusters. */
 	fun setDebugConstantVelocity(vec: Vec3) {
 
 		this.debugConstantVelocity = vec
-		this.lastDebugVelocityTick = -1 // force apply on next simulate() instead of waiting out a stale window
 
 	}
 
@@ -96,7 +97,6 @@ class StarshipSimulator private constructor() {
 	fun resetDebugConstantVelocity() {
 
 		this.debugConstantVelocity = Vec3.ZERO
-		this.lastDebugVelocityTick = -1
 
 	}
 
@@ -104,11 +104,7 @@ class StarshipSimulator private constructor() {
 
 		if (this.debugConstantVelocity == Vec3.ZERO) return
 
-		val currentTick = Bukkit.getCurrentTick()
-		if (this.lastDebugVelocityTick != -1 && currentTick - this.lastDebugVelocityTick < 20) return
-
 		this.starship.velocity.addVelocity(this.debugConstantVelocity)
-		this.lastDebugVelocityTick = currentTick
 
 	}
 

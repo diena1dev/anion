@@ -80,6 +80,18 @@ class StarshipVelocity private constructor() {
 
 	}
 
+	/** copy motion state from [other] into this instance. used when a detached piece inherits its parent's
+	 *  momentum: each ship must keep its OWN [StarshipVelocity] (whose [starship] back-reference points at
+	 *  itself) — aliasing the parent's instance makes this ship's [applyMovement] move the parent instead, so
+	 *  the detached piece never moves and both ships fight over one shared [subBlockOffset]. */
+	fun inheritFrom(other: StarshipVelocity) {
+
+		this.velocity = other.velocity
+		this.subBlockOffset = other.subBlockOffset
+		// pendingStep is a per-tick latch; this ship recomputes its own in beginTick.
+
+	}
+
 	/** clamps the latched [pendingStep] down to [safeDistance]. used by
 	 *  [dev.diena.anion.features.starship.simluated.StarshipSimulator] when a collision check finds the ship
 	 *  can't travel its full intended distance. */

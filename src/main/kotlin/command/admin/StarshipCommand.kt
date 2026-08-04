@@ -42,9 +42,6 @@ import kotlin.collections.toSet
 @Name("starship")
 object StarshipCommand {
 
-    // used in info command
-    private var currentCVel: Vec3 = Vec3(0.0, 0.0, 0.0)
-
     @Register
     object DebugStarshipListeners : Listener {
 
@@ -62,7 +59,7 @@ object StarshipCommand {
                 val ship = getSelectedStarship(player, false) ?: continue
 
                 player.sendActionBar(
-                    Component.text("Pos: ${ship.origin} | Vel: ${ship.velocity.velocity} | CVel: $currentCVel | Level: ${ship.level.bukkitName}")
+                    Component.text("Pos: ${ship.origin} | Vel: ${ship.velocity.velocity} | CVel: ${ship.simulator.debugVelocity} | Level: ${ship.level.bukkitName}")
                 )
 
             }
@@ -215,7 +212,7 @@ object StarshipCommand {
             "\n|- Velocity: ${ship.velocity.velocity}" +
             "\n|- Pos: ${ship.origin}" +
             "\n|- Level: ${ship.level.bukkitName}" +
-            "\n|- DEBUG CVelocity: $currentCVel"
+            "\n|- DEBUG CVelocity: ${ship.simulator.debugVelocity}"
         )
 
     }
@@ -328,7 +325,6 @@ object StarshipCommand {
 
             val ship = getSelectedStarship(sender) ?: return
             ship.simulator.setDebugConstantVelocity(Vec3(x, y, z))
-            currentCVel = Vec3(x, y, z)
 
             sender.info("Set debug constant velocity to Vec{$x, $y, $z}. Re-applied every tick until reset.")
 
