@@ -66,12 +66,12 @@ object StarshipCollision {
 
 		var lastClean = Vec3i.ZERO
 
-		for (i in 1..steps) {
+		for (stepIndex in 1..steps) {
 
 			val stepVec = Vec3i(
-				(vectorToMoveIn.x * i) / steps,
-				(vectorToMoveIn.y * i) / steps,
-				(vectorToMoveIn.z * i) / steps,
+				(vectorToMoveIn.x * stepIndex) / steps,
+				(vectorToMoveIn.y * stepIndex) / steps,
+				(vectorToMoveIn.z * stepIndex) / steps,
 			)
 
 			if (!isClean(stepVec, starship)) break
@@ -97,17 +97,17 @@ object StarshipCollision {
 
 	private fun stepsFromTo(from: BlockFace, to: BlockFace): Int {
 
-		var steps = 0; var cur = from
-		while (cur != to && steps < 4) { cur = cur.rotateRight(); steps++ }
+		var steps = 0; var currentFace = from
+		while (currentFace != to && steps < 4) { currentFace = currentFace.rotateRight(); steps++ }
 		return steps
 
 	}
 
-	private fun rotateVec(rel: Vec3i, steps: Int): Vec3i {
+	private fun rotateVec(relative: Vec3i, steps: Int): Vec3i {
 
-		var x = rel.x; var z = rel.z
-		repeat(steps) { val nx = -z; z = x; x = nx }
-		return Vec3i(x, rel.y, z)
+		var rotatedX = relative.x; var rotatedZ = relative.z
+		repeat(steps) { val nextX = -rotatedZ; rotatedZ = rotatedX; rotatedX = nextX }
+		return Vec3i(rotatedX, relative.y, rotatedZ)
 
 	}
 

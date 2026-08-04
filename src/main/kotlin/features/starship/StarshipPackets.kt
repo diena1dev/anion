@@ -20,42 +20,42 @@ import net.minecraft.world.level.block.state.BlockState
  * */
 object StarshipPackets {
 
-    fun sendSections(
+	fun sendSections(
 
-        level: ServerLevel,
-        newPositions: Set<Vec3i>,
-        oldPositions: Set<Vec3i>,
-        newBlockMap: Map<Vec3i, BlockState>
+		level: ServerLevel,
+		newPositions: Set<Vec3i>,
+		oldPositions: Set<Vec3i>,
+		newBlockMap: Map<Vec3i, BlockState>
 
-    ) {
+	) {
 
-        val changes = HashMap<SectionPos, Short2ObjectOpenHashMap<BlockState>>()
+		val changes = HashMap<SectionPos, Short2ObjectOpenHashMap<BlockState>>()
 
-        for (vec in oldPositions) {
+		for (vec in oldPositions) {
 
-            val sec = SectionPos.of(vec.blockPos)
-            changes.getOrPut(sec) { Short2ObjectOpenHashMap() }[SectionPos.sectionRelativePos(vec.blockPos)] =
-                Blocks.AIR.defaultBlockState()
+			val sec = SectionPos.of(vec.blockPos)
+			changes.getOrPut(sec) { Short2ObjectOpenHashMap() }[SectionPos.sectionRelativePos(vec.blockPos)] =
+				Blocks.AIR.defaultBlockState()
 
-        }
+		}
 
-        for (vec in newPositions) {
+		for (vec in newPositions) {
 
-            val sec = SectionPos.of(vec.blockPos)
-            changes.getOrPut(sec) { Short2ObjectOpenHashMap() }[SectionPos.sectionRelativePos(vec.blockPos)] =
-                newBlockMap[vec] ?: Blocks.AIR.defaultBlockState()
+			val sec = SectionPos.of(vec.blockPos)
+			changes.getOrPut(sec) { Short2ObjectOpenHashMap() }[SectionPos.sectionRelativePos(vec.blockPos)] =
+				newBlockMap[vec] ?: Blocks.AIR.defaultBlockState()
 
-        }
+		}
 
-        for ((secPos, blockMap) in changes) {
+		for ((secPos, blockMap) in changes) {
 
-            val packet = ClientboundSectionBlocksUpdatePacket(secPos, blockMap)
-            level.chunkSource.chunkMap.getPlayers(secPos.chunk(), false).forEach { player ->
-                player.connection.send(packet)
-            }
+			val packet = ClientboundSectionBlocksUpdatePacket(secPos, blockMap)
+			level.chunkSource.chunkMap.getPlayers(secPos.chunk(), false).forEach { player ->
+				player.connection.send(packet)
+			}
 
-        }
+		}
 
-    }
+	}
 
 }

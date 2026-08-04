@@ -8,13 +8,13 @@ import net.minecraft.core.BlockPos
  * The origin point is used in when assembling a Machine with a wrench, usually occupied by a Machine "Core" tiered block.
  * */
 class MachineStructure(
-    val blockMap: MutableMap<BlockPos, AnionBlock>,
-    height: Int,
-    width: Int,
-    depth: Int
+	val blockMap: MutableMap<BlockPos, AnionBlock>,
+	height: Int,
+	width: Int,
+	depth: Int
 ) {
 
-    /** holy FUCK astral is so much smarter than i am */
+	/** holy FUCK astral is so much smarter than i am */
 
 
 

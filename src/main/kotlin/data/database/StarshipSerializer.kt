@@ -14,105 +14,105 @@ import java.util.UUID
 // and we all say "thank you, Claude", because surely nothing ill will come of me not actually learning how to use a database
 object StarshipSerializer {
 
-    fun serialize(ship: Starship): ByteArray {
-        val baos = ByteArrayOutputStream()
-        val dos = DataOutputStream(baos)
+	fun serialize(ship: Starship): ByteArray {
+		val baos = ByteArrayOutputStream()
+		val dos = DataOutputStream(baos)
 
-        dos.writeShort(STARSHIPS_VERSION.toInt())
+		dos.writeShort(STARSHIPS_VERSION.toInt())
 
-        val worldUid = ship.level.world.uid
-        dos.writeLong(worldUid.mostSignificantBits)
-        dos.writeLong(worldUid.leastSignificantBits)
+		val worldUid = ship.level.world.uid
+		dos.writeLong(worldUid.mostSignificantBits)
+		dos.writeLong(worldUid.leastSignificantBits)
 
-        dos.writeInt(ship.origin.x)
-        dos.writeInt(ship.origin.y)
-        dos.writeInt(ship.origin.z)
+		dos.writeInt(ship.origin.x)
+		dos.writeInt(ship.origin.y)
+		dos.writeInt(ship.origin.z)
 
-        dos.writeDouble(ship.yaw)
+		dos.writeDouble(ship.yaw)
 
-        dos.writeInt(ship.blockHashMap.size)
-        for ((vec, state) in ship.blockHashMap) {
-            val relLong = BlockPos.asLong(
-                vec.x - ship.origin.x,
-                vec.y - ship.origin.y,
-                vec.z - ship.origin.z
-            )
-            dos.writeLong(relLong)
+		dos.writeInt(ship.blockHashMap.size)
+		for ((vec, state) in ship.blockHashMap) {
+			val relLong = BlockPos.asLong(
+				vec.x - ship.origin.x,
+				vec.y - ship.origin.y,
+				vec.z - ship.origin.z
+			)
+			dos.writeLong(relLong)
 
-            val tag = NbtUtils.writeBlockState(state)
-            val blockBaos = ByteArrayOutputStream()
-            NbtIo.write(tag, DataOutputStream(blockBaos))
-            val arr = blockBaos.toByteArray()
-            dos.writeInt(arr.size)
-            dos.write(arr)
-        }
+			val tag = NbtUtils.writeBlockState(state)
+			val blockBaos = ByteArrayOutputStream()
+			NbtIo.write(tag, DataOutputStream(blockBaos))
+			val arr = blockBaos.toByteArray()
+			dos.writeInt(arr.size)
+			dos.write(arr)
+		}
 
-        // machines not currently implemented
-        dos.writeInt(0)
+		// machines not currently implemented
+		dos.writeInt(0)
 
-        dos.flush()
-        return baos.toByteArray()
-    }
+		dos.flush()
+		return baos.toByteArray()
+	}
 
-    fun deserialize(uuid: UUID, bytes: ByteArray, world: ServerLevel): Starship {
-        val dis = DataInputStream(ByteArrayInputStream(bytes))
-        val registryAccess = world.registryAccess()
-        val blockRegistry = registryAccess.lookup(Registries.BLOCK).orElseThrow()
+	fun deserialize(uuid: UUID, bytes: ByteArray, world: ServerLevel): Starship {
+		val dis = DataInputStream(ByteArrayInputStream(bytes))
+		val registryAccess = world.registryAccess()
+		val blockRegistry = registryAccess.lookup(Registries.BLOCK).orElseThrow()
 
-        val schemaVersion = dis.readShort()
-        check(schemaVersion == STARSHIPS_VERSION) {
-            "unsupported starship schema v$schemaVersion (code at v$STARSHIPS_VERSION)"
-        }
+		val schemaVersion = dis.readShort()
+		check(schemaVersion == STARSHIPS_VERSION) {
+			"unsupported starship schema v$schemaVersion (code at v$STARSHIPS_VERSION)"
+		}
 
-        dis.readLong() // world uuid MSB
-        dis.readLong() // world uuid LSB
+		dis.readLong() // world uuid MSB
+		dis.readLong() // world uuid LSB
 
-        val originX = dis.readInt()
-        val originY = dis.readInt()
-        val originZ = dis.readInt()
-        val origin = Vec3i(originX, originY, originZ)
+		val originX = dis.readInt()
+		val originY = dis.readInt()
+		val originZ = dis.readInt()
+		val origin = Vec3i(originX, originY, originZ)
 
-        val yaw = dis.readDouble()
+		val yaw = dis.readDouble()
 
-        val blockCount = dis.readInt()
-        val blocks = HashMap<Vec3i, BlockState>(blockCount)
+		val blockCount = dis.readInt()
+		val blocks = HashMap<Vec3i, BlockState>(blockCount)
 
-        repeat(blockCount) {
-            val relLong = dis.readLong()
-            val relPos = BlockPos.of(relLong)
-            val absVec = Vec3i(origin.x + relPos.x, origin.y + relPos.y, origin.z + relPos.z)
+		repeat(blockCount) {
+			val relLong = dis.readLong()
+			val relPos = BlockPos.of(relLong)
+			val absVec = Vec3i(origin.x + relPos.x, origin.y + relPos.y, origin.z + relPos.z)
 
-            val nbtLen = dis.readInt()
-            val nbtBytes = ByteArray(nbtLen)
-            dis.readFully(nbtBytes)
-            val tag = NbtIo.read(DataInputStream(ByteArrayInputStream(nbtBytes)))
-            val blockState = NbtUtils.readBlockState(blockRegistry, tag)
+			val nbtLen = dis.readInt()
+			val nbtBytes = ByteArray(nbtLen)
+			dis.readFully(nbtBytes)
+			val tag = NbtIo.read(DataInputStream(ByteArrayInputStream(nbtBytes)))
+			val blockState = NbtUtils.readBlockState(blockRegistry, tag)
 
-            blocks[absVec] = blockState
-        }
+			blocks[absVec] = blockState
+		}
 
-        // machines not currently implemented
-        val machineRefCount = dis.readInt()
-        repeat(machineRefCount) { dis.readLong() }
+		// machines not currently implemented
+		val machineRefCount = dis.readInt()
+		repeat(machineRefCount) { dis.readLong() }
 
-        return Starship().load(uuid, world, origin, yaw, blocks)
-    }
+		return Starship().load(uuid, world, origin, yaw, blocks)
+	}
 
-    /** Peeks at the blob header to check if this starship's origin falls in the given chunk. */
-    fun matchesChunk(bytes: ByteArray, world: ServerLevel, chunkX: Int, chunkZ: Int): Boolean {
-        return try {
-            val dis = DataInputStream(ByteArrayInputStream(bytes))
-            dis.readShort() // schema version
-            val msb = dis.readLong()
-            val lsb = dis.readLong()
-            val storedWorldUid = UUID(msb, lsb)
-            if (storedWorldUid != world.world.uid) return false
-            val originX = dis.readInt()
-            dis.readInt()   // originY
-            val originZ = dis.readInt()
-            (originX shr 4) == chunkX && (originZ shr 4) == chunkZ
-        } catch (_: Exception) {
-            false
-        }
-    }
+	/** Peeks at the blob header to check if this starship's origin falls in the given chunk. */
+	fun matchesChunk(bytes: ByteArray, world: ServerLevel, chunkX: Int, chunkZ: Int): Boolean {
+		return try {
+			val dis = DataInputStream(ByteArrayInputStream(bytes))
+			dis.readShort() // schema version
+			val msb = dis.readLong()
+			val lsb = dis.readLong()
+			val storedWorldUid = UUID(msb, lsb)
+			if (storedWorldUid != world.world.uid) return false
+			val originX = dis.readInt()
+			dis.readInt()   // originY
+			val originZ = dis.readInt()
+			(originX shr 4) == chunkX && (originZ shr 4) == chunkZ
+		} catch (_: Exception) {
+			false
+		}
+	}
 }

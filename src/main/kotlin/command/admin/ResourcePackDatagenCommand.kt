@@ -16,15 +16,15 @@ import org.bukkit.command.CommandSender
 @Permission("${Keys.COMMAND_PERMISSION_TREE}.admin.resourcepackdatagen")
 object ResourcePackDatagenCommand {
 
-    @Inferred
-    fun self(
-        @Sender sender: CommandSender
-    ) {
+	@Inferred
+	fun self(
+		@Sender sender: CommandSender
+	) {
 
-        sender.sendMessage(Component.text("[Started Datagen]"))
-        AnionResourcePackDatagen(Anion().dataFolder).generate()
-        sender.sendMessage(Component.text("[Finished Datagen] \n" +
-                "Exported to `${Anion().dataFolder}/generated/resourcepack`"))
-    }
+		sender.sendMessage(Component.text("[Started Datagen]"))
+		AnionResourcePackDatagen(Anion().dataFolder).generate()
+		sender.sendMessage(Component.text("[Finished Datagen] \n" +
+				"Exported to `${Anion().dataFolder}/generated/resourcepack`"))
+	}
 
 }

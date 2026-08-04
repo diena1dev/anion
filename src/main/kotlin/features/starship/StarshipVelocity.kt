@@ -11,10 +11,10 @@ class StarshipVelocity private constructor() {
 	lateinit var velocity: Vec3 private set
 	private lateinit var starship: Starship
 
-	/** fractional leftover between whole-block moves. the ship's position is an integer lattice, so a velocity of
-	 *  -0.5 blocks/tick has to accumulate here across two ticks before it becomes a single downward step.
-	 *  keeping this separate from [velocity] is what stops velocity from being silently consumed by movement:
-	 *  a ship falling at -3.5 keeps falling at -3.5, it doesn't get reset to -0.5 every time it moves 3 blocks. */
+	/**
+	 * fractional leftover between whole-block moves.
+	 * TODO: refactor starship coordinate storage to merge coordinate handling back into Starship.
+	 * */
 	var subBlockOffset: Vec3 = Vec3.ZERO
 
 	/** whole-block step latched by [beginTick] and consumed by [applyVelocity]. */
@@ -48,7 +48,7 @@ class StarshipVelocity private constructor() {
 	 *  must run after all forces are applied for the tick and before [applyVelocity]. */
 	fun beginTick() {
 
-		this.subBlockOffset = this.subBlockOffset + this.velocity
+		this.subBlockOffset += this.velocity
 		this.pendingStep = this.subBlockOffset.floorVec3i
 
 	}
@@ -84,11 +84,10 @@ class StarshipVelocity private constructor() {
 	 *  momentum: each ship must keep its OWN [StarshipVelocity] (whose [starship] back-reference points at
 	 *  itself) — aliasing the parent's instance makes this ship's [applyMovement] move the parent instead, so
 	 *  the detached piece never moves and both ships fight over one shared [subBlockOffset]. */
-	fun inheritFrom(other: StarshipVelocity) {
+	fun copyFrom(other: StarshipVelocity) {
 
 		this.velocity = other.velocity
 		this.subBlockOffset = other.subBlockOffset
-		// pendingStep is a per-tick latch; this ship recomputes its own in beginTick.
 
 	}
 

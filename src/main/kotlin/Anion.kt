@@ -17,62 +17,62 @@ import java.util.concurrent.TimeUnit
 
 @Suppress("Unused", "UnstableAPIUsage")
 class AnionBootstrap : PluginBootstrap {
-    val startTime = System.currentTimeMillis()
+	val startTime = System.currentTimeMillis()
 
-    override fun bootstrap(context: BootstrapContext) {
-        context.lifecycleManager.registerEventHandler(COMMANDS, Registration(context.logger))
+	override fun bootstrap(context: BootstrapContext) {
+		context.lifecycleManager.registerEventHandler(COMMANDS, Registration(context.logger))
 
-        println("[Anion] Bootstrap stage completed in ${(System.currentTimeMillis()-startTime)}ms")
-    }
+		println("[Anion] Bootstrap stage completed in ${(System.currentTimeMillis()-startTime)}ms")
+	}
 
-    override fun createPlugin(context: PluginProviderContext): JavaPlugin {
-        return Anion()
-    }
+	override fun createPlugin(context: PluginProviderContext): JavaPlugin {
+		return Anion()
+	}
 }
 
 class Anion : JavaPlugin() {
 
-    override fun onEnable() {
-        Registration.listeners(this)
+	override fun onEnable() {
+		Registration.listeners(this)
 
-        instance = this.server
-        plugin = this
+		instance = this.server
+		plugin = this
 
-        AnionDatabase.open(dataFolder)
+		AnionDatabase.open(dataFolder)
 
-        // init our feature classes that call registries
-        AnionItems
-        AnionBlocks
-        //AnionGasses
-        //AnionEnergies
-	    AnionRecipes
+		// init our feature classes that call registries
+		AnionItems
+		AnionBlocks
+		//AnionGasses
+		//AnionEnergies
+		AnionRecipes
 
-        // starship slowTick updates
-        Tasks.scheduleAsync(1, 1, TimeUnit.SECONDS, Runnable {
-            for ((uuid, ship) in Starship.loadedStarships) {
+		// starship slowTick updates
+		Tasks.scheduleAsync(1, 1, TimeUnit.SECONDS, Runnable {
+			for ((uuid, ship) in Starship.loadedStarships) {
 
-                // saving
-                if (ship.dirty) AnionPersistence.saveStarship(uuid, ship)
+				// saving
+				if (ship.dirty) AnionPersistence.saveStarship(uuid, ship)
 
-                // ticking (sync for API safety)
-                Tasks.runSync { ship.slowTick() }
-            }
-        })
+				// ticking (sync for API safety)
+				Tasks.runSync { ship.slowTick() }
+			}
+		})
 
-    }
+	}
 
-    override fun onDisable() {
-        AnionPersistence.flushAll()
-        AnionDatabase.close()
-        Tasks.shutdown()
-    }
+	override fun onDisable() {
+		AnionPersistence.flushAll()
+		AnionDatabase.close()
+		Tasks.shutdown()
+	}
 
-    companion object {
-        const val NAMESPACE = "anion"
+	companion object {
+		const val NAMESPACE = "anion"
 
-        lateinit var instance: Server private set
-        lateinit var plugin: Anion private set
+		lateinit var instance: Server private set
+		lateinit var plugin: Anion private set
 
-    }
+	}
 
 }

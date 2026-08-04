@@ -102,22 +102,22 @@ object AnionDatabase {
 
 		if (stored == current) return
 
-		var v = stored
-		while (v < current) {
-			val next = (v + 1).toShort()
-			val migrator = Migrators.find(cfName, v, next)
-				?: error("[$cfName] no migrator registered for v$v -> v$next")
+		var version = stored
+		while (version < current) {
+			val next = (version + 1).toShort()
+			val migrator = Migrators.find(cfName, version, next)
+				?: error("[$cfName] no migrator registered for v$version -> v$next")
 			if (cf != null) migrator.migrate(db, cf)
-			v = next
+			version = next
 		}
 
 		db.put(metadata, key, shortToBytes(current))
 	}
 
-	private fun shortToBytes(v: Short): ByteArray =
-		ByteBuffer.allocate(2).putShort(v).array()
+	private fun shortToBytes(value: Short): ByteArray =
+		ByteBuffer.allocate(2).putShort(value).array()
 
-	private fun bytesToShort(b: ByteArray): Short =
-		ByteBuffer.wrap(b).short
+	private fun bytesToShort(bytes: ByteArray): Short =
+		ByteBuffer.wrap(bytes).short
 
 }

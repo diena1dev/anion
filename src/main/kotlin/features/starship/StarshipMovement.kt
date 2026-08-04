@@ -16,6 +16,7 @@ import net.minecraft.world.phys.Vec3
 import org.bukkit.block.BlockFace
 import org.bukkit.craftbukkit.entity.CraftPlayer
 import org.bukkit.entity.Player
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.collections.component1
 import kotlin.collections.component2
 import kotlin.collections.iterator
@@ -32,10 +33,10 @@ object StarshipMovement {
 		vectorToMoveIn: Vec3i,
 		starship: Starship,
 
-	) : HashMap<Vec3i, BlockState> {
+	) : ConcurrentHashMap<Vec3i, BlockState> {
 
-		val beBlockMap = moveBlockEntities(vectorToMoveIn, starship)
-		val newBlockMap = moveBlocks(vectorToMoveIn, starship, beBlockMap)
+		val blockEntityBlockMap = moveBlockEntities(vectorToMoveIn, starship)
+		val newBlockMap = moveBlocks(vectorToMoveIn, starship, blockEntityBlockMap)
 		moveEntities(vectorToMoveIn, starship)
 
 		return newBlockMap
@@ -47,7 +48,7 @@ object StarshipMovement {
 		byAngle: Float,
 		starship: Starship,
 
-	) : HashMap<Vec3i, BlockState> {
+	) : ConcurrentHashMap<Vec3i, BlockState> {
 
 		val oldYaw = starship.yaw                                                  // alias to starship's current yaw
 		starship.yaw = ((oldYaw + byAngle % 360) + 360) % 360                      // modulo to wraparound whatever angle we get
@@ -55,8 +56,8 @@ object StarshipMovement {
 
 		val steps = stepsFromTo(oldYaw.toFace(), starship.yaw.toFace())
 
-		val beBlockMap = rotateBlockEntities(steps, starship)
-		val newBlockMap = rotateBlocks(steps, starship, beBlockMap)
+		val blockEntityBlockMap = rotateBlockEntities(steps, starship)
+		val newBlockMap = rotateBlocks(steps, starship, blockEntityBlockMap)
 		rotateEntities(steps, starship)
 
 		return newBlockMap
@@ -71,11 +72,11 @@ object StarshipMovement {
 
 		vectorToMoveIn: Vec3i,
 		starship: Starship,
-		beBlockMap: HashMap<Vec3i, BlockState>,
+		blockEntityBlockMap: HashMap<Vec3i, BlockState>,
 
-	) : HashMap<Vec3i, BlockState> {
+	) : ConcurrentHashMap<Vec3i, BlockState> {
 
-		val newBlockMap: HashMap<Vec3i, BlockState> = hashMapOf() // nms BlockState collection
+		val newBlockMap: ConcurrentHashMap<Vec3i, BlockState> = ConcurrentHashMap() // nms BlockState collection
 
 		// translate blocks
 		for ((vec, _) in starship.blockHashMap) {
@@ -87,7 +88,7 @@ object StarshipMovement {
 		// remove old ship section
 		for ((vec, _) in starship.blockHashMap) {
 
-			if (vec in beBlockMap) continue
+			if (vec in blockEntityBlockMap) continue
 
 			// 4. no observer updates, 16. no shape recalc, 32. no item drops
 			starship.level.setBlock(vec.blockPos, airBlock, 4 or 16 or 32)
@@ -95,12 +96,12 @@ object StarshipMovement {
 		}
 
 		// move ship blocks
-		for ((vec, b) in newBlockMap) {
+		for ((vec, blockState) in newBlockMap) {
 
-			if (vec in beBlockMap) continue
+			if (vec in blockEntityBlockMap) continue
 
 			// 1. update neighboring blocks, 4. no observer updates, 16. no shape recalc
-			starship.level.setBlock(vec.blockPos, b, 1 or 4 or 16)
+			starship.level.setBlock(vec.blockPos, blockState, 1 or 4 or 16)
 
 		}
 
@@ -119,39 +120,39 @@ object StarshipMovement {
 
 	) : HashMap<Vec3i, BlockState> {
 
-		val beMap: HashMap<Vec3i, CompoundTag>     = hashMapOf()
-		val beBlockMap: HashMap<Vec3i, BlockState> = hashMapOf()
-		val provider                               = starship.level.registryAccess()
+		val blockEntityNbtMap: HashMap<Vec3i, CompoundTag>   = hashMapOf()
+		val blockEntityBlockMap: HashMap<Vec3i, BlockState> = hashMapOf()
+		val provider                                        = starship.level.registryAccess()
 
 		for ((vec, _) in starship.blockHashMap) {
 
 			// store BEs and remove BE blocks
-			val be = starship.level.getBlockEntity(vec.blockPos) ?: continue
-			val nbt = be.saveWithFullMetadata(provider)
+			val blockEntity = starship.level.getBlockEntity(vec.blockPos) ?: continue
+			val nbt = blockEntity.saveWithFullMetadata(provider)
 			val newPos = vec + vectorToMoveIn
 
 			nbt.putInt("x", newPos.x)
 			nbt.putInt("y", newPos.y)
 			nbt.putInt("z", newPos.z)
 
-			beMap[newPos] = nbt
-			beBlockMap[newPos] = starship.level.getBlockState(vec.blockPos)
+			blockEntityNbtMap[newPos] = nbt
+			blockEntityBlockMap[newPos] = starship.level.getBlockState(vec.blockPos)
 			starship.level.removeBlockEntity(vec.blockPos)
 
 		}
 
 		// then load ship BEs (setting blocks in the process)
-		for ((vec, nbt) in beMap) {
+		for ((vec, nbt) in blockEntityNbtMap) {
 
-			val bs = beBlockMap[vec] ?: continue
-			starship.level.setBlock(vec.blockPos, bs, 4 or 16 or 32)
+			val blockState = blockEntityBlockMap[vec] ?: continue
+			starship.level.setBlock(vec.blockPos, blockState, 4 or 16 or 32)
 
-			val newBe = BlockEntity.loadStatic(vec.blockPos, bs, nbt, provider) ?: continue
-			starship.level.setBlockEntity(newBe)
+			val newBlockEntity = BlockEntity.loadStatic(vec.blockPos, blockState, nbt, provider) ?: continue
+			starship.level.setBlockEntity(newBlockEntity)
 
 		}
 
-		return beBlockMap
+		return blockEntityBlockMap
 
 	}
 
@@ -210,17 +211,17 @@ object StarshipMovement {
 
 	private fun stepsFromTo(from: BlockFace, to: BlockFace): Int {
 
-		var steps = 0; var cur = from
-		while (cur != to && steps < 4) { cur = cur.rotateRight(); steps++ }
+		var steps = 0; var currentFace = from
+		while (currentFace != to && steps < 4) { currentFace = currentFace.rotateRight(); steps++ }
 		return steps
 
 	}
 
-	private fun rotateVec(rel: Vec3i, steps: Int): Vec3i {
+	private fun rotateVec(relative: Vec3i, steps: Int): Vec3i {
 
-		var x = rel.x; var z = rel.z
-		repeat(steps) { val nx = -z; z = x; x = nx }
-		return Vec3i(x, rel.y, z)
+		var rotatedX = relative.x; var rotatedZ = relative.z
+		repeat(steps) { val nextX = -rotatedZ; rotatedZ = rotatedX; rotatedX = nextX }
+		return Vec3i(rotatedX, relative.y, rotatedZ)
 
 	}
 
@@ -230,9 +231,9 @@ object StarshipMovement {
 
 		rotationSteps: Int,
 		starship: Starship,
-		beBlockMap: HashMap<Vec3i, BlockState>,
+		blockEntityBlockMap: HashMap<Vec3i, BlockState>,
 
-	) : HashMap<Vec3i, BlockState> {
+	) : ConcurrentHashMap<Vec3i, BlockState> {
 
 		val nmsRotation = when (rotationSteps) {
 			1    -> Rotation.CLOCKWISE_90
@@ -241,7 +242,7 @@ object StarshipMovement {
 			else -> throw IllegalStateException("what the fuck did you do")
 		}
 
-		val newBlockMap: HashMap<Vec3i, BlockState> = hashMapOf()
+		val newBlockMap: ConcurrentHashMap<Vec3i, BlockState> = ConcurrentHashMap()
 
 		// translate blocks
 		for ((vec, state) in starship.blockHashMap) {
@@ -254,7 +255,7 @@ object StarshipMovement {
 		// remove old ship section
 		for ((vec, _) in starship.blockHashMap) {
 
-			if (vec in beBlockMap) continue
+			if (vec in blockEntityBlockMap) continue
 
 			// 4. no observer updates, 16. no shape recalc, 32. no item drops
 			starship.level.setBlock(vec.blockPos, airBlock, 4 or 16 or 32)
@@ -262,12 +263,12 @@ object StarshipMovement {
 		}
 
 		// move ship blocks
-		for ((vec, b) in newBlockMap) {
+		for ((vec, blockState) in newBlockMap) {
 
-			if (vec in beBlockMap) continue
+			if (vec in blockEntityBlockMap) continue
 
 			// 1. update neighboring blocks, 4. no observer updates, 16. no shape recalc
-			starship.level.setBlock(vec.blockPos, b, 1 or 4 or 16)
+			starship.level.setBlock(vec.blockPos, blockState, 1 or 4 or 16)
 
 		}
 
@@ -286,39 +287,39 @@ object StarshipMovement {
 
 	) : HashMap<Vec3i, BlockState> {
 
-		val beMap: HashMap<Vec3i, CompoundTag>     = hashMapOf()
-		val beBlockMap: HashMap<Vec3i, BlockState> = hashMapOf()
-		val provider                               = starship.level.registryAccess()
+		val blockEntityNbtMap: HashMap<Vec3i, CompoundTag>   = hashMapOf()
+		val blockEntityBlockMap: HashMap<Vec3i, BlockState> = hashMapOf()
+		val provider                                        = starship.level.registryAccess()
 
 		for ((vec, _) in starship.blockHashMap) {
 
 			// store BEs and remove BE blocks
-			val be = starship.level.getBlockEntity(vec.blockPos) ?: continue
-			val nbt = be.saveWithFullMetadata(provider)
+			val blockEntity = starship.level.getBlockEntity(vec.blockPos) ?: continue
+			val nbt = blockEntity.saveWithFullMetadata(provider)
 			val newPos = starship.origin + rotateVec(vec - starship.origin, rotationSteps)
 
 			nbt.putInt("x", newPos.x)
 			nbt.putInt("y", newPos.y)
 			nbt.putInt("z", newPos.z)
 
-			beMap[newPos] = nbt
-			beBlockMap[newPos] = starship.level.getBlockState(vec.blockPos)
+			blockEntityNbtMap[newPos] = nbt
+			blockEntityBlockMap[newPos] = starship.level.getBlockState(vec.blockPos)
 			starship.level.removeBlockEntity(vec.blockPos)
 
 		}
 
 		// then load ship BEs (setting blocks in the process)
-		for ((vec, nbt) in beMap) {
+		for ((vec, nbt) in blockEntityNbtMap) {
 
-			val bs = beBlockMap[vec] ?: continue
-			starship.level.setBlock(vec.blockPos, bs, 4 or 16 or 32)
+			val blockState = blockEntityBlockMap[vec] ?: continue
+			starship.level.setBlock(vec.blockPos, blockState, 4 or 16 or 32)
 
-			val newBe = BlockEntity.loadStatic(vec.blockPos, bs, nbt, provider) ?: continue
-			starship.level.setBlockEntity(newBe)
+			val newBlockEntity = BlockEntity.loadStatic(vec.blockPos, blockState, nbt, provider) ?: continue
+			starship.level.setBlockEntity(newBlockEntity)
 
 		}
 
-		return beBlockMap
+		return blockEntityBlockMap
 
 	}
 

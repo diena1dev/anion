@@ -42,340 +42,340 @@ import kotlin.collections.toSet
 @Name("starship")
 object StarshipCommand {
 
-    @Register
-    object DebugStarshipListeners : Listener {
+	@Register
+	object DebugStarshipListeners : Listener {
 
-        private var lastTick = -1
+		private var lastTick = -1
 
-        @EventHandler
-        fun onServerTick(event: ServerTickEndEvent) {
+		@EventHandler
+		fun onServerTick(event: ServerTickEndEvent) {
 
-            if (lastTick > event.tickNumber) return
+			if (lastTick > event.tickNumber) return
 
-            lastTick = event.tickNumber+5
+			lastTick = event.tickNumber+5
 
-            for (player in Anion.instance.onlinePlayers) {
+			for (player in Anion.instance.onlinePlayers) {
 
-                val ship = getSelectedStarship(player, false) ?: continue
+				val ship = getSelectedStarship(player, false) ?: continue
 
-                player.sendActionBar(
-                    Component.text("Pos: ${ship.origin} | Vel: ${ship.velocity.velocity} | CVel: ${ship.simulator.debugVelocity} | Level: ${ship.level.bukkitName}")
-                )
+				player.sendActionBar(
+					Component.text("Pos: ${ship.origin} | Vel: ${ship.velocity.velocity} | CVel: ${ship.simulator.debugVelocity} | Level: ${ship.level.bukkitName}")
+				)
 
-            }
+			}
 
-        }
+		}
 
-    }
+	}
 
-    ////////////////////////////////////////////////
-    ///// DATA SUBCOMMANDS (Create, Destroy, Select)
-    ////////////////////////////////////////////////
+	////////////////////////////////////////////////
+	///// DATA SUBCOMMANDS (Create, Destroy, Select)
+	////////////////////////////////////////////////
 
-    @Subcommand
-    fun create(
+	@Subcommand
+	fun create(
 
-        @Sender sender: Player
+		@Sender sender: Player
 
-    ) {
+	) {
 
-        val origin = sender.location.block
-        val visited = mutableSetOf<Block>()
-        val queue = ArrayDeque<Block>()
+		val origin = sender.location.block
+		val visited = mutableSetOf<Block>()
+		val queue = ArrayDeque<Block>()
 
-        queue.add(origin)
-        visited.add(origin)
+		queue.add(origin)
+		visited.add(origin)
 
-        val cardinalFaces = arrayOf(
-            BlockFace.UP,
-            BlockFace.DOWN,
-            BlockFace.NORTH,
-            BlockFace.SOUTH,
-            BlockFace.EAST,
-            BlockFace.WEST
-        )
+		val cardinalFaces = arrayOf(
+			BlockFace.UP,
+			BlockFace.DOWN,
+			BlockFace.NORTH,
+			BlockFace.SOUTH,
+			BlockFace.EAST,
+			BlockFace.WEST
+		)
 
-        while (queue.isNotEmpty()) {
-            if (visited.size > 50_000) {
+		while (queue.isNotEmpty()) {
+			if (visited.size > 50_000) {
 
-                sender.info("Detection Failed! (Exceeded 50,000 blocks). Are you standing on any terrain?")
-                return
+				sender.info("Detection Failed! (Exceeded 50,000 blocks). Are you standing on any terrain?")
+				return
 
-            }
+			}
 
-            val current = queue.removeFirst()
+			val current = queue.removeFirst()
 
-            for (face in cardinalFaces) {
-                val neighbor = current.getRelative(face)
-                if (neighbor !in visited && !neighbor.type.isAir) {
-                    visited.add(neighbor)
-                    queue.add(neighbor)
-                }
-            }
-        }
+			for (face in cardinalFaces) {
+				val neighbor = current.getRelative(face)
+				if (neighbor !in visited && !neighbor.type.isAir) {
+					visited.add(neighbor)
+					queue.add(neighbor)
+				}
+			}
+		}
 
-        val locations = visited.map { it.location.blockPos }.toSet()
-        val ship = Starship().create(locations, sender.world) // assigns uuid, registers, and persists
+		val locations = visited.map { it.location.blockPos }.toSet()
+		val ship = Starship().create(locations, sender.world) // assigns uuid, registers, and persists
 
-        sender.info("Detected ${visited.size} blocks and created starship at ${ship.origin}.")
+		sender.info("Detected ${visited.size} blocks and created starship at ${ship.origin}.")
 
-        // select ship too
-        select(sender)
+		// select ship too
+		select(sender)
 
-    }
+	}
 
-    /** remove starship from all starship related things (very helpful note i know :3) */
-    @Subcommand
-    fun destroy(
+	/** remove starship from all starship related things (very helpful note i know :3) */
+	@Subcommand
+	fun destroy(
 
-        @Sender sender: Player,
-        confirm: Boolean = false,
+		@Sender sender: Player,
+		confirm: Boolean = false,
 
-    ) {
+	) {
 
-        if (!confirm) {
+		if (!confirm) {
 
-            sender.info(
-                "WARNING: THIS WILL STOP YOUR SHIP FROM MOVING!" +
-                "\nNo blocks will be removed by executing this command." +
-                "\nTo confirm, add 'true' to the end of this command."
-            )
-            return
+			sender.info(
+				"WARNING: THIS WILL STOP YOUR SHIP FROM MOVING!" +
+				"\nNo blocks will be removed by executing this command." +
+				"\nTo confirm, add 'true' to the end of this command."
+			)
+			return
 
-        }
+		}
 
-        val starship = getSelectedStarship(sender)
+		val starship = getSelectedStarship(sender)
 
-        AnionPersistence.deleteStarship(starship?.uuid ?: return)
-        Starship.loadedStarships.remove(starship.uuid)
+		AnionPersistence.deleteStarship(starship?.uuid ?: return)
+		Starship.loadedStarships.remove(starship.uuid)
 
-        sender.info("Removed starship from tick list and dropped from database.")
+		sender.info("Removed starship from tick list and dropped from database.")
 
-    }
+	}
 
-    @Subcommand
-    fun select(
+	@Subcommand
+	fun select(
 
-        @Sender sender: Player
+		@Sender sender: Player
 
-    ) {
+	) {
 
-        val distanceMap: MutableMap<UUID, Int> = mutableMapOf()
-        val sVec = sender.location.block.vec3i
+		val distanceMap: MutableMap<UUID, Int> = mutableMapOf()
+		val sVec = sender.location.block.vec3i
 
-        for ((u,s) in Starship.loadedStarships) {
-            distanceMap[u] = s.origin.distSqr(sVec).toInt()
-        }
+		for ((u,s) in Starship.loadedStarships) {
+			distanceMap[u] = s.origin.distSqr(sVec).toInt()
+		}
 
-        val smallestKey: UUID = distanceMap.minByOrNull { it.value }?.key ?: return
+		val smallestKey: UUID = distanceMap.minByOrNull { it.value }?.key ?: return
 
-        sender.persistentDataContainer.set(
-            NamespacedKey(Anion.NAMESPACE, "selected_starship"),
-            PersistentDataType.STRING,
-            smallestKey.toString()
-        )
+		sender.persistentDataContainer.set(
+			NamespacedKey(Anion.NAMESPACE, "selected_starship"),
+			PersistentDataType.STRING,
+			smallestKey.toString()
+		)
 
-        sender.info("Selected starship [${smallestKey.toString().take(5)}...] at ${Starship.loadedStarships[smallestKey]?.origin}.")
+		sender.info("Selected starship [${smallestKey.toString().take(5)}...] at ${Starship.loadedStarships[smallestKey]?.origin}.")
 
-    }
+	}
 
-    @Subcommand
-    fun unselect(
+	@Subcommand
+	fun unselect(
 
-        @Sender sender: Player
+		@Sender sender: Player
 
-    ) {
+	) {
 
-        sender.persistentDataContainer.set(
-            NamespacedKey(Anion.NAMESPACE, "selected_starship"),
-            PersistentDataType.STRING,
-            UUID.randomUUID().toString()
-        )
+		sender.persistentDataContainer.set(
+			NamespacedKey(Anion.NAMESPACE, "selected_starship"),
+			PersistentDataType.STRING,
+			UUID.randomUUID().toString()
+		)
 
-        sender.info("Unselected starship.")
+		sender.info("Unselected starship.")
 
-    }
+	}
 
-    @Subcommand
-    fun info(
+	@Subcommand
+	fun info(
 
-        @Sender sender: Player
+		@Sender sender: Player
 
-    ) {
+	) {
 
-        val ship = getSelectedStarship(sender) ?: return
+		val ship = getSelectedStarship(sender) ?: return
 
-        sender.info(
-            "Info" +
-            "\n|- UUID: ${ship.uuid.toString().take(5)}..." +
-            "\n|- Size: ${ship.size}" +
-            "\n|- Velocity: ${ship.velocity.velocity}" +
-            "\n|- Pos: ${ship.origin}" +
-            "\n|- Level: ${ship.level.bukkitName}" +
-            "\n|- DEBUG CVelocity: ${ship.simulator.debugVelocity}"
-        )
+		sender.info(
+			"Info" +
+			"\n|- UUID: ${ship.uuid.toString().take(5)}..." +
+			"\n|- Size: ${ship.size}" +
+			"\n|- Velocity: ${ship.velocity.velocity}" +
+			"\n|- Pos: ${ship.origin}" +
+			"\n|- Level: ${ship.level.bukkitName}" +
+			"\n|- DEBUG CVelocity: ${ship.simulator.debugVelocity}"
+		)
 
-    }
+	}
 
-    //////////////////////////
-    ///// MOVEMENT SUBCOMMANDS
-    //////////////////////////
+	//////////////////////////
+	///// MOVEMENT SUBCOMMANDS
+	//////////////////////////
 
-    /** move ship in given direction */
-    @Subcommand
-    fun move(
+	/** move ship in given direction */
+	@Subcommand
+	fun move(
 
-        @Sender sender: Player,
-        x: Int,
-        y: Int,
-        z: Int
+		@Sender sender: Player,
+		x: Int,
+		y: Int,
+		z: Int
 
-    ) {
+	) {
 
-        val moveResult = getSelectedStarship(sender)?.move(
-            Vec3i(x, y, z)
-        )
+		val moveResult = getSelectedStarship(sender)?.move(
+			Vec3i(x, y, z)
+		)
 
-        if (moveResult ?: return) return
-        sender.info("Failed to move starship by provided Vec3i{$x, $y, $z}!")
+		if (moveResult ?: return) return
+		sender.info("Failed to move starship by provided Vec3i{$x, $y, $z}!")
 
-    }
+	}
 
-    @Subcommand
-    fun rotate(
+	@Subcommand
+	fun rotate(
 
-        @Sender sender: Player,
-        rotation: Double
+		@Sender sender: Player,
+		rotation: Double
 
-    ) {
+	) {
 
-        val ship = getSelectedStarship(sender) ?: return
-        ship.rotate(rotation)
+		val ship = getSelectedStarship(sender) ?: return
+		ship.rotate(rotation)
 
-        sender.info("Applied $rotation degrees to starship yaw. Current Yaw: ${ship.yaw} degrees")
+		sender.info("Applied $rotation degrees to starship yaw. Current Yaw: ${ship.yaw} degrees")
 
-    }
+	}
 
-    @Subcommand
-    fun teleport(
+	@Subcommand
+	fun teleport(
 
-        @Sender sender: Player,
-        x: Int,
-        y: Int,
-        z: Int,
-        preserveVelocity: Boolean = true,
+		@Sender sender: Player,
+		x: Int,
+		y: Int,
+		z: Int,
+		preserveVelocity: Boolean = true,
 
-        ) {
+		) {
 
-        val starship = getSelectedStarship(sender) ?: return
+		val starship = getSelectedStarship(sender) ?: return
 
-        if (starship.teleportInWorld(Vec3i(x, y, z), preserveVelocity)) {
-            sender.info("Teleported starship to Vec3i{$x, $y, $z}.")
-        } else {
-            sender.info("Failed to teleport starship by provided Vec3i{$x, $y, $z}!")
-        }
+		if (starship.teleportInWorld(Vec3i(x, y, z), preserveVelocity)) {
+			sender.info("Teleported starship to Vec3i{$x, $y, $z}.")
+		} else {
+			sender.info("Failed to teleport starship by provided Vec3i{$x, $y, $z}!")
+		}
 
-    }
+	}
 
-    /** modify starship velocity */
-    @Subcommand
-    object Velocity {
+	/** modify starship velocity */
+	@Subcommand
+	object Velocity {
 
-        @Subcommand
-        fun add(
+		@Subcommand
+		fun add(
 
-            @Sender sender: Player,
-            x: Double,
-            y: Double,
-            z: Double,
+			@Sender sender: Player,
+			x: Double,
+			y: Double,
+			z: Double,
 
-        ) {
+		) {
 
-            val ship = getSelectedStarship(sender) ?: return
-            val newVelocity = ship.velocity.addVelocity(Vec3(x, y, z))
+			val ship = getSelectedStarship(sender) ?: return
+			val newVelocity = ship.velocity.addVelocity(Vec3(x, y, z))
 
-            sender.info("Added Vec{$x, $y, $z} to Velocity. Current Velocity: $newVelocity.")
+			sender.info("Added Vec{$x, $y, $z} to Velocity. Current Velocity: $newVelocity.")
 
-        }
+		}
 
-        @Subcommand
-        fun reset(
+		@Subcommand
+		fun reset(
 
-            @Sender sender: Player
+			@Sender sender: Player
 
-        ) {
+		) {
 
-            val ship = getSelectedStarship(sender) ?: return
-            ship.velocity.resetVelocity()
+			val ship = getSelectedStarship(sender) ?: return
+			ship.velocity.resetVelocity()
 
-            sender.info("Reset Velocity to Vec{0.0, 0.0, 0.0}.")
+			sender.info("Reset Velocity to Vec{0.0, 0.0, 0.0}.")
 
-        }
+		}
 
-        /** set a constant velocity re-applied every tick, for debugging movement without thrusters */
-        @Subcommand
-        fun setConstant(
+		/** set a constant velocity re-applied every tick, for debugging movement without thrusters */
+		@Subcommand
+		fun setConstant(
 
-            @Sender sender: Player,
-            x: Double,
-            y: Double,
-            z: Double,
+			@Sender sender: Player,
+			x: Double,
+			y: Double,
+			z: Double,
 
-        ) {
+		) {
 
-            val ship = getSelectedStarship(sender) ?: return
-            ship.simulator.setDebugConstantVelocity(Vec3(x, y, z))
+			val ship = getSelectedStarship(sender) ?: return
+			ship.simulator.setDebugConstantVelocity(Vec3(x, y, z))
 
-            sender.info("Set debug constant velocity to Vec{$x, $y, $z}. Re-applied every tick until reset.")
+			sender.info("Set debug constant velocity to Vec{$x, $y, $z}. Re-applied every tick until reset.")
 
-        }
+		}
 
-        /** stop re-applying the debug constant velocity (does not reset current velocity, see [reset]) */
-        @Subcommand
-        fun resetConstant(
+		/** stop re-applying the debug constant velocity (does not reset current velocity, see [reset]) */
+		@Subcommand
+		fun resetConstant(
 
-            @Sender sender: Player
+			@Sender sender: Player
 
-        ) {
+		) {
 
-            val ship = getSelectedStarship(sender) ?: return
-            ship.simulator.resetDebugConstantVelocity()
+			val ship = getSelectedStarship(sender) ?: return
+			ship.simulator.resetDebugConstantVelocity()
 
-            sender.info("Reset debug constant velocity to Vec{0.0, 0.0, 0.0}.")
+			sender.info("Reset debug constant velocity to Vec{0.0, 0.0, 0.0}.")
 
-        }
+		}
 
-    }
+	}
 
-    //////////////////////
-    ///// HELPER FUNCTIONS
-    //////////////////////
+	//////////////////////
+	///// HELPER FUNCTIONS
+	//////////////////////
 
-    private fun Player.info(message: String) {
+	private fun Player.info(message: String) {
 
-        this.sendMessage(
-            Component.text("[Starship] ").color(TextColor.color(Color.AQUA.asARGB()))
-                .append(Component.text(message).color(TextColor.color(Color.WHITE.asARGB())))
-        )
+		this.sendMessage(
+			Component.text("[Starship] ").color(TextColor.color(Color.AQUA.asARGB()))
+				.append(Component.text(message).color(TextColor.color(Color.WHITE.asARGB())))
+		)
 
-    }
+	}
 
-    // shhhh it can be messy
-    private fun getSelectedStarship(
-        sender: Player,
-        message: Boolean = true,
-    ): Starship? {
+	// shhhh it can be messy
+	private fun getSelectedStarship(
+		sender: Player,
+		message: Boolean = true,
+	): Starship? {
 
-        val starship = Starship.loadedStarships[UUID.fromString(sender.persistentDataContainer.get(
-            NamespacedKey(Anion.NAMESPACE, "selected_starship"),
-            PersistentDataType.STRING
-        ) ?: UUID.randomUUID().toString())]
+		val starship = Starship.loadedStarships[UUID.fromString(sender.persistentDataContainer.get(
+			NamespacedKey(Anion.NAMESPACE, "selected_starship"),
+			PersistentDataType.STRING
+		) ?: UUID.randomUUID().toString())]
 
-        if (starship == null && message) {
-            sender.info("Stored UUID for the selected starship not found in active starships. Make sure your starship is in loaded chunks!")
-        }
+		if (starship == null && message) {
+			sender.info("Stored UUID for the selected starship not found in active starships. Make sure your starship is in loaded chunks!")
+		}
 
-        return starship
-    }
+		return starship
+	}
 
 }

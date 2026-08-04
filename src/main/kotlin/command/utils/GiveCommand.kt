@@ -16,27 +16,27 @@ import org.bukkit.entity.Player
 @Permission("${Keys.COMMAND_PERMISSION_TREE}.give")
 object GiveCommand {
 
-    /** FIXME: AnionItem/AnionBlock suggestion provider */
-    @Inferred
-    fun self(
-        @Sender sender: Player, // require player
-        itemKey: String
-    ) {
+	/** FIXME: AnionItem/AnionBlock suggestion provider */
+	@Inferred
+	fun self(
+		@Sender sender: Player, // require player
+		itemKey: String
+	) {
 
-        fun fail() = sender.sendMessage(Component.text("ohnaurrrr we can't fwind the item sworry >w<"))
+		fun fail() = sender.sendMessage(Component.text("ohnaurrrr we can't fwind the item sworry >w<"))
 
-        val attemptItem = AnionRegistries.ITEM_REGISTRY.getValue(NamespacedKey.fromString(itemKey) ?: return fail())
-        if (attemptItem == null) return fail()
+		val attemptItem = AnionRegistries.ITEM_REGISTRY.getValue(NamespacedKey.fromString(itemKey) ?: return fail())
+		if (attemptItem == null) return fail()
 
-        val itemToGive = attemptItem.asItemStack()
+		val itemToGive = attemptItem.asItemStack()
 
-        sender.sendMessage(
-            Component
-            .text("Gave 1 ")
-            .append(itemToGive.displayName())
-            .append(Component.text(" to "))
-            .append(sender.displayName()))
-        sender.give(itemToGive)
+		sender.sendMessage(
+			Component
+			.text("Gave 1 ")
+			.append(itemToGive.displayName())
+			.append(Component.text(" to "))
+			.append(sender.displayName()))
+		sender.give(itemToGive)
 
-    }
+	}
 }
