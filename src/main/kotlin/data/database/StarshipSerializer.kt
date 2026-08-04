@@ -10,6 +10,7 @@ import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.level.block.state.BlockState
 import java.io.*
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 // and we all say "thank you, Claude", because surely nothing ill will come of me not actually learning how to use a database
 object StarshipSerializer {
@@ -75,7 +76,7 @@ object StarshipSerializer {
 		val yaw = dis.readDouble()
 
 		val blockCount = dis.readInt()
-		val blocks = HashMap<Vec3i, BlockState>(blockCount)
+		val blocks = ConcurrentHashMap<Vec3i, BlockState>(blockCount)
 
 		repeat(blockCount) {
 			val relLong = dis.readLong()
