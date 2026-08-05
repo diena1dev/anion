@@ -6,6 +6,7 @@ import dev.diena.anion.extensions.plus
 import dev.diena.anion.extensions.times
 import dev.diena.anion.extensions.vec3i
 import dev.diena.anion.features.starship.Starship
+import dev.diena.anion.features.starship.StarshipMovement
 import dev.diena.anion.features.starship.StarshipSelection
 import net.minecraft.world.phys.Vec3
 import org.bukkit.Bukkit
@@ -20,11 +21,12 @@ import java.util.concurrent.TimeUnit
 /** blaster that grabs the starship it is shot at and drags it around with the player's crosshair. */
 class AnionToolGunItem : AnionBlasterItem("Tool Gun") {
 
-	/** a ship being carried, and how far in front of the carrier's eyes it is kept. */
+	/** a ship being carried, how far in front of the carrier's eyes it is kept, and the yaw it was grabbed at. */
 	private class HeldStarship(
 
 		val starship: Starship,
-		val holdDistance: Double
+		val holdDistance: Double,
+		val yawOffset: Double
 
 	)
 
@@ -48,16 +50,22 @@ class AnionToolGunItem : AnionBlasterItem("Tool Gun") {
 
 	}
 
-	/** left click toggles the grab: grabs the ship under the crosshair, or lets go of the one already held. */
-	override fun onLeftClick(player: Player) {
+	/** right click toggles the grab: grabs the ship under the crosshair, or lets go of the one already held. */
+	override fun onRightClick(player: Player) {
 
 		if (releaseStarship(player.uniqueId)) return
 		shootBullet(player)
 
 	}
 
-	// grabbing is left click only
-	override fun onRightClick(player: Player) {}
+	// grabbing is right click only
+	override fun onLeftClick(player: Player) {}
+
+	override fun onRemove(player: Player) {
+
+		if (releaseStarship(player.uniqueId)) return
+
+	}
 
 	override fun onHitBlock(player: Player, block: Block, hitPoint: Vector) {
 
@@ -65,7 +73,15 @@ class AnionToolGunItem : AnionBlasterItem("Tool Gun") {
 		val starship = Starship.starshipAt(level, block.vec3i) ?: return
 
 		val origin = Vector(starship.origin.x.toDouble(), starship.origin.y.toDouble(), starship.origin.z.toDouble())
-		heldStarships[player.uniqueId] = HeldStarship(starship, player.eyeLocation.toVector().distance(origin))
+
+		// the ship keeps the facing it was grabbed with, and turns with the player from there
+		val yawOffset = starship.yaw - StarshipMovement.shipYawFacing(player.eyeLocation.yaw)
+
+		heldStarships[player.uniqueId] = HeldStarship(
+			starship,
+			player.eyeLocation.toVector().distance(origin),
+			yawOffset
+		)
 
 		// the tool gun drives the ship by hand until it is let go
 		starship.velocity.pause()
@@ -113,6 +129,10 @@ class AnionToolGunItem : AnionBlasterItem("Tool Gun") {
 				Vec3(targetPoint.x, targetPoint.y, targetPoint.z).floorVec3i,
 				preserveVelocity = true
 			)
+
+			// ship turns with the carrier, holding the yaw it had when it was grabbed
+			val targetYaw = StarshipMovement.shipYawFacing(eyeLocation.yaw) + held.yawOffset
+			held.starship.rotate(StarshipMovement.yawDelta(held.starship, targetYaw))
 
 		}
 

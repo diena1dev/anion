@@ -199,6 +199,22 @@ object StarshipMovement {
 
 	// ROTATION HELPERS START
 
+	/** the ship yaw whose face points the same way as vanilla entity yaw [entityYaw]. */
+	fun shipYawFacing(entityYaw: Float): Double {
+
+		// ship yaw runs the opposite way round from entity yaw (S, E, N, W against S, W, N, E), and its faces
+		// are bucketed from 0 upward, so the +45 lands an entity looking straight down a face mid-bucket.
+		return ((45.0 - entityYaw) % 360 + 360) % 360
+
+	}
+
+	/** the shortest relative rotation, in degrees, that turns [starship] to [targetYaw]. */
+	fun yawDelta(starship: Starship, targetYaw: Double): Double {
+
+		return ((targetYaw - starship.yaw) % 360 + 540) % 360 - 180
+
+	}
+
 	private fun Double.toFace(): BlockFace = when (this) {
 
 		in 0.0..90.0 -> BlockFace.SOUTH
