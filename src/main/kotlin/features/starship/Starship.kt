@@ -79,6 +79,9 @@ class Starship {
 
 	fun slowTick() {
 
+		// a paused ship's motion belongs to something else, and keeps the velocity it had for when it resumes
+		if (velocity.paused) return
+
 		// simulate starship (for now apply static gravity if not in world ending in _space.)
 		simulator.simulate()
 

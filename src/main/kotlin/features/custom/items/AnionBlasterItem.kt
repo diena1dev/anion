@@ -11,10 +11,14 @@ import net.kyori.adventure.text.Component
 import org.bukkit.Material
 import org.bukkit.Particle
 import org.bukkit.Sound
+import org.bukkit.block.Block
 import org.bukkit.block.BlockType
+import org.bukkit.entity.Entity
 import org.bukkit.entity.Player
+import org.bukkit.event.block.Action
 import org.bukkit.event.entity.EntityShootBowEvent
 import org.bukkit.event.player.PlayerInteractEvent
+import org.bukkit.inventory.EquipmentSlot
 import org.bukkit.inventory.ItemStack
 import org.bukkit.inventory.ItemType
 import org.bukkit.util.Vector
@@ -23,7 +27,7 @@ open class AnionBlasterItem(
 	displayName: String,
 	itemRepresentation: ItemType = ItemType.CROSSBOW,
 	styledDisplayName: Component = Component.text(displayName)
-) : AnionItem(displayName, itemRepresentation, 1) {
+) : AnionItem(displayName, itemRepresentation, 1, styledDisplayName) {
 
 	val RANGE = 1..100    // how many blocks to move across
 	val RESOLUTION = 1..5 // how many places within a block to move
@@ -36,16 +40,38 @@ open class AnionBlasterItem(
 	}
 
 	override fun onPlayerInteract(event: PlayerInteractEvent) {
+
+		if (event.hand != EquipmentSlot.HAND) return // offhand fires a second event for the same click
 		event.isCancelled = true
-		shootBullet(event.player)
+
+		when (event.action) {
+
+			Action.LEFT_CLICK_AIR, Action.LEFT_CLICK_BLOCK -> onLeftClick(event.player)
+			Action.RIGHT_CLICK_AIR, Action.RIGHT_CLICK_BLOCK -> onRightClick(event.player)
+			else -> {}
+
+		}
+
 	}
 
 	override fun onEntityShootBow(event: EntityShootBowEvent) {
 		event.isCancelled = true
 	}
 
-	// TODO: make into common functions that all the blaster classes can call
-	private fun shootBullet(player: Player) {
+	/** left click. does nothing by default. */
+	open fun onLeftClick(player: Player) {}
+
+	/** right click. fires a shot by default. */
+	open fun onRightClick(player: Player) { shootBullet(player) }
+
+	/** called when a shot stops on [block], at world position [hitPoint]. */
+	open fun onHitBlock(player: Player, block: Block, hitPoint: Vector) {}
+
+	/** called when a shot stops on [entity], at world position [hitPoint]. */
+	open fun onHitEntity(player: Player, entity: Entity, hitPoint: Vector) {}
+
+	/** traces a shot out of [player]'s eyes, draws it, and reports the first block or entity it stops on. */
+	protected fun shootBullet(player: Player) {
 
 		val world       = player.world               // world snapshot
 		val eyeLocation = player.eyeLocation         // eye location
@@ -75,7 +101,13 @@ open class AnionBlasterItem(
 				val scaledDir = forward/resolutionMax                     // scale down our forward normal by the set resolution value
 				val resolutionCheck = rangeVector+(scaledDir*resolutionStep) // this is what we check for entities in
 
-				if (world.getBlockAt(resolutionCheck.toLocation(world)).type.asBlockType() != BlockType.AIR) break@rangeLoop
+				val hitBlock = world.getBlockAt(resolutionCheck.toLocation(world))
+				if (hitBlock.type.asBlockType() != BlockType.AIR) {
+
+					onHitBlock(player, hitBlock, resolutionCheck)
+					break@rangeLoop
+
+				}
 
 				// FIXME: this is wrong, but will work (ish) for a res of 5.
 				val nearbyEntities = world.getNearbyEntities(
@@ -83,12 +115,9 @@ open class AnionBlasterItem(
 				)
 				if (!nearbyEntities.isEmpty()) {
 
-					val newLoc = nearbyEntities.first().location.clone()
-					newLoc.y += 5
-
-					nearbyEntities.first().teleport(newLoc)
-
+					onHitEntity(player, nearbyEntities.first(), resolutionCheck)
 					break@rangeLoop
+
 				}
 
 			}

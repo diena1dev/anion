@@ -20,6 +20,12 @@ class StarshipVelocity private constructor() {
 	/** whole-block step latched by [beginTick] and consumed by [applyVelocity]. */
 	var pendingStep: Vec3i = Vec3i.ZERO
 
+	/** outstanding holds taken by [pause]. */
+	private var pauseCount = 0
+
+	/** true while something outside the simulation owns this ship's motion. */
+	val paused get() = pauseCount > 0
+
 	companion object {
 
 		/** creates a new starship hitbox */
@@ -121,6 +127,20 @@ class StarshipVelocity private constructor() {
 
 	}
 
+	/** takes a hold on this ship's motion. velocity and sub-block offset are left untouched while paused. */
+	fun pause() {
+
+		this.pauseCount++
+
+	}
+
+	/** releases one hold taken by [pause]. */
+	fun resume() {
+
+		if (this.pauseCount > 0) this.pauseCount--
+
+	}
+
 	fun resetVelocity() : Vec3 {
 
 		this.velocity = Vec3(0.0, 0.0, 0.0)
@@ -148,7 +168,7 @@ class StarshipVelocity private constructor() {
 		if (step == Vec3i.ZERO) return
 
 		// consume the step out of the accumulator up front, so a step is never applied twice.
-		this.subBlockOffset = this.subBlockOffset - Vec3(step.x.toDouble(), step.y.toDouble(), step.z.toDouble())
+		this.subBlockOffset -= Vec3(step.x.toDouble(), step.y.toDouble(), step.z.toDouble())
 
 		// collision clamping should have already made this reachable; if it still failed the ship is wedged,
 		// and carrying the leftover forward would just re-attempt the same blocked move every tick.

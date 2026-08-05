@@ -32,6 +32,10 @@ object AnionItems {
 		AnionBlasterPistolItem()
 	)
 
+	val ANION_TOOL_GUN = registerItem(
+		AnionToolGunItem()
+	)
+
 	val RAW_URANIUM_ORE = registerItem(
 		AnionItem(
 			displayName = "Raw Uranium Ore",

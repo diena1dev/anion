@@ -9,31 +9,22 @@ import dev.astralchroma.processor.annotations.Subcommand
 import dev.diena.anion.Anion
 import dev.diena.anion.data.database.AnionPersistence
 import dev.diena.anion.extensions.blockPos
-import dev.diena.anion.extensions.vec3i
 import dev.diena.anion.features.starship.Starship
+import dev.diena.anion.features.starship.StarshipSelection
 import net.kyori.adventure.text.Component
 import net.minecraft.core.Vec3i
 import net.kyori.adventure.text.format.TextColor
 import net.minecraft.world.phys.Vec3
 import org.bukkit.Color
-import org.bukkit.NamespacedKey
 import org.bukkit.block.Block
 import org.bukkit.block.BlockFace
 import org.bukkit.entity.Player
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
-import org.bukkit.persistence.PersistentDataType
-import java.util.UUID
 import kotlin.collections.ArrayDeque
-import kotlin.collections.MutableMap
-import kotlin.collections.component1
-import kotlin.collections.component2
 import kotlin.collections.isNotEmpty
-import kotlin.collections.iterator
 import kotlin.collections.map
-import kotlin.collections.mutableMapOf
 import kotlin.collections.mutableSetOf
-import kotlin.collections.set
 import kotlin.collections.toSet
 
 // TODO: add permission nodes
@@ -160,22 +151,9 @@ object StarshipCommand {
 
 	) {
 
-		val distanceMap: MutableMap<UUID, Int> = mutableMapOf()
-		val sVec = sender.location.block.vec3i
+		val starship = StarshipSelection.selectNearest(sender) ?: return
 
-		for ((u,s) in Starship.loadedStarships) {
-			distanceMap[u] = s.origin.distSqr(sVec).toInt()
-		}
-
-		val smallestKey: UUID = distanceMap.minByOrNull { it.value }?.key ?: return
-
-		sender.persistentDataContainer.set(
-			NamespacedKey(Anion.NAMESPACE, "selected_starship"),
-			PersistentDataType.STRING,
-			smallestKey.toString()
-		)
-
-		sender.info("Selected starship [${smallestKey.toString().take(5)}...] at ${Starship.loadedStarships[smallestKey]?.origin}.")
+		sender.info("Selected starship [${starship.uuid.toString().take(5)}...] at ${starship.origin}.")
 
 	}
 
@@ -186,11 +164,7 @@ object StarshipCommand {
 
 	) {
 
-		sender.persistentDataContainer.set(
-			NamespacedKey(Anion.NAMESPACE, "selected_starship"),
-			PersistentDataType.STRING,
-			UUID.randomUUID().toString()
-		)
+		StarshipSelection.clear(sender)
 
 		sender.info("Unselected starship.")
 
@@ -366,10 +340,7 @@ object StarshipCommand {
 		message: Boolean = true,
 	): Starship? {
 
-		val starship = Starship.loadedStarships[UUID.fromString(sender.persistentDataContainer.get(
-			NamespacedKey(Anion.NAMESPACE, "selected_starship"),
-			PersistentDataType.STRING
-		) ?: UUID.randomUUID().toString())]
+		val starship = StarshipSelection.selected(sender)
 
 		if (starship == null && message) {
 			sender.info("Stored UUID for the selected starship not found in active starships. Make sure your starship is in loaded chunks!")
