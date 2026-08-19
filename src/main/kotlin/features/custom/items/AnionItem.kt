@@ -2,19 +2,31 @@ package dev.diena.anion.features.custom.items
 
 import dev.astralchroma.processor.annotations.Register
 import dev.diena.anion.Anion
+import dev.diena.anion.Tasks
 import dev.diena.anion.extensions.set
 import dev.diena.anion.extensions.toAnionItem
 import dev.diena.anion.features.custom.AnionResource
 import io.papermc.paper.datacomponent.DataComponentTypes
+import io.papermc.paper.event.player.PlayerInventorySlotChangeEvent
 import net.kyori.adventure.text.Component
 import org.bukkit.NamespacedKey
+import org.bukkit.entity.Player
 import org.bukkit.event.EventHandler
+import org.bukkit.event.EventPriority
 import org.bukkit.event.Listener
 import org.bukkit.event.entity.EntityShootBowEvent
+import org.bukkit.event.entity.PlayerDeathEvent
+import org.bukkit.event.player.PlayerDropItemEvent
 import org.bukkit.event.player.PlayerInteractEvent
+import org.bukkit.event.player.PlayerItemHeldEvent
+import org.bukkit.event.player.PlayerJoinEvent
+import org.bukkit.event.player.PlayerQuitEvent
+import org.bukkit.event.player.PlayerRespawnEvent
 import org.bukkit.event.player.PlayerSwapHandItemsEvent
 import org.bukkit.inventory.ItemStack
 import org.bukkit.inventory.ItemType
+import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  *
@@ -31,6 +43,7 @@ import org.bukkit.inventory.ItemType
  * */
 @Suppress("UnstableApiUsage")
 open class AnionItem(
+
 	displayName: String,
 	private val itemRepresentation: ItemType,
 	stacksTo: Int = 64,
@@ -39,6 +52,9 @@ open class AnionItem(
 
 	private val interactHandler: ((PlayerInteractEvent) -> Unit)? = null,
 	private val swapHandler: ((PlayerSwapHandItemsEvent) -> Unit)? = null,
+	private val addHandler: ((Player) -> Unit)? = null,
+	private val removeHandler: ((Player) -> Unit)? = null,
+
 ) : AnionResource {
 
 	// go-go gadget internal item stack
@@ -64,13 +80,20 @@ open class AnionItem(
 	open fun onPlayerInteract(event: PlayerInteractEvent) { interactHandler?.invoke(event) }
 	open fun onPlayerSwapHand(event: PlayerSwapHandItemsEvent) { swapHandler?.invoke(event) }
 	open fun onEntityShootBow(event: EntityShootBowEvent) {}
-	open fun onRemove() {}
-	open fun onAdd() {}
+
+	/** [player] no longer holds this item in their main hand. */
+	open fun onRemove(player: Player) { removeHandler?.invoke(player) }
+
+	/** [player] now holds this item in their main hand. */
+	open fun onAdd(player: Player) { addHandler?.invoke(player) }
 
 }
 
 @Register
 object AnionItemDispatcher : Listener {
+
+	/** the anion item each player currently holds in their main hand. */
+	private val equippedItems = ConcurrentHashMap<UUID, AnionItem>()
 
 	@EventHandler
 	fun onPlayerInteract(event: PlayerInteractEvent) {
@@ -79,6 +102,8 @@ object AnionItemDispatcher : Listener {
 
 	@EventHandler
 	fun onPlayerSwapHand(event: PlayerSwapHandItemsEvent) {
+		refreshEquipped(event.player)
+
 		val item = event.mainHandItem.toAnionItem()
 			?: event.offHandItem.toAnionItem()
 			?: return
@@ -88,6 +113,62 @@ object AnionItemDispatcher : Listener {
 	@EventHandler
 	fun onEntityShootBow(event: EntityShootBowEvent) {
 		event.bow?.toAnionItem()?.onEntityShootBow(event)
+	}
+
+	@EventHandler
+	fun onPlayerItemHeld(event: PlayerItemHeldEvent) { refreshEquipped(event.player) }
+
+	@EventHandler
+	fun onPlayerInventorySlotChange(event: PlayerInventorySlotChangeEvent) { refreshEquipped(event.player) }
+
+	@EventHandler
+	fun onPlayerDropItem(event: PlayerDropItemEvent) { refreshEquipped(event.player) }
+
+	@EventHandler
+	fun onPlayerJoin(event: PlayerJoinEvent) { refreshEquipped(event.player) }
+
+	// MONITOR so keepInventory is read after every other plugin has had its say on it
+	@EventHandler(priority = EventPriority.MONITOR)
+	fun onPlayerDeath(event: PlayerDeathEvent) {
+
+		if (event.keepInventory) return // the item never left their hand
+		unequip(event.entity)
+
+	}
+
+	@EventHandler
+	fun onPlayerRespawn(event: PlayerRespawnEvent) { refreshEquipped(event.player) }
+
+	@EventHandler
+	fun onPlayerQuit(event: PlayerQuitEvent) { unequip(event.player) }
+
+	/** re-reads [player]'s main hand next tick and fires the onRemove/onAdd pair if the item there changed.
+	 *  deferred because the events that trigger it fire before the inventory actually changes. */
+	private fun refreshEquipped(player: Player) {
+
+		Tasks.runSync {
+
+			if (!player.isOnline) return@runSync
+
+			val equipped = player.inventory.itemInMainHand.toAnionItem()
+			val previous =
+				if (equipped == null) equippedItems.remove(player.uniqueId)
+				else equippedItems.put(player.uniqueId, equipped)
+
+			if (previous === equipped) return@runSync
+
+			previous?.onRemove(player)
+			equipped?.onAdd(player)
+
+		}
+
+	}
+
+	/** drops [player]'s tracked item and fires its onRemove. */
+	private fun unequip(player: Player) {
+
+		equippedItems.remove(player.uniqueId)?.onRemove(player)
+
 	}
 
 }

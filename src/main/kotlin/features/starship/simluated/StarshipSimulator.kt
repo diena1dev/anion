@@ -5,7 +5,6 @@ import dev.diena.anion.features.starship.StarshipCollision
 import net.minecraft.core.Vec3i
 import net.minecraft.world.phys.Vec3
 import net.minecraft.world.level.block.state.BlockState
-import org.bukkit.Bukkit
 import org.bukkit.block.Block
 import org.bukkit.block.BlockType
 
@@ -26,13 +25,16 @@ class StarshipSimulator private constructor() {
 	lateinit var starship: Starship
 	var starshipMass: Int = 0
 
-	/** debug-only: constant velocity re-applied every 20 ticks, standing in for thrusters until those exist. */
+	/**
+	 *  debug-only: constant velocity re-applied every slowTick, standing in for thrusters until those exist.
+	 *  applied on the same cadence as [applyPlanetGravity] so the two can cancel exactly (a +0.5 debug against
+	 *  -0.5 gravity holds a ship suspended).
+	 */
 	private var debugConstantVelocity: Vec3 = Vec3.ZERO
 
-	/** game tick [debugConstantVelocity] was last applied on; -1 forces an immediate apply. slowTick runs off
-	 *  a real-time (1s) async scheduler, which can drift from the actual 20-tick server cadence under lag,
-	 *  so we track elapsed game ticks ourselves instead of trusting "once per slowTick" to mean "every 20 ticks". */
-	private var lastDebugVelocityTick: Int = -1
+	/** the debug constant velocity this ship is actually re-applying. read-only; mutate via
+	 *  [setDebugConstantVelocity] / [resetDebugConstantVelocity]. */
+	val debugVelocity: Vec3 get() = this.debugConstantVelocity
 
 	companion object {
 
@@ -57,8 +59,10 @@ class StarshipSimulator private constructor() {
 
 	fun simulate() {
 
+		// forces first, then latch the whole-block step they produced, then clamp that step to what actually fits.
 		applyPlanetGravity()
 		applyDebugConstantVelocity()
+		this.starship.velocity.beginTick()
 		clampVelocityToCollision()
 
 	}
@@ -82,11 +86,10 @@ class StarshipSimulator private constructor() {
 	///// VELOCITY SOURCES (Thrusters, Debug Velocity)
 	//////////////////////////////////////////////////
 
-	/** set the debug constant velocity, re-applied every 20 ticks until reset. for testing movement without thrusters. */
+	/** set the debug constant velocity, re-applied every slowTick until reset. for testing movement without thrusters. */
 	fun setDebugConstantVelocity(vec: Vec3) {
 
 		this.debugConstantVelocity = vec
-		this.lastDebugVelocityTick = -1 // force apply on next simulate() instead of waiting out a stale window
 
 	}
 
@@ -94,7 +97,6 @@ class StarshipSimulator private constructor() {
 	fun resetDebugConstantVelocity() {
 
 		this.debugConstantVelocity = Vec3.ZERO
-		this.lastDebugVelocityTick = -1
 
 	}
 
@@ -102,11 +104,7 @@ class StarshipSimulator private constructor() {
 
 		if (this.debugConstantVelocity == Vec3.ZERO) return
 
-		val currentTick = Bukkit.getCurrentTick()
-		if (this.lastDebugVelocityTick != -1 && currentTick - this.lastDebugVelocityTick < 20) return
-
 		this.starship.velocity.addVelocity(this.debugConstantVelocity)
-		this.lastDebugVelocityTick = currentTick
 
 	}
 
@@ -116,7 +114,7 @@ class StarshipSimulator private constructor() {
 	 *  and a fast-moving ship could tunnel past a collision that's within its full velocity but not adjacent. */
 	private fun clampVelocityToCollision() {
 
-		val intendedMove = this.starship.velocity.vec3i
+		val intendedMove = this.starship.velocity.pendingStep
 		if (intendedMove == Vec3i.ZERO) return
 
 		val (canMoveFull, safeDistance) = StarshipCollision.processMoveCollision(intendedMove, this.starship)
@@ -124,7 +122,7 @@ class StarshipSimulator private constructor() {
 
 		// TODO: this is where hit-transfer belongs (deal damage/mass-transfer to the block or starship
 		//       we collided with, proportional to the velocity we didn't get to use).
-		this.starship.velocity.setVelocity(Vec3(safeDistance.x.toDouble(), safeDistance.y.toDouble(), safeDistance.z.toDouble()))
+		this.starship.velocity.clampStep(safeDistance)
 
 	}
 
@@ -133,14 +131,20 @@ class StarshipSimulator private constructor() {
 	//////////////////////
 
 	// TODO: breakout into single function call so we don't iterate over the same array twice (merge mass adding logic into starship detection loop)
+	/** recomputes mass from scratch. must not accumulate onto the previous value: this is called again after a
+	 *  split strips blocks off the ship, where accumulating would grow the mass of a ship that just got smaller. */
 	fun calculateTotalStarshipMass() {
+
+		var total = 0
 
 		this.starship.blockHashMap.forEach { (_, state) ->
 
 			val simulatedBlock = BlockLists.getSimulatedBlock(state.bukkitMaterial.asBlockType() ?: BlockType.AIR)
-			starshipMass += simulatedBlock.mass
+			total += simulatedBlock.mass
 
 		}
+
+		this.starshipMass = total
 
 	}
 

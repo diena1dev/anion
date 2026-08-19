@@ -9,55 +9,55 @@ import java.util.logging.Level
 @Suppress("Unused")
 object Tasks {
 
-    private val executor: ScheduledExecutorService = Executors.newScheduledThreadPool(4)
+	private val executor: ScheduledExecutorService = Executors.newScheduledThreadPool(4)
 
-    fun runSync(block: Runnable) {
-        Anion.instance.scheduler.runTask(Anion.plugin, block)
-    }
+	fun runSync(block: Runnable) {
+		Anion.instance.scheduler.runTask(Anion.plugin, block)
+	}
 
-    fun runAsync(block: Runnable): ScheduledFuture<*> {
-        return executor.schedule(block.logExceptions(), 0, TimeUnit.MILLISECONDS)
-    }
+	fun runAsync(block: Runnable): ScheduledFuture<*> {
+		return executor.schedule(block.logExceptions(), 0, TimeUnit.MILLISECONDS)
+	}
 
-    /** Repeating task on the main thread. Use for anything that touches the world or the Bukkit API. */
-    fun scheduleSync(
-        delayTicks: Long,
-        periodTicks: Long,
-        block: Runnable
-    ) {
-        Anion.instance.scheduler.runTaskTimer(Anion.plugin, block, delayTicks, periodTicks)
-    }
+	/** Repeating task on the main thread. Use for anything that touches the world or the Bukkit API. */
+	fun scheduleSync(
+		delayTicks: Long,
+		periodTicks: Long,
+		block: Runnable
+	) {
+		Anion.instance.scheduler.runTaskTimer(Anion.plugin, block, delayTicks, periodTicks)
+	}
 
-    /** [ScheduledExecutorService.scheduleAtFixedRate] silently and permanently stops future executions
-     *  if [block] ever throws — no log, no crash, it just never runs again. wrap so a single bad tick
-     *  logs and gets skipped instead of killing the whole periodic task forever. */
-    fun scheduleAsync(
-        delay: Long,
-        period: Long,
-        unit: TimeUnit,
-        block: Runnable
-    ): ScheduledFuture<*> {
-        return executor.scheduleAtFixedRate(block.logExceptions(), delay, period, unit)
-    }
+	/** [ScheduledExecutorService.scheduleAtFixedRate] silently and permanently stops future executions
+	 *  if [block] ever throws — no log, no crash, it just never runs again. wrap so a single bad tick
+	 *  logs and gets skipped instead of killing the whole periodic task forever. */
+	fun scheduleAsync(
+		delay: Long,
+		period: Long,
+		unit: TimeUnit,
+		block: Runnable
+	): ScheduledFuture<*> {
+		return executor.scheduleAtFixedRate(block.logExceptions(), delay, period, unit)
+	}
 
-    fun scheduleAsyncDelayed(
-        delay: Long,
-        unit: TimeUnit,
-        block: Runnable
-    ): ScheduledFuture<*> {
-        return executor.schedule(block.logExceptions(), delay, unit)
-    }
+	fun scheduleAsyncDelayed(
+		delay: Long,
+		unit: TimeUnit,
+		block: Runnable
+	): ScheduledFuture<*> {
+		return executor.schedule(block.logExceptions(), delay, unit)
+	}
 
-    fun shutdown() {
-        executor.shutdown()
-    }
+	fun shutdown() {
+		executor.shutdown()
+	}
 
-    private fun Runnable.logExceptions(): Runnable = Runnable {
-        try {
-            run()
-        } catch (e: Throwable) {
-            Anion.plugin.logger.log(Level.SEVERE, "Uncaught exception in scheduled task", e)
-        }
-    }
+	private fun Runnable.logExceptions(): Runnable = Runnable {
+		try {
+			run()
+		} catch (exception: Throwable) {
+			Anion.plugin.logger.log(Level.SEVERE, "Uncaught exception in scheduled task", exception)
+		}
+	}
 
 }

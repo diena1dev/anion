@@ -30,31 +30,31 @@ import org.jetbrains.annotations.ApiStatus.Experimental
 import org.joml.Quaternionf
 
 inline fun <reified E: Entity> RegionAccessor.spawn(
-    location: Location,
-    reason: SpawnReason = CUSTOM,
-    noinline function: (entity: E) -> Unit,
+	location: Location,
+	reason: SpawnReason = CUSTOM,
+	noinline function: (entity: E) -> Unit,
 ): E = spawn<E>(location, E::class.java, function, reason)
 
 inline fun <reified E: Entity> Location.spawn(
-    reason: SpawnReason = CUSTOM,
-    noinline function: (entity: E) -> Unit,
+	reason: SpawnReason = CUSTOM,
+	noinline function: (entity: E) -> Unit,
 ): E = world.spawn(this, reason, function)
 
 @Suppress("UnstableApiUsage")
 fun ItemStack.toAnionItem(): AnionItem? {
-    val model: Key = getData(DataComponentTypes.ITEM_MODEL) ?: return null
-    return AnionRegistries.ITEM_REGISTRY.getValue(AnionRegistryKey(model.value()))
+	val model: Key = getData(DataComponentTypes.ITEM_MODEL) ?: return null
+	return AnionRegistries.ITEM_REGISTRY.getValue(AnionRegistryKey(model.value()))
 }
 
 @Experimental
 inline operator fun <T : Any> ItemStack.set(
-    @Suppress("UnstableApiUsage") component: DataComponentType.Valued<T>,
-    value: T
+	@Suppress("UnstableApiUsage") component: DataComponentType.Valued<T>,
+	value: T
 ) = @Suppress("UnstableApiUsage") setData(component, value)
 
 @Experimental
 inline operator fun<T : Any> ItemStack.get(
-    @Suppress("UnstableApiUsage") component: DataComponentType.Valued<T>,
+	@Suppress("UnstableApiUsage") component: DataComponentType.Valued<T>,
 ): T? = @Suppress("UnstableApiUsage") getData(component)
 
 inline operator fun Location.plus(other: Vector) = add(other)
@@ -92,12 +92,12 @@ inline operator fun Vector.timesAssign(other: Double) { multiply(other) }
 inline operator fun Vector.divAssign(other: Vector) { divide(other) }
 
 inline fun Quaternionf.times(other: Quaternionf): Quaternionf {
-    return Quaternionf(
-        w * other.x + x * other.w + y * other.z - z * other.y,  // x
-        w * other.y - x * other.z + y * other.w + z * other.x,  // y
-        w * other.z + x * other.y - y * other.x + z * other.w,  // z
-        w * other.w - x * other.x - y * other.y - z * other.z,  // real number
-    )
+	return Quaternionf(
+		w * other.x + x * other.w + y * other.z - z * other.y,  // x
+		w * other.y - x * other.z + y * other.w + z * other.x,  // y
+		w * other.z + x * other.y - y * other.x + z * other.w,  // z
+		w * other.w - x * other.x - y * other.y - z * other.z,  // real number
+	)
 }
 
 inline operator fun BlockPos.unaryPlus() = this
@@ -135,20 +135,28 @@ inline operator fun Vec3i.div(other: Int) = Vec3i(x / other, y / other, z / othe
 inline val Vec3i.blockPos get() = BlockPos(x, y, z)
 inline val Vec3.vec3i get() = Vec3i(x.toInt(), y.toInt(), z.toInt())
 
+/** [vec3i] truncates toward zero, so -0.5 and 0.5 both land on 0 and negative motion is biased upward.
+ *  this rounds consistently downward, which is what block-lattice coordinates want. */
+inline val Vec3.floorVec3i get() = Vec3i(
+	kotlin.math.floor(x).toInt(),
+	kotlin.math.floor(y).toInt(),
+	kotlin.math.floor(z).toInt(),
+)
+
 fun BlockFace.rotateRight() = when (this) {
-    BlockFace.NORTH -> BlockFace.EAST
-    BlockFace.EAST -> BlockFace.SOUTH
-    BlockFace.SOUTH -> BlockFace.WEST
-    BlockFace.WEST -> BlockFace.NORTH
-    else -> throw NotImplementedError("non-cartesian faces are not supported")
+	BlockFace.NORTH -> BlockFace.EAST
+	BlockFace.EAST -> BlockFace.SOUTH
+	BlockFace.SOUTH -> BlockFace.WEST
+	BlockFace.WEST -> BlockFace.NORTH
+	else -> throw NotImplementedError("non-cartesian faces are not supported")
 }
 
 fun BlockFace.rotateLeft() = when (this) {
-    BlockFace.NORTH -> BlockFace.WEST
-    BlockFace.WEST -> BlockFace.SOUTH
-    BlockFace.SOUTH -> BlockFace.EAST
-    BlockFace.EAST -> BlockFace.NORTH
-    else -> throw NotImplementedError("non-cartesian faces are not supported")
+	BlockFace.NORTH -> BlockFace.WEST
+	BlockFace.WEST -> BlockFace.SOUTH
+	BlockFace.SOUTH -> BlockFace.EAST
+	BlockFace.EAST -> BlockFace.NORTH
+	else -> throw NotImplementedError("non-cartesian faces are not supported")
 }
 
 /** Quantises a yaw in degrees down to the cardinal face it currently reads as. */
@@ -235,7 +243,7 @@ inline val Block.adjacentBlocks get() = run {
 	blockSet.add(world.getBlockAt(x, y, z+1))
 	blockSet.add(world.getBlockAt(x, y, z-1))
 
-    blockSet
+	blockSet
 }
 
 inline val Location.blockPos get() = BlockPos(x.toInt(), y.toInt(), z.toInt())

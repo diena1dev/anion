@@ -38,12 +38,12 @@ class StarshipHitbox private constructor() {
 
 			entity ->
 
-			val bp = entity.blockPosition()
+			val entityPos = entity.blockPosition()
 
 			// so apparently you can just do this and it works, thanks kotlin
-			for (x in -1..1) for (y in -1..1) for (z in -1..1) {
+			for (offsetX in -1..1) for (offsetY in -1..1) for (offsetZ in -1..1) {
 
-				if (this.starship.blockHashMap.containsKey(Vec3i(bp.x + x, bp.y + y, bp.z + z))) return@getEntities true
+				if (this.starship.blockHashMap.containsKey(Vec3i(entityPos.x + offsetX, entityPos.y + offsetY, entityPos.z + offsetZ))) return@getEntities true
 
 			}
 
@@ -74,11 +74,11 @@ class StarshipHitbox private constructor() {
 		var minX = Int.MAX_VALUE; var minY = Int.MAX_VALUE; var minZ = Int.MAX_VALUE
 		var maxX = Int.MIN_VALUE; var maxY = Int.MIN_VALUE; var maxZ = Int.MIN_VALUE
 
-		for (v in this.starship.blockHashMap.keys) {
+		for (position in this.starship.blockHashMap.keys) {
 
-			if (v.x < minX) minX = v.x; if (v.x > maxX) maxX = v.x
-			if (v.y < minY) minY = v.y; if (v.y > maxY) maxY = v.y
-			if (v.z < minZ) minZ = v.z; if (v.z > maxZ) maxZ = v.z
+			if (position.x < minX) minX = position.x; if (position.x > maxX) maxX = position.x
+			if (position.y < minY) minY = position.y; if (position.y > maxY) maxY = position.y
+			if (position.z < minZ) minZ = position.z; if (position.z > maxZ) maxZ = position.z
 
 		}
 

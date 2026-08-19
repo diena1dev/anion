@@ -1,12 +1,12 @@
 package dev.diena.anion.features.starship
 
+import dev.diena.anion.Tasks
 import dev.diena.anion.data.database.AnionPersistence
 import dev.diena.anion.extensions.adjacentBlocks
 import dev.diena.anion.extensions.blockPos
 import dev.diena.anion.extensions.div
 import dev.diena.anion.extensions.minus
 import dev.diena.anion.extensions.plus
-import dev.diena.anion.extensions.rotateRight
 import dev.diena.anion.extensions.rotationOf
 import dev.diena.anion.extensions.stepsFromTo
 import dev.diena.anion.extensions.toFace
@@ -15,374 +15,456 @@ import dev.diena.anion.features.machine.MachineIndex
 import dev.diena.anion.features.starship.simluated.StarshipSimulator
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Vec3i
-import net.minecraft.nbt.CompoundTag
 import net.minecraft.server.level.ServerLevel
-import net.minecraft.world.entity.Entity
-import net.minecraft.world.entity.PositionMoveRotation
-import net.minecraft.world.entity.Relative
-import net.minecraft.world.item.Items
-import net.minecraft.world.level.block.Blocks
-import net.minecraft.world.level.block.Rotation
-import net.minecraft.world.level.block.entity.BlockEntity
 import net.minecraft.world.level.block.state.BlockState
-import net.minecraft.world.phys.AABB
-import net.minecraft.world.phys.Vec3
+import org.bukkit.Material
 import org.bukkit.World
 import org.bukkit.block.Block
-import org.bukkit.block.BlockFace
 import org.bukkit.craftbukkit.CraftWorld
 import org.bukkit.craftbukkit.block.CraftBlock
-import org.bukkit.craftbukkit.entity.CraftPlayer
-import org.bukkit.entity.Player
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
 /** represents a collection of simulated blocks. logic and functionality split off into subclasses. */
-// FIXME: Starship yaw can exist in states between what rotate the ship, while starship position is clamped to integer values and is never changed if velocity is below 1 unit.
+// FIXME: Starship yaw can exist in states between what rotate the ship,
+//        while starship position is clamped to integer values and is never changed if velocity is below 1 unit.
+//        Update starship Position to support partial moves (so starships can still move at <=1 block a second)
 class Starship {
 
-    companion object {
-        /** all loaded and active ships on the server */
-        val loadedStarships: MutableMap<UUID, Starship> = ConcurrentHashMap()
+	companion object {
+		/** all loaded and active ships on the server */
+		val loadedStarships: MutableMap<UUID, Starship> = ConcurrentHashMap()
 
-        /** the loaded ship occupying [vec] in [level], if any. used to claim freshly assembled machines. */
-        fun starshipAt(level: ServerLevel, vec: Vec3i): Starship? =
-            loadedStarships.values.firstOrNull { it.level == level && it.blockHashMap.containsKey(vec) }
-    }
+		/** true while a starship is writing its blocks into the world. block events fired during
+		 *  that window are ignored by [addBlock]/[updateBlock]. main thread only. */
+		var applyingWorldChanges: Boolean = false
+			private set
 
-    lateinit var uuid: UUID
-    lateinit var level: ServerLevel           // nms Level that the ship currently exists in
-    lateinit var origin: Vec3i                // approximated center of the starship, what is rotated around
-    lateinit var hitbox: StarshipHitbox       // ship hitbox
-    lateinit var simulator: StarshipSimulator // starship world interaction
-    lateinit var machines: StarshipMachines   // machines carried by this ship
+		/** the loaded ship in [level] that owns [pos], or null if no ship does. */
+		fun starshipAt(level: ServerLevel, pos: Vec3i): Starship? =
+			loadedStarships.values.firstOrNull { it.level == level && it.blockHashMap[pos] != null }
 
-    lateinit var velocity: StarshipVelocity
-    var yaw: Double = 0.0
-    var size: Int = 0
+		/** runs [block] with [applyingWorldChanges] set, so block events it provokes are ignored by ships. */
+		fun <T> writingToWorld(block: () -> T): T {
 
-    var dirty: Boolean = false      // marks if we need to save starship in database
+			val previous = applyingWorldChanges
+			applyingWorldChanges = true
 
-    // moves run on the main thread, machines tick on the async pool — this is read from there, so it
-    // has to be volatile or a machine can sit on a stale copy indefinitely.
-    /** true while a move/rotate is rewriting the world. carried machines skip their ticks. */
-    @Volatile var moving = false; private set
+			try { return block() } finally { applyingWorldChanges = previous }
 
-    /** Represents the blocks that make up a ship. Readable publicly, writable privately. */
-    lateinit var blockHashMap: HashMap<Vec3i, BlockState> private set // nms BlockState
+		}
+	}
 
-    //////////////////////////////////////
-    ///// TICK OPERATIONS (SlowTick, Tick)
-    //////////////////////////////////////
+	lateinit var uuid: UUID
+	lateinit var level: ServerLevel           // nms Level that the ship currently exists in
+	lateinit var origin: Vec3i                // approximated center of the starship, what is rotated around
+	lateinit var hitbox: StarshipHitbox       // ship hitbox
+	lateinit var simulator: StarshipSimulator // starship world interaction
+	lateinit var machines: StarshipMachines   // machines carried by this ship
 
-    fun tick() {
+	lateinit var velocity: StarshipVelocity
+	var yaw: Double = 0.0
+	var size: Int = 0
 
-        // NO-OP atm
+	var dirty: Boolean = false      // marks if we need to save starship in database
+	/** true while a move/rotate is rewriting the world. carried machines skip their ticks. */
+	var moving = false; private set
 
-    }
+	/** Represents the blocks that make up a ship. Readable publicly, writable privately. */
+	lateinit var blockHashMap: ConcurrentHashMap<Vec3i, BlockState> private set // nms BlockState
 
-    fun slowTick() {
+	//////////////////////////////////////
+	///// TICK OPERATIONS (SlowTick, Tick)
+	//////////////////////////////////////
 
-        // every move tick we need to apply a simulator.... which would be every tick
-        // applying velocity not only mutates our velocity value, it moves the starship too.
-        // this is *fine*, but not ideal, since movement should be done after our simulator layer is complete.
+	fun tick() {
 
-        // simulate starship (for now apply static gravity if not in world ending in _space.)
-        simulator.simulate()
+		// NO-OP atm
 
-        // applyVelocity in StarshipVelocity calls our Starship.move() class, so we can run Simulator before it and update the velocity values
-        velocity.applyVelocity()
+	}
 
-    }
+	fun slowTick() {
 
-    /////////////////////////////////////////////////
-    ///// DATA OPERATIONS (Creation, Loading, Saving)
-    /////////////////////////////////////////////////
+		// a paused ship's motion belongs to something else, and keeps the velocity it had for when it resumes
+		if (velocity.paused) return
 
-    /** Creates a fresh instance of a [Starship] with the provided Block locations. */
-    fun create(
+		// simulate starship (for now apply static gravity if not in world ending in _space.)
+		simulator.simulate()
 
-        blockPosSet: Set<BlockPos>,
-        setWorld: World
+		// applyVelocity in StarshipVelocity calls our Starship.move() class, so we can run Simulator before it and update the velocity values
+		velocity.applyVelocity()
 
-    ): Starship {
+	}
 
-        this.level = (setWorld as CraftWorld).handle           // init level
-        this.blockHashMap = hashMapOf()                        // init hashmap
-        this.simulator = StarshipSimulator.new(this) // init simulator
+	/////////////////////////////////////////////////
+	///// DATA OPERATIONS (Creation, Loading, Saving)
+	/////////////////////////////////////////////////
 
-        for (b in blockPosSet) {
+	/** Creates a fresh instance of a [Starship] with the provided Block locations. */
+	fun create(
 
-            val block = level.getBlockState(b.blockPos)
-            this.blockHashMap[b] = block
+		blockPosSet: Set<BlockPos>,
+		setWorld: World
 
-        }
+	): Starship {
 
-        // calculate center of starship
-        // FIXME: RECALCULATE EVERY TIME A BLOCK IS ADDED
-        var vectorAddedTo = Vec3i(0, 0, 0)
-        for (v in this.blockHashMap.keys) {
+		this.level = (setWorld as CraftWorld).handle           // init level
+		this.blockHashMap = ConcurrentHashMap()                // init hashmap
+		this.simulator = StarshipSimulator.new(this) // init simulator
 
-            vectorAddedTo += v
+		for (blockPos in blockPosSet) {
 
-        }
+			val block = level.getBlockState(blockPos.blockPos)
+			this.blockHashMap[blockPos] = block
 
-        this.origin = vectorAddedTo/blockHashMap.size
-        this.hitbox = StarshipHitbox.new(this)
-        this.velocity = StarshipVelocity.new(this)
-        this.machines = StarshipMachines.new(this)
-        this.yaw = 1.0
-        this.size = blockPosSet.size
+		}
 
-        this.machines.rebuild() // claim any machine already assembled inside the detected blocks
+		// calculate center of starship
+		// FIXME: RECALCULATE EVERY TIME A BLOCK IS ADDED
+		var vectorAddedTo = Vec3i(0, 0, 0)
+		for (position in this.blockHashMap.keys) {
 
-        this.simulator.calculateTotalStarshipMass() // calculate initial starship mass
+			vectorAddedTo += position
 
-        return this
+		}
 
-    }
+		this.origin = vectorAddedTo/blockHashMap.size
+		this.hitbox = StarshipHitbox.new(this)
+		this.velocity = StarshipVelocity.new(this)
+		this.machines = StarshipMachines.new(this)
+		this.yaw = 1.0
+		this.size = blockPosSet.size
 
-    /** restores a starship from data. */
-    internal fun load(
+		this.machines.rebuild() // claim any machine already assembled inside the detected blocks
 
-        uuid: UUID,
-        level: ServerLevel,
-        origin: Vec3i,
-        yaw: Double,
-        blocks: HashMap<Vec3i, BlockState>
+		this.simulator.calculateTotalStarshipMass() // calculate initial starship mass
 
-    ): Starship {
+		// register + persist the freshly built ship so callers cannot forget to (and desync the world).
+		this.uuid = UUID.randomUUID()
+		loadedStarships[this.uuid] = this
+		AnionPersistence.saveStarship(this.uuid, this)
 
-        this.uuid = uuid
-        this.level = level
-        this.origin = origin
-        this.yaw = yaw
-        this.blockHashMap = blocks
-        this.hitbox = StarshipHitbox.new(this)
-        this.velocity = StarshipVelocity.new(this) // FIXME: SAVE VELOCITY ON SHIP UNLOAD
-        this.simulator = StarshipSimulator.new(this) // FIXME: Save Simulator on unload.
-        this.machines = StarshipMachines.new(this)
+		return this
 
-        // machines load on their own chunk, which may come up before or after this ship — rebuild()
-        // catches the ones already in memory, and any that load later claim this ship themselves.
-        this.machines.rebuild()
+	}
 
-        return this
+	/** restores a starship from data. */
+	internal fun load(
 
-    }
+		uuid: UUID,
+		level: ServerLevel,
+		origin: Vec3i,
+		yaw: Double,
+		blocks: ConcurrentHashMap<Vec3i, BlockState>
 
-    ////////////////////////////////////////////
-    ///// MOVEMENT OPERATIONS (Moving, Rotating)
-    ////////////////////////////////////////////
+	): Starship {
 
-    /** moves the ship by the given [Vec3i] */
-    fun move(
+		this.uuid = uuid
+		this.level = level
+		this.origin = origin
+		this.yaw = yaw
+		this.blockHashMap = blocks
+		this.hitbox = StarshipHitbox.new(this)
+		this.velocity = StarshipVelocity.new(this) // FIXME: SAVE VELOCITY ON SHIP UNLOAD
+		this.simulator = StarshipSimulator.new(this) // FIXME: Save Simulator on unload.
+		this.machines = StarshipMachines.new(this)
 
-        vectorToMoveIn: Vec3i,
+		// machines load on their own chunk, which may come up before or after this ship — rebuild()
+		// catches the ones already in memory, and any that load later claim this ship themselves.
+		this.machines.rebuild()
 
-    ) : Boolean {
+		return this
 
-        this.moving = true
+	}
 
-        val (canMove, _) = StarshipCollision.processMoveCollision(vectorToMoveIn, this)
-        if (!canMove) {
+	////////////////////////////////////////////
+	///// MOVEMENT OPERATIONS (Moving, Rotating)
+	////////////////////////////////////////////
 
-            this.moving = false
-            return false
+	/** moves the ship by the given [Vec3i] */
+	fun move(
 
-        }
+		vectorToMoveIn: Vec3i,
 
-	    this.origin += vectorToMoveIn                  // translate origin
-        this.blockHashMap = StarshipMovement.move(vectorToMoveIn, this)
-        this.machines.translate(vectorToMoveIn) // carry machines along, after the world is rewritten
-        this.hitbox.moveHitbox(vectorToMoveIn) // translate hitbox
-        this.dirty = true
-        this.moving = false
+	) : Boolean {
 
-        this.machines.revalidate() // machines are only unfrozen now, so re-check against the settled world
+		this.moving = true
 
-        return true
+		val (canMove, _) = StarshipCollision.processMoveCollision(vectorToMoveIn, this)
+		if (!canMove) {
 
-    }
+			this.moving = false
+			return false
 
-    /** increments yaw by given amount, rotates if */
-    fun rotate(
+		}
 
-        byAmount: Double // can be negative
+		this.origin += vectorToMoveIn                  // translate origin
+		this.blockHashMap = writingToWorld { StarshipMovement.move(vectorToMoveIn, this) }
+		this.machines.translate(vectorToMoveIn) // carry machines along, after the world is rewritten
+		this.hitbox.moveHitbox(vectorToMoveIn) // translate hitbox
+		this.dirty = true
+		this.moving = false
 
-    ) : Boolean {
+		this.machines.revalidate() // machines are only unfrozen now, so re-check against the settled world
 
-        this.moving = true
+		return true
 
-        // narrowed once and reused: the collision check has to resolve the exact same face the yaw
-        // update below does, and Float vs Double rounding can disagree right on a face boundary.
-        val byAngle = byAmount.toFloat()
+	}
 
-        if (!StarshipCollision.processRotationCollision(byAngle, this)) {
+	/** increments yaw by given amount, rotates if */
+	fun rotate(
 
-            this.moving = false
-            return false
+		byAmount: Double // can be negative
 
-        }
+	) : Boolean {
 
-        // yaw lives here, not in StarshipMovement — that class only rewrites blocks, and the machine
-        // transform has to be driven off the exact same step count the blocks were rotated by.
-        val oldYaw = this.yaw
-        this.yaw = ((oldYaw + byAngle % 360) + 360) % 360 // modulo to wraparound whatever angle we get
-        val steps = stepsFromTo(oldYaw.toFace(), this.yaw.toFace())
+		this.moving = true
 
-        // sub-face yaw change: nothing in the world moves, but the new yaw still has to be persisted
-        if (steps == 0) {
+		// narrowed once and reused: the collision check has to resolve the exact same face the yaw
+		// update below does, and Float vs Double rounding can disagree right on a face boundary.
+		val byAngle = byAmount.toFloat()
 
-            this.dirty = true
-            this.moving = false
-            return true
+		if (!StarshipCollision.processRotationCollision(byAngle, this)) {
 
-        }
+			this.moving = false
+			return false
 
-        // origin is unchanged
-        this.blockHashMap = StarshipMovement.rotate(steps, this)
-        this.machines.rotate(rotationOf(steps)) // same steps as the blocks, so machines land with them
-        this.hitbox.rebuildHitbox() // recompute hitbox
-        this.dirty = true
-        this.moving = false
+		}
 
-        this.machines.revalidate()
+		// yaw lives here, not in StarshipMovement — that class only rewrites blocks, and the machine
+		// transform has to be driven off the exact same step count the blocks were rotated by.
+		val oldYaw = this.yaw
+		this.yaw = ((oldYaw + byAngle % 360) + 360) % 360 // modulo to wraparound whatever angle we get
+		val steps = stepsFromTo(oldYaw.toFace(), this.yaw.toFace())
 
-        return true
+		// sub-face yaw change: nothing in the world moves, but the new yaw still has to be persisted
+		if (steps == 0) {
 
-    }
+			this.dirty = true
+			this.moving = false
+			return true
 
-    // TODO: call machines.reassignLevel(newLevel) alongside the block rewrite — relocate() only moves
-    //       carried machines within a level.
-    fun changeWorld(
+		}
 
-        newWorld: World,
-        posInNewWorld: Vec3i
+		// origin is unchanged
+		this.blockHashMap = writingToWorld { StarshipMovement.rotate(steps, this) }
+		this.machines.rotate(rotationOf(steps)) // same steps as the blocks, so machines land with them
+		this.hitbox.rebuildHitbox() // recompute hitbox
+		this.dirty = true
+		this.moving = false
 
-    ) : Boolean {
+		this.machines.revalidate()
 
-        TODO("NYI")
+		return true
 
-    }
+	}
 
-    /** effectively teleports the starship to the given coordinates by manipulating the move method. */
-    fun teleportInWorld(
+	// TODO: call machines.reassignLevel(newLevel) alongside the block rewrite — relocate() only moves
+	//       carried machines within a level.
+	fun changeWorld(
 
-        posInWorldToMoveTo: Vec3i,
-        preserveVelocity: Boolean, // TODO: implement with velocity
+		newWorld: World,
+		posInNewWorld: Vec3i
 
-    ): Boolean {
+	) : Boolean {
 
-        if (!preserveVelocity) velocity.resetVelocity()
-        return this.move(posInWorldToMoveTo-this.origin)
+		TODO("NYI")
 
-    }
+	}
 
-    ///////////////////////////////////////////////////
-    ///// BLOCK OPERATIONS (Adding, Removing, Updating)
-    ///////////////////////////////////////////////////
+	/** effectively teleports the starship to the given coordinates by manipulating the move method. */
+	fun teleportInWorld(
 
-    /** removes block from starship. returns a boolean based on the result. */
-    fun removeBlock(
+		posInWorldToMoveTo: Vec3i,
+		preserveVelocity: Boolean, // TODO: implement with velocity
 
-        block: Block
+	): Boolean {
 
-    ) : Boolean {
+		if (!preserveVelocity) velocity.resetVelocity()
+		return this.move(posInWorldToMoveTo-this.origin)
 
-        if (this.blockHashMap[block.vec3i] == null) return false // fail if removing block not on starship
-        if (this.moving) return false                            // fail if we're moving
-        if ((block.world as CraftWorld).handle != this.level) {  // fail if removing block that is in another level (impossible?)
-            throw IllegalStateException("you cannot remove a block from a ship from another level!")
-        }
+	}
 
-        this.blockHashMap.remove(block.vec3i)
+	///////////////////////////////////////////////////
+	///// BLOCK OPERATIONS (Adding, Removing, Updating)
+	///////////////////////////////////////////////////
 
-        // a machine that lost a block goes inactive and waits for that exact block to come back. it only
-        // tears itself down once more than half its structure is wrong — see Machine.revalidate().
-        for (machine in this.machines.machinesHolding(block.vec3i)) MachineIndex.markChanged(machine)
+	/** removes block from starship. returns a boolean based on the result. */
+	fun removeBlock(
 
-        // deregister and remove ship if all blocks gone
-        if (blockHashMap.isEmpty()) {
+		block: Block
 
-            this.machines.detachAll()
-            loadedStarships.remove(this.uuid)
-            AnionPersistence.deleteStarship(this.uuid)
+	) : Boolean {
 
-            return true
+		if (this.blockHashMap[block.vec3i] == null) return false // fail if removing block not on starship
+		if (this.moving) return false                            // fail if we're moving
+		if ((block.world as CraftWorld).handle != this.level) {  // fail if removing block that is in another level (impossible?)
+			throw IllegalStateException("you cannot remove a block from a ship from another level!")
+		}
 
-        }
+		this.blockHashMap.remove(block.vec3i)
 
-        this.simulator.removeStarshipMass(block)
+		// TODO: move this out of removeBlock
+		this.checkForSplit(block.vec3i)
 
-        this.hitbox.rebuildHitbox()
-        this.dirty = true
-        return true
+		// a machine that lost a block goes inactive and waits for that exact block to come back. it only
+		// tears itself down once more than half its structure is wrong — see Machine.revalidate().
+		for (machine in this.machines.machinesHolding(block.vec3i)) MachineIndex.markChanged(machine)
 
-    }
+		// deregister and remove ship if all blocks gone
+		if (blockHashMap.isEmpty()) {
 
-    /** adds block to starship if block is adjacent to the ship. returns a boolean based on the result. */
-    // FIXME: this currently adds ANY adjacently placed block to the ship ONTO the ship.
-    //        in this current state, blocks cannot be placed on the world directly adjacent
-    //        to the ship without being added onto it. a more ideal solution would be to ONLY
-    //        add a block of the clicked block (in placement) was already part of a starship
-    fun addBlock(
+			this.machines.detachAll()
+			loadedStarships.remove(this.uuid)
+			AnionPersistence.deleteStarship(this.uuid)
 
-        block: Block
+			return true
 
-    ) : Boolean {
+		}
 
-        if (this.moving) return false
+		this.simulator.removeStarshipMass(block)
 
-        // only check blocks adjacent to the placed block
-        for (b in block.adjacentBlocks) {
+		this.hitbox.rebuildHitbox()
+		this.dirty = true
+		return true
 
-            if (this.blockHashMap[b.vec3i] == null) continue        // if not in entry continue, if in no entries do not add block.
-            if ((block.world as CraftWorld).handle != this.level) { // fail if adding block that is in another level (impossible?)
-                throw IllegalStateException("you cannot add a block to a ship from another level!")
-            }
+	}
 
-            // if at least one adjacent block was found, add it to the ship and break the loop
-            this.blockHashMap[block.vec3i] = (block as CraftBlock).blockState
-            this.hitbox.rebuildHitbox()
-            this.dirty = true
+	/** adds block to starship if block is adjacent to the ship. returns a boolean based on the result. */
+	// FIXME: this currently adds ANY adjacently placed block to the ship ONTO the ship.
+	//        in this current state, blocks cannot be placed on the world directly adjacent
+	//        to the ship without being added onto it. a more ideal solution would be to ONLY
+	//        add a block of the clicked block (in placement) was already part of a starship
+	fun addBlock(
 
-            this.simulator.removeStarshipMass(block)
+		block: Block
 
-            return true
+	) : Boolean {
 
-        }
+		if (this.moving) return false
+		if (applyingWorldChanges) return false // a ship's own world writes must never grow another ship
 
-        return false
+		// blacklisted blocks go here
+		if (block.type == Material.AIR) return false
 
-    }
+		// a block can only ever belong to one ship. without this two face-adjacent ships both claim the same
+		// cell and then stamp over each other on every move.
+		val owner = starshipAt((block.world as CraftWorld).handle, block.vec3i)
+		if (owner != null && owner !== this) return false
 
-    // TODO: combine/refactor updateBlock with addBlock as the functions are literally identical
-    /** used for things like pistons. returns a boolean based on the result. */
-    fun updateBlock(
+		// only check blocks adjacent to the placed block
+		for (adjacentBlock in block.adjacentBlocks) {
 
-        block: Block
+			if (this.blockHashMap[adjacentBlock.vec3i] == null) continue        // if not in entry continue, if in no entries do not add block.
+			if ((block.world as CraftWorld).handle != this.level) { // fail if adding block that is in another level (impossible?)
+				throw IllegalStateException("you cannot add a block to a ship from another level!")
+			}
 
-    ) : Boolean {
+			// if at least one adjacent block was found, add it to the ship and break the loop
+			this.blockHashMap[block.vec3i] = (block as CraftBlock).blockState
+			this.hitbox.rebuildHitbox()
+			this.dirty = true
 
-        if (this.moving) return false
+			this.simulator.addStarshipMass(block)
 
-        for (b in block.adjacentBlocks) {
+			return true
 
-            // if not in entry continue, if in no entries do not add block.
-            if (blockHashMap[b.vec3i] == null) continue
+		}
 
-            // if at least one adjacent block was found, add it to the ship
-            this.blockHashMap[block.vec3i] = (block as CraftBlock).blockState
-            this.hitbox.rebuildHitbox()
-            this.dirty = true
+		return false
 
-            return true
+	}
 
-        }
+	/**
+	 * Refreshes the stored state of a block the ship *already owns*. Used for things like pistons.
+	 * Never adds new blocks, unlike [addBlock]. Returns a boolean based on the result.
+	 */
+	fun updateBlock(
 
-        return false
+		block: Block
 
-    }
+	) : Boolean {
+
+		if (this.moving) return false
+		if (applyingWorldChanges) return false // a ship's own world writes must never mutate any ship
+
+		if ((block.world as CraftWorld).handle != this.level) return false
+		if (this.blockHashMap[block.vec3i] == null) return false // not ours: do not claim it
+
+		// blacklisted blocks go here. a block turning to air is a removal, which is removeBlock's job.
+		if (block.type == Material.AIR) return false
+
+		// position is unchanged, so the hitbox does not need rebuilding
+		this.blockHashMap[block.vec3i] = (block as CraftBlock).blockState
+		this.dirty = true
+
+		return true
+
+	}
+
+	//////////////////
+	///// MISC HELPERS
+	//////////////////
+
+	/**
+	 * Checks asynchronously whether the most recent block removal split this ship into
+	 * disconnected sections, and if so spawns the smaller detached island as its own [Starship].
+	 *
+	 * @param removedPos position of the block that was just removed.
+	 */
+	fun checkForSplit(removedPos: Vec3i) {
+
+		// snapshot on the main thread, in ship-local space (relative to origin). rebased onto the
+		// current origin when the result is applied.
+		val originAtSnapshot = this.origin
+		val yawAtSnapshot = this.yaw
+		val snapshot = this.blockHashMap.keys.mapTo(HashSet()) { it - originAtSnapshot }
+		val removedLocal = removedPos - originAtSnapshot
+
+		Tasks.runAsync {
+
+			val detached = StarshipSplit.detachedComponents(snapshot, removedLocal)
+			if (detached.isEmpty()) return@runAsync
+
+			Tasks.runSync {
+
+				// rotation remaps local coordinates, so a rotated ship invalidates the snapshot outright.
+				// dropping the result is safe: the next block removal re-runs the check against fresh geometry.
+				if (this.yaw != yawAtSnapshot) return@runSync
+
+				val rebased = detached.map { island -> island.mapTo(HashSet()) { it + this.origin } }
+
+				// blocks may still have been added/removed while the floodfill ran; bail if the island no
+				// longer matches what this ship actually owns.
+				if (rebased.any { island -> island.any { this.blockHashMap[it] == null } }) return@runSync
+
+				for (island in rebased) spawnDetachedShip(island)
+
+			}
+
+		}
+
+	}
+
+	/** strips [detached] off this ship and re-registers it as an independent [Starship]. main thread only. */
+	private fun spawnDetachedShip(detached: Set<Vec3i>) {
+
+		// strip the detached blocks off this ship
+		for (pos in detached) this.blockHashMap.remove(pos)
+		this.size = this.blockHashMap.size
+		this.simulator.calculateTotalStarshipMass()
+		this.hitbox.rebuildHitbox()
+		this.machines.rebuild() // the island took some of these blocks with it
+		this.dirty = true
+
+		// build the new ship from the detached block set (world states re-read here on the main thread).
+		// create() assigns the uuid, registers it in loadedStarships, and persists it.
+		val blockPosSet = detached.mapTo(HashSet()) { BlockPos(it.x, it.y, it.z) }
+		val createdStarship = Starship().create(blockPosSet, this.level.world)
+
+		// inherit the parent's momentum by VALUE, into the child's own StarshipVelocity instance.
+		createdStarship.velocity.copyFrom(this.velocity)
+
+	}
 
 }

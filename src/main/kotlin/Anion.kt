@@ -20,84 +20,84 @@ import java.util.concurrent.TimeUnit
 
 @Suppress("Unused", "UnstableAPIUsage")
 class AnionBootstrap : PluginBootstrap {
-    val startTime = System.currentTimeMillis()
+	val startTime = System.currentTimeMillis()
 
-    override fun bootstrap(context: BootstrapContext) {
-        context.lifecycleManager.registerEventHandler(COMMANDS, Registration(context.logger))
+	override fun bootstrap(context: BootstrapContext) {
+		context.lifecycleManager.registerEventHandler(COMMANDS, Registration(context.logger))
 
-        println("[Anion] Bootstrap stage completed in ${(System.currentTimeMillis()-startTime)}ms")
-    }
+		println("[Anion] Bootstrap stage completed in ${(System.currentTimeMillis()-startTime)}ms")
+	}
 
-    override fun createPlugin(context: PluginProviderContext): JavaPlugin {
-        return Anion()
-    }
+	override fun createPlugin(context: PluginProviderContext): JavaPlugin {
+		return Anion()
+	}
 }
 
 class Anion : JavaPlugin() {
 
-    override fun onEnable() {
-        Registration.listeners(this)
+	override fun onEnable() {
+		Registration.listeners(this)
 
-        instance = this.server
-        plugin = this
+		instance = this.server
+		plugin = this
 
-        AnionDatabase.open(dataFolder)
-        AnionPersistence.rebuildChunkIndices() // no-op unless a pre-index database is being opened
+		AnionDatabase.open(dataFolder)
+		AnionPersistence.rebuildChunkIndices() // no-op unless a pre-index database is being opened
 
-        // init our feature classes that call registries
-        AnionItems
-        AnionBlocks
-        //AnionGasses
-        //AnionEnergies
-	    AnionRecipes
-        AnionMachines
+		// init our feature classes that call registries
+		AnionItems
+		AnionBlocks
+		//AnionGasses
+		//AnionEnergies
+		AnionRecipes
+		AnionMachines
 
-        // starship slowTick updates
-        Tasks.scheduleAsync(1, 1, TimeUnit.SECONDS, Runnable {
-            for ((uuid, ship) in Starship.loadedStarships) {
+		// starship slowTick updates
+		Tasks.scheduleAsync(1, 1, TimeUnit.SECONDS, Runnable {
+			for ((uuid, ship) in Starship.loadedStarships) {
 
-                // saving
-                if (ship.dirty) AnionPersistence.saveStarship(uuid, ship)
+				// saving
+				if (ship.dirty) AnionPersistence.saveStarship(uuid, ship)
 
-                // ticking (sync for API safety)
-                Tasks.runSync { ship.slowTick() }
-            }
-        })
+				// ticking (sync for API safety)
+				Tasks.runSync { ship.slowTick() }
+			}
+		})
 
-        // machine tick updates (every game tick). sync: tick() reads and writes the world
-        Tasks.scheduleSync(0, 1, Runnable {
-            for (machine in Machine.activeMachines.values) machine.runTick()
-        })
+		// machine tick updates (every game tick). sync: tick() reads and writes the world
+		Tasks.scheduleSync(0, 1, Runnable {
+			for (machine in Machine.activeMachines.values) machine.runTick()
+		})
 
-        // machine slowTick updates (once a second). structure re-checks ride the same pass, but only
-        // for machines a block change actually queued
-        Tasks.scheduleSync(20, 20, Runnable {
-            MachineIndex.drainPending()
+		// machine slowTick updates (once a second). structure re-checks ride the same pass, but only
+		// for machines a block change actually queued
+		Tasks.scheduleSync(20, 20, Runnable {
+			MachineIndex.drainPending()
 
-            for (machine in Machine.activeMachines.values) machine.runSlowTick()
-        })
+			for (machine in Machine.activeMachines.values) machine.runSlowTick()
+		})
 
-        // machine saving. off-thread, since RocksDB writes have no business on the main thread
-        Tasks.scheduleAsync(1, 1, TimeUnit.SECONDS, Runnable {
-            for ((uuid, machine) in Machine.activeMachines) {
-                if (machine.dirty) AnionPersistence.saveMachine(uuid, machine)
-            }
-        })
+		// machine saving. off-thread, since RocksDB writes have no business on the main thread
+		Tasks.scheduleAsync(1, 1, TimeUnit.SECONDS, Runnable {
+			for ((uuid, machine) in Machine.activeMachines) {
+				if (machine.dirty) AnionPersistence.saveMachine(uuid, machine)
+			}
+		})
 
-    }
+	}
 
-    override fun onDisable() {
-        AnionPersistence.flushAll()
-        AnionDatabase.close()
-        Tasks.shutdown()
-    }
+	override fun onDisable() {
+		AnionPersistence.flushAll()
+		AnionDatabase.close()
+		Tasks.shutdown()
+	}
 
-    companion object {
-        const val NAMESPACE = "anion"
+	companion object {
+		const val NAMESPACE = "anion"
 
-        lateinit var instance: Server private set
-        lateinit var plugin: Anion private set
+		lateinit var instance: Server private set
+		lateinit var plugin: Anion private set
 
-    }
+	}
 
 }

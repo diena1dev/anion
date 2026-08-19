@@ -16,42 +16,42 @@ import org.bukkit.inventory.ItemStack
 
 open class AnionBlock(
 
-    displayName: String,
-    val instrument: Instrument,
-    val note: Int,
-    val stacksTo: Int = 64,
-    val styledDisplayName: Component = Component.text(displayName),
-    override val namespacedKey: NamespacedKey = NamespacedKey(Anion.NAMESPACE, displayName.replace(" ", "_").lowercase()),
-    val drops: ItemStack? = null,
+	displayName: String,
+	val instrument: Instrument,
+	val note: Int,
+	val stacksTo: Int = 64,
+	val styledDisplayName: Component = Component.text(displayName),
+	override val namespacedKey: NamespacedKey = NamespacedKey(Anion.NAMESPACE, displayName.replace(" ", "_").lowercase()),
+	val drops: ItemStack? = null,
 
-    private val placeHandler: ((block: Block, player: Player?) -> Unit)? = null,
-    private val breakHandler: ((block: Block, player: Player?) -> Unit)? = null,
-    private val interactHandler: ((event: PlayerInteractEvent) -> Unit)? = null,
-    private val neighborChangeHandler: ((block: Block) -> Unit)? = null,
+	private val placeHandler: ((block: Block, player: Player?) -> Unit)? = null,
+	private val breakHandler: ((block: Block, player: Player?) -> Unit)? = null,
+	private val interactHandler: ((event: PlayerInteractEvent) -> Unit)? = null,
+	private val neighborChangeHandler: ((block: Block) -> Unit)? = null,
 
 ) : AnionResource {
 
-    companion object {
-        private val internalBlock = BlockType.NOTE_BLOCK
+	companion object {
+		private val internalBlock = BlockType.NOTE_BLOCK
 
-        fun AnionBlock.getBlockState(): BlockState? {
-            val block = internalBlock.createBlockData() as? NoteBlock
-            block?.note = Note(this.note)
-            block?.instrument = instrument
+		fun AnionBlock.getBlockState(): BlockState? {
+			val block = internalBlock.createBlockData() as? NoteBlock
+			block?.note = Note(this.note)
+			block?.instrument = instrument
 
-            return block?.createBlockState()
-        }
-    }
+			return block?.createBlockState()
+		}
+	}
 
-    init {
-        if (note !in 0..24) throw IllegalStateException("note must be 0–24, got $note for ${this.namespacedKey}")
-    }
+	init {
+		if (note !in 0..24) throw IllegalStateException("note must be 0–24, got $note for ${this.namespacedKey}")
+	}
 
-    open fun onPlace(block: Block, player: Player?) { placeHandler?.invoke(block, player) }
-    open fun onBreak(block: Block, player: Player?) { breakHandler?.invoke(block, player) }
-    open fun onInteract(event: PlayerInteractEvent) { interactHandler?.invoke(event) }
-    open fun onNeighborChange(block: Block) { neighborChangeHandler?.invoke(block) }
-    open fun onAdd() {}
-    open fun onRemove() {}
+	open fun onPlace(block: Block, player: Player?) { placeHandler?.invoke(block, player) }
+	open fun onBreak(block: Block, player: Player?) { breakHandler?.invoke(block, player) }
+	open fun onInteract(event: PlayerInteractEvent) { interactHandler?.invoke(event) }
+	open fun onNeighborChange(block: Block) { neighborChangeHandler?.invoke(block) }
+	open fun onAdd() {}
+	open fun onRemove() {}
 
 }
