@@ -101,8 +101,6 @@ open class BlockSet private constructor(
 		var length: Int = 0
 		var height: Int = 0
 
-		// store if we have added a core block yet
-		var hasCoreBlock = false
 
 		/**
 		 *  holy FUCK astral is so much smarter than i am
@@ -115,8 +113,10 @@ open class BlockSet private constructor(
 		/** run final checks and return structure */
 		fun build(): BlockSet {
 
-			if (!hasCoreBlock) throw IllegalStateException("attempted to build a MachineStructure without a core assignment. fix your registrations!")
-			val offset = this.coreOffset ?: throw IllegalStateException("coreBlock was never initialized!")
+			val declaredCoreChar = this.coreChar
+				?: throw IllegalStateException("attempted to build a MachineStructure without a core assignment. fix your registrations!")
+			val offset = this.coreOffset
+				?: throw IllegalStateException("core char '$declaredCoreChar' never appears in any slice of '$name'. fix your registrations!")
 
 			// re-center every entry so the core's own cell lands on (0, 0, 0) — that's the
 			// pivot assemble()/isIntact() actually measure every other offset against.
@@ -129,11 +129,22 @@ open class BlockSet private constructor(
 
 		}
 
-		/** Assign Machine Core position */
+		/**
+		 * Assign Machine Core position. Callable exactly once.
+		 *
+		 * [block] does not have to be unique to the structure — pass a block that fills it, like the
+		 * casing, and the first cell that char lands on becomes the origin. A machine only needs a
+		 * dedicated core block if you want one.
+		 */
 		fun core(char: Char, block: AnionBlock): Builder {
 
 			if (coreChar != null) throw IllegalStateException("duplicate core registration in machine structure")
-			charMatchers.getOrPut(char) { mutableListOf() }.add(BlockMatcher.Custom(block))
+
+			// the same block may already be an accepted variant for this char, and listing it twice
+			// would only make resolveStructure walk a dead entry
+			val matchers = charMatchers.getOrPut(char) { mutableListOf() }
+			val matcher = BlockMatcher.Custom(block)
+			if (matcher !in matchers) matchers.add(matcher)
 
 			coreChar = char
 			return this
@@ -185,11 +196,11 @@ open class BlockSet private constructor(
 					val variants = charMatchers[char]
 						?: throw IllegalStateException("block mapping missing for char '$char'")
 
-					// record where the core actually sits in the raw grid so build() can
-					// re-center the whole structure around it.
-					if (char == coreChar) {
-						if (hasCoreBlock) throw IllegalStateException("duplicate core block assignment in structure")
-						hasCoreBlock = true
+					// record where the core actually sits in the raw grid so build() can re-center the
+					// whole structure around it. the core char may repeat all over the structure, and
+					// slices are walked in a fixed order, so the first cell it lands on is a
+					// deterministic choice across rebuilds.
+					if (char == coreChar && coreOffset == null) {
 						coreOffset = Vec3i(localX, this.height, localZ)
 					}
 

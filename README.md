@@ -144,6 +144,10 @@ Outside of the `slice()` function, the class contains:
 - an `anchor()` function, which takes a character and an Anion or Vanilla (Bukkit) Block and adds it to a mapping list
 - an `assign()` function, that also takes a character and an Anion or Vanilla (Bukkit) Block (This differs from `anchor()` in that multiple assignments can be made to one character to allow for alternate blocks to exist under that same representation. `anchor()` only allows one assignment and one representation in the StructureSet.)
 
+-# `anchor()` shipped as `core()`, and it is one call per structure — but the block it names does *not* have to be unique.
+Pass a block that fills the structure (the casing, say) and the first cell that char lands on becomes the origin, so a machine only needs a dedicated core block when you actually want one. Slices are walked in a fixed order, so that choice is stable across rebuilds.
+The tradeoff is in assembly: `candidatesAt` cheap-rejects on the origin cell, and a dedicated core block kills nearly every candidate there. A repeated core makes that filter weaker, so a very large coreless structure does more full resolves per wrench click, and two identical ones built flush together are likelier to read as ambiguous.
+
 Past the given schema, this is all that BlockSet should contain, as it's only meant to be a convenient and ergonomic way of checking structures.
 
 *The last design hurdle for Machine structure sets is a fast iterator to match the surrounding blocks in every rotation and offset for a given structure to it's registered counterparts*
