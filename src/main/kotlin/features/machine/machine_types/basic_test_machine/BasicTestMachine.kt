@@ -17,6 +17,7 @@ val BASIC_TEST_MACHINE =
 			.assign('I', AnionBlocks.COPPER_MACHINE_VALVE)
 			.assign('I', AnionBlocks.COPPER_MACHINE_DISPLAY)
 			.assign('I', AnionBlocks.COPPER_MACHINE_DATAPORT)
+			.assign('I', AnionBlocks.COPPER_MACHINE_CONDUIT)
 
 			.assign('G', BlockType.WAXED_COPPER_GRATE)
 			.assign('U', AnionBlocks.URANIUM_BLOCK)
