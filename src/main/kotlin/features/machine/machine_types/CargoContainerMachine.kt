@@ -20,7 +20,6 @@ val MEDIUM_CARGO_CONTAINER_STRUCTURE =
 		// any casing cell may be swapped for a port at build time. no valve — nothing here is a fluid
 		.assign('I', AnionBlocks.COPPER_MACHINE_CASING)
 		.assign('I', AnionBlocks.COPPER_MACHINE_BUS)
-		.assign('I', AnionBlocks.COPPER_MACHINE_CONDUIT)
 		.assign('I', AnionBlocks.COPPER_MACHINE_DISPLAY)
 
 		// floor. the origin is this slice's first cell, so local offsets run 0..5 x, 0..2 y, 0..2 z
