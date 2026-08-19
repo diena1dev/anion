@@ -13,8 +13,9 @@ import dev.diena.anion.features.machine.component.MachinePort
  */
 val MEDIUM_CARGO_CONTAINER_STRUCTURE =
 	BlockSet.new("medium_cargo_container")
-		// TODO: swap for a proper machine core block once one has a texture
-		.core('C', AnionBlocks.TEST_BLOCK)
+		// no dedicated core block: a crate is casing all the way round, so the first casing cell in
+		// the floor anchors it. the casing is listed under assign() below too — core() de-duplicates.
+		.core('I', AnionBlocks.COPPER_MACHINE_CASING)
 
 		// any casing cell may be swapped for a port at build time. no valve — nothing here is a fluid
 		.assign('I', AnionBlocks.COPPER_MACHINE_CASING)
@@ -22,11 +23,11 @@ val MEDIUM_CARGO_CONTAINER_STRUCTURE =
 		.assign('I', AnionBlocks.COPPER_MACHINE_CONDUIT)
 		.assign('I', AnionBlocks.COPPER_MACHINE_DISPLAY)
 
-		// floor
+		// floor. the origin is this slice's first cell, so local offsets run 0..5 x, 0..2 y, 0..2 z
 		.slice(
 			"III",
 			"III",
-			"ICI",
+			"III",
 			"III",
 			"III",
 			"III",
