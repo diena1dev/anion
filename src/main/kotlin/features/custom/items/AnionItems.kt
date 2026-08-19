@@ -64,9 +64,10 @@ object AnionItems {
 	val COPPER_MACHINE_CONDUIT  = registerBlock(AnionBlocks.COPPER_MACHINE_CONDUIT)
 
 	// transport
-	val COPPER_CONDUIT          = registerBlock(AnionBlocks.COPPER_CONDUIT)
-	val COPPER_CONDUIT_VERTICAL = registerBlock(AnionBlocks.COPPER_CONDUIT_VERTICAL)
-	val COPPER_CONDUIT_JUNCTION = registerBlock(AnionBlocks.COPPER_CONDUIT_JUNCTION)
+	val COPPER_PIPE          = registerBlock(AnionBlocks.COPPER_PIPE)
+	val COPPER_PIPE_VERTICAL = registerBlock(AnionBlocks.COPPER_PIPE_VERTICAL)
+	val COPPER_PIPE_JUNCTION = registerBlock(AnionBlocks.COPPER_PIPE_JUNCTION)
+	val COPPER_CHUTE         = registerBlock(AnionBlocks.COPPER_CHUTE)
 
 	private fun registerItem(item: AnionItem) = item.also {
 		AnionRegistries.ITEM_REGISTRY.register(AnionRegistryKey(it.namespacedKey.key), it)

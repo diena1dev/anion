@@ -6,14 +6,13 @@ import dev.diena.anion.extensions.anionFacing
 import dev.diena.anion.extensions.drawItem
 import dev.diena.anion.extensions.hasRoomFor
 import dev.diena.anion.extensions.itemKeys
+import dev.diena.anion.extensions.minus
 import dev.diena.anion.extensions.plus
 import dev.diena.anion.extensions.pushItem
 import dev.diena.anion.extensions.vec3i
 import dev.diena.anion.features.custom.ItemKey
 import dev.diena.anion.features.custom.blocks.AnionBlocks
-import dev.diena.anion.features.custom.blocks.AnionDirectionalBlock
 import dev.diena.anion.features.machine.Machine
-import dev.diena.anion.features.machine.component.MachineBuffer
 import dev.diena.anion.features.machine.component.MachinePort
 import dev.diena.anion.features.machine.machine_types.PortedMachine
 import net.minecraft.core.Vec3i
@@ -25,30 +24,33 @@ import org.bukkit.block.Container
 import org.bukkit.inventory.Inventory
 
 /**
- * Moves items between machine bus ports along conduit runs.
+ * Moves items along pipe runs.
  *
- * Flow is the conduit's own facing: a straight conduit only takes items in through its back face and
- * only passes them out of its front, so turning a corner is what the junction is for. That makes the
- * network a directed graph read straight off the world, with nothing to configure and nothing to
- * cache — which is also why breaking a conduit needs no invalidation.
+ * **Components drive, ports do not.** A [MachinePort] exists only to bridge to an internal buffer, so
+ * transport never iterates ports — it iterates its own blocks and looks a port up when one happens to
+ * be on the other side. The item adapter is the chute; a pump on a valve and a connector on a conduit
+ * are the same idea for fluid and power, when those land.
  *
- * Vanilla containers join in at both ends. A container touching a conduit's output face is a valid
- * drop-off, and a crafting table behind a run is an import node that pulls from any container touching
- * *it* — so a chest feeds the network through a crafting table, and any chest catches what comes out.
+ * Drivers:
+ * - **chute** — exports the buffer of the bus port behind it into whatever is in front
+ * - **crafting table** — imports from any vanilla container touching it
+ *
+ * Carriers: pipes and the junction. Flow is a pipe's own facing, so a run only takes items in through
+ * its back face and only passes them out of its front — turning a corner is what the junction is for.
+ * That makes the network a directed graph read straight off the world, with nothing to configure.
+ *
+ * Drop-offs: a bus port, or any vanilla container on an open side.
  *
  * TODO: routes are re-walked from scratch every pass. Once networks get large this wants a cached
- *       graph rebuilt off block events, the same way MachineIndex handles machine cells.
- * TODO: discovery is anchored on machine bus ports, because nothing indexes conduits in the world. A
- *       run with no machine anywhere on it (chest -> table -> conduit -> chest) is therefore invisible.
- *       Fixing it properly means a persisted conduit index, the same shape as the machine_chunks CF.
- * TODO: items only. Gas, fluid and energy get their own conduit families later.
+ *       graph rebuilt off block events, on top of the index rather than instead of it.
+ * TODO: items only. Gas, fluid and energy get their own adapters and pipe families later.
  */
 object AnionTransport {
 
-	/** conduit blocks walked before a route is abandoned */
+	/** blocks walked before a route is abandoned */
 	private const val MAX_ROUTE_LENGTH = 64
 
-	/** items a single port hands off per pass */
+	/** items a single driver hands off per pass */
 	private const val THROUGHPUT = 64L
 
 	/** somewhere a run can put items down */
@@ -64,74 +66,26 @@ object AnionTransport {
 
 		for (world in Bukkit.getWorlds()) {
 
-			val ports = busPortsIn(world)
-			if (ports.isEmpty()) continue // ports are what anchors discovery, so no ports means no network
+			val components = AnionTransportIndex.cellsIn(world)
+			if (components.isEmpty()) continue
 
-			for ((cell, port) in ports) {
+			val ports = portsIn(world)
 
-				val buffer = port.buffer() ?: continue // broken machine, or an unbound port
+			for (cell in components.toList()) {
 
-				// push what we hold outward, then top up from anything importing upstream
-				if (buffer.contents().isNotEmpty()) drain(world, cell, buffer, ports)
-				fill(world, cell, buffer)
+				val block = world.getBlockAt(cell.x, cell.y, cell.z)
 
-			}
+				// the index is a hint: a cell that no longer holds a component drops out on read
+				if (!AnionTransportIndex.isComponent(block)) {
+					AnionTransportIndex.unregister(block)
+					continue
+				}
 
-		}
-
-	}
-
-	/** Every bus port in [world], by the world cell it occupies. */
-	// built per pass rather than indexed, so it picks up ship-carried machines too — their cells move
-	// every tick and are deliberately absent from MachineIndex.
-	private fun busPortsIn(world: World): Map<Vec3i, MachinePort> {
-
-		val ports = HashMap<Vec3i, MachinePort>()
-
-		for (machine in Machine.activeMachines.values) {
-
-			if (machine.level.world != world) continue
-			if (!machine.intact) continue
-
-			val ported = machine as? PortedMachine ?: continue
-
-			for (port in ported.ports.values) {
-				if (port.kind != MachinePort.Kind.BUS) continue
-				ports[machine.localToWorld(port.offset)] = port
-			}
-
-		}
-
-		return ports
-
-	}
-
-	/** Pushes what [sourceBuffer] holds into every conduit run leaving [sourceCell]. */
-	private fun drain(
-
-		world: World,
-		sourceCell: Vec3i,
-		sourceBuffer: MachineBuffer,
-		ports: Map<Vec3i, MachinePort>,
-
-	) {
-
-		for (direction in CARTESIAN_FACES) {
-
-			val conduitCell = sourceCell + direction.vec3i
-
-			// the conduit's face touching this port is the one opposite the direction we stepped in
-			if (!acceptsFrom(world, conduitCell, direction.oppositeFace)) continue
-
-			// snapshot: handing off mutates the buffer we are reading
-			for (resource in sourceBuffer.contents().keys.toList()) {
-
-				val key = resource as? ItemKey ?: continue
-
-				val destination = route(world, conduitCell, direction.oppositeFace, key, ports, sourceCell, HashSet(), 0)
-					?: continue
-
-				handOff(sourceBuffer, destination, key)
+				// pipes and the junction only carry, so there is nothing to drive for them
+				when {
+					block.type == Material.CRAFTING_TABLE -> driveTable(world, cell, ports)
+					block.anionBlock === AnionBlocks.COPPER_CHUTE -> driveChute(world, cell, ports)
+				}
 
 			}
 
@@ -139,58 +93,110 @@ object AnionTransport {
 
 	}
 
-	/** Whether the conduit at [cell] takes items in through its [face] side. */
-	private fun acceptsFrom(world: World, cell: Vec3i, face: BlockFace): Boolean {
+	/////////////
+	///// DRIVERS
+	/////////////
 
-		val block = world.getBlockAt(cell.x, cell.y, cell.z)
+	/** Exports the buffer of the bus port behind the chute at [cell] into whatever is in front of it. */
+	private fun driveChute(world: World, cell: Vec3i, ports: Map<Vec3i, MachinePort>) {
 
-		return when (block.anionBlock) {
+		val facing = world.getBlockAt(cell.x, cell.y, cell.z).anionFacing ?: return
 
-			null -> false
-			AnionBlocks.COPPER_CONDUIT_JUNCTION -> true
-			is AnionDirectionalBlock -> block.anionFacing?.oppositeFace == face
+		// a chute with no port behind it is just another length of pipe
+		val port = ports[cell - facing.vec3i] ?: return
+		val buffer = port.buffer() ?: return
+		if (buffer.contents().isEmpty()) return
 
-			else -> false
+		val ahead = cell + facing.vec3i
+
+		// snapshot: handing off mutates the buffer we are reading
+		for (resource in buffer.contents().keys.toList()) {
+
+			val key = resource as? ItemKey ?: continue
+			val sink = findSink(world, ahead, facing.oppositeFace, key, ports, cell, HashSet(), 0) ?: continue
+
+			val taken = buffer.extract(key, THROUGHPUT)
+			if (taken <= 0L) continue
+
+			val accepted = sink.push(key, taken)
+			if (accepted < taken) buffer.insert(key, taken - accepted) // never drop what did not fit
 
 		}
 
 	}
+
+	/** Imports from any vanilla container touching the crafting table at [cell]. */
+	private fun driveTable(world: World, cell: Vec3i, ports: Map<Vec3i, MachinePort>) {
+
+		val sources = CARTESIAN_FACES.mapNotNull { containerAt(world, cell + it.vec3i) }
+		if (sources.isEmpty()) return
+
+		for (container in sources) {
+			for (key in container.itemKeys()) {
+
+				for (direction in CARTESIAN_FACES) {
+
+					val target = cell + direction.vec3i
+
+					// a table imports into the network; it does not shuffle between neighbouring chests
+					if (containerAt(world, target) != null) continue
+
+					val sink = findSink(world, target, direction.oppositeFace, key, ports, cell, HashSet(), 0)
+						?: continue
+
+					val taken = container.drawItem(key, THROUGHPUT)
+					if (taken <= 0L) continue
+
+					val accepted = sink.push(key, taken)
+					if (accepted < taken) container.pushItem(key, taken - accepted) // never drop what did not fit
+
+					break
+
+				}
+
+			}
+		}
+
+	}
+
+	/////////////
+	///// ROUTING
+	/////////////
 
 	/**
-	 * Walks the conduit at [cell], entered through its [entryFace], to the first place that will take
-	 * [key]. Returns null when the run dead-ends or nothing on it has room.
+	 * Follows the run at [cell], entered through its [entryFace], to the first place that will take
+	 * [key]. Returns null when it dead-ends or nothing on it has room.
 	 */
 	// depth-first with a shared visited set: it finds a path rather than the best one, which is all a
-	// conduit run needs. the visited set is also what stops a junction loop spinning forever.
-	private fun route(
+	// pipe run needs. the visited set is also what stops a junction loop spinning forever.
+	private fun findSink(
 
 		world: World,
 		cell: Vec3i,
 		entryFace: BlockFace,
 		key: ItemKey,
 		ports: Map<Vec3i, MachinePort>,
-		sourceCell: Vec3i,
+		originCell: Vec3i,
 		visited: MutableSet<Vec3i>,
 		depth: Int,
 
 	): Sink? {
 
 		if (depth > MAX_ROUTE_LENGTH) return null
-		if (!visited.add(cell)) return null
 
+		// this cell may be the drop-off itself
+		sinkAt(world, cell, key, ports)?.let { return it }
+
+		// otherwise it has to be something that carries
+		if (!visited.add(cell)) return null
 		val exits = exitsOf(world, cell, entryFace) ?: return null
 
 		for (exit in exits) {
 
 			val next = cell + exit.vec3i
-			if (next == sourceCell) continue // straight back where it came from is not transport
+			if (next == originCell) continue // straight back where it came from is not transport
 
-			sinkAt(world, next, key, ports)?.let { return it }
-
-			// a port or container ends the branch either way — a run does not tunnel through one
-			if (ports.containsKey(next) || containerAt(world, next) != null) continue
-
-			route(world, next, exit.oppositeFace, key, ports, sourceCell, visited, depth + 1)?.let { return it }
+			findSink(world, next, exit.oppositeFace, key, ports, originCell, visited, depth + 1)?.let { return it }
 
 		}
 
@@ -198,17 +204,19 @@ object AnionTransport {
 
 	}
 
-	/** Where a conduit at [cell] entered through [entryFace] can pass items on to, or null if it cannot. */
+	/** Where a carrier at [cell] entered through [entryFace] can pass items on to, or null if it cannot. */
 	private fun exitsOf(world: World, cell: Vec3i, entryFace: BlockFace): List<BlockFace>? {
 
 		val block = world.getBlockAt(cell.x, cell.y, cell.z)
 
 		return when (block.anionBlock) {
 
-			null -> null
-			AnionBlocks.COPPER_CONDUIT_JUNCTION -> CARTESIAN_FACES.filter { it != entryFace }
+			AnionBlocks.COPPER_PIPE_JUNCTION -> CARTESIAN_FACES.filter { it != entryFace }
 
-			is AnionDirectionalBlock -> {
+			// a chute carries like any straight run when it is not the one driving
+			AnionBlocks.COPPER_PIPE,
+			AnionBlocks.COPPER_PIPE_VERTICAL,
+			AnionBlocks.COPPER_CHUTE -> {
 
 				val facing = block.anionFacing ?: return null
 				if (entryFace != facing.oppositeFace) return null // entered against the flow
@@ -243,123 +251,37 @@ object AnionTransport {
 
 	}
 
-	/** The live inventory of a vanilla container at [cell]. Crafting tables have none, so they fall out. */
-	private fun containerAt(world: World, cell: Vec3i): Inventory? =
-		(world.getBlockAt(cell.x, cell.y, cell.z).state as? Container)?.inventory
+	/////////////
+	///// LOOKUPS
+	/////////////
 
-	/////////////////////
-	///// VANILLA IMPORTS
-	/////////////////////
+	/** Every bus port in [world], by cell. A lookup only — transport never drives off this. */
+	// built per pass rather than indexed, so it picks up ship-carried machines too: their cells move
+	// every tick and are deliberately absent from MachineIndex.
+	private fun portsIn(world: World): Map<Vec3i, MachinePort> {
 
-	/** Pulls into [buffer] from any container feeding a crafting table upstream of [portCell]. */
-	private fun fill(world: World, portCell: Vec3i, buffer: MachineBuffer) {
+		val ports = HashMap<Vec3i, MachinePort>()
 
-		if (buffer.free() <= 0L) return
+		for (machine in Machine.activeMachines.values) {
 
-		for (direction in CARTESIAN_FACES) {
+			if (machine.level.world != world) continue
+			if (!machine.intact) continue
 
-			val conduitCell = portCell + direction.vec3i
+			val ported = machine as? PortedMachine ?: continue
 
-			// only a conduit actually pointing into this port can be feeding it
-			if (!outputsThrough(world, conduitCell, direction.oppositeFace)) continue
-
-			val tableCell = traceImport(world, conduitCell, HashSet(), 0) ?: continue
-			pullInto(world, tableCell, buffer)
-
-		}
-
-	}
-
-	/** Whether the conduit at [cell] passes items out through its [face] side. */
-	private fun outputsThrough(world: World, cell: Vec3i, face: BlockFace): Boolean {
-
-		val block = world.getBlockAt(cell.x, cell.y, cell.z)
-
-		return when (block.anionBlock) {
-
-			null -> false
-			AnionBlocks.COPPER_CONDUIT_JUNCTION -> true
-			is AnionDirectionalBlock -> block.anionFacing == face
-
-			else -> false
-
-		}
-
-	}
-
-	/** Walks a run backwards from [cell] to the crafting table importing into it, if there is one. */
-	private fun traceImport(world: World, cell: Vec3i, visited: MutableSet<Vec3i>, depth: Int): Vec3i? {
-
-		if (depth > MAX_ROUTE_LENGTH) return null
-		if (!visited.add(cell)) return null
-
-		val block = world.getBlockAt(cell.x, cell.y, cell.z)
-
-		val inputs = when (block.anionBlock) {
-
-			null -> return null
-			AnionBlocks.COPPER_CONDUIT_JUNCTION -> CARTESIAN_FACES
-			is AnionDirectionalBlock -> listOf((block.anionFacing ?: return null).oppositeFace)
-
-			else -> return null
-
-		}
-
-		for (input in inputs) {
-
-			val previous = cell + input.vec3i
-
-			if (world.getBlockAt(previous.x, previous.y, previous.z).type == Material.CRAFTING_TABLE) return previous
-
-			// only follow a neighbour that actually feeds this cell
-			if (!outputsThrough(world, previous, input.oppositeFace)) continue
-
-			traceImport(world, previous, visited, depth + 1)?.let { return it }
-
-		}
-
-		return null
-
-	}
-
-	/** Draws whatever the containers around [tableCell] hold into [buffer]. */
-	private fun pullInto(world: World, tableCell: Vec3i, buffer: MachineBuffer) {
-
-		for (direction in CARTESIAN_FACES) {
-
-			if (buffer.free() <= 0L) return
-
-			val container = containerAt(world, tableCell + direction.vec3i) ?: continue
-
-			for (key in container.itemKeys()) {
-
-				if (!buffer.accepts(key)) continue
-
-				val room = minOf(THROUGHPUT, buffer.free())
-				if (room <= 0L) return
-
-				val drawn = container.drawItem(key, room)
-				if (drawn <= 0L) continue
-
-				val accepted = buffer.insert(key, drawn)
-				if (accepted < drawn) container.pushItem(key, drawn - accepted) // never drop what did not fit
-
+			for (port in ported.ports.values) {
+				if (port.kind != MachinePort.Kind.BUS) continue
+				ports[machine.localToWorld(port.offset)] = port
 			}
 
 		}
 
-	}
-
-	/** Moves up to [THROUGHPUT] of [key] across, returning anything the far end could not take. */
-	private fun handOff(source: MachineBuffer, destination: Sink, key: ItemKey) {
-
-		val taken = source.extract(key, THROUGHPUT)
-		if (taken <= 0L) return
-
-		val accepted = destination.push(key, taken)
-		if (accepted < taken) source.insert(key, taken - accepted) // never drop what did not fit
+		return ports
 
 	}
 
+	/** The live inventory of a vanilla container at [cell]. Crafting tables have none, so they fall out. */
+	private fun containerAt(world: World, cell: Vec3i): Inventory? =
+		(world.getBlockAt(cell.x, cell.y, cell.z).state as? Container)?.inventory
 
 }

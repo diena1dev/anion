@@ -12,6 +12,7 @@ import dev.diena.anion.features.custom.blocks.AnionDirectionalBlock
 import dev.diena.anion.features.custom.items.AnionBlockItem
 import dev.diena.anion.features.machine.MachineIndex
 import dev.diena.anion.features.starship.Starship
+import dev.diena.anion.features.transport.AnionTransportIndex
 import org.bukkit.craftbukkit.CraftWorld
 import io.papermc.paper.event.player.PlayerPickBlockEvent
 import net.minecraft.core.BlockPos
@@ -44,6 +45,8 @@ import org.bukkit.event.block.BlockPistonExtendEvent
 import org.bukkit.event.block.BlockPistonRetractEvent
 import org.bukkit.event.block.NotePlayEvent
 import org.bukkit.event.player.PlayerInteractEvent
+import org.bukkit.event.world.ChunkLoadEvent
+import org.bukkit.event.world.ChunkUnloadEvent
 import org.bukkit.inventory.EquipmentSlot
 
 // FIXME: cleanup and explain more of the listeners.
@@ -158,6 +161,7 @@ object AnionBlockListeners : Listener {
 		val block = event.blockPlaced
 
 		markMachineCell(block) // a replaced cell can repair a broken machine
+		AnionTransportIndex.register(block) // no-op unless it is a pipe, chute or crafting table
 
 		if (block.type == Material.NOTE_BLOCK) {
 			val data = noteData(block) ?: return
@@ -186,6 +190,7 @@ object AnionBlockListeners : Listener {
 	@EventHandler
 	fun onBlockBreak(event: BlockBreakEvent) {
 		markMachineCell(event.block)
+		AnionTransportIndex.unregister(event.block)
 
 		val anionBlock = anionBlockAt(event.block) ?: return
 		event.isDropItems = false
@@ -384,6 +389,7 @@ object AnionBlockListeners : Listener {
 		while (iter.hasNext()) {
 			val block = iter.next()
 			markMachineCell(block)
+			AnionTransportIndex.unregister(block)
 
 			val anionBlock = anionBlockAt(block) ?: continue
 
@@ -405,5 +411,19 @@ object AnionBlockListeners : Listener {
 	fun onEntityExplode(event: EntityExplodeEvent) = handleExplosionBlockList(event.blockList())
 
 	// explosion end
+
+	// transport index paging
+
+	@EventHandler
+	fun onChunkLoad(event: ChunkLoadEvent) {
+		AnionTransportIndex.loadChunk(event.world, event.chunk.x, event.chunk.z)
+	}
+
+	@EventHandler
+	fun onChunkUnload(event: ChunkUnloadEvent) {
+		AnionTransportIndex.unloadChunk(event.world, event.chunk.x, event.chunk.z)
+	}
+
+	// transport index paging end
 
 }

@@ -3,6 +3,7 @@ package dev.diena.anion.data.database
 import dev.diena.anion.features.machine.Machine
 import dev.diena.anion.features.machine.MachineIndex
 import dev.diena.anion.features.starship.Starship
+import net.minecraft.core.BlockPos
 import net.minecraft.core.Vec3i
 import net.minecraft.server.level.ServerLevel
 import org.bukkit.Bukkit
@@ -147,6 +148,57 @@ object AnionPersistence {
 			if (machine.dirty) saveMachine(uuid, machine)
 		}
 	}
+
+	// Transport components
+
+	/** Records a transport component cell so a chunk load can find it again. */
+	fun saveTransportCell(worldUid: UUID, cell: Vec3i) {
+		AnionDatabase.put(AnionDatabase.transport, transportKey(worldUid, cell), NO_VALUE)
+	}
+
+	fun deleteTransportCell(worldUid: UUID, cell: Vec3i) {
+		AnionDatabase.delete(AnionDatabase.transport, transportKey(worldUid, cell))
+	}
+
+	/** Every transport component cell recorded in the given chunk. Prefix scan, not a full column scan. */
+	fun transportCellsInChunk(worldUid: UUID, chunkX: Int, chunkZ: Int): List<Vec3i> {
+
+		val prefix = chunkPrefix(worldUid, chunkX, chunkZ)
+		val found = mutableListOf<Vec3i>()
+
+		AnionDatabase.iterator(AnionDatabase.transport).use { iterator ->
+
+			iterator.seek(prefix)
+
+			while (iterator.isValid) {
+
+				val key = iterator.key()
+				if (key.size != prefix.size + 8) break
+				if (!key.copyOfRange(0, prefix.size).contentEquals(prefix)) break // walked past this chunk
+
+				val packed = ByteBuffer.wrap(key, prefix.size, 8).long
+				val position = BlockPos.of(packed)
+				found += Vec3i(position.x, position.y, position.z)
+
+				iterator.next()
+
+			}
+
+		}
+
+		return found
+
+	}
+
+	/** world uuid (16) | chunk x (4) | chunk z (4) | packed cell (8) */
+	private fun transportKey(worldUid: UUID, cell: Vec3i): ByteArray =
+		ByteBuffer.allocate(CHUNK_PREFIX_SIZE + 8)
+			.putLong(worldUid.mostSignificantBits)
+			.putLong(worldUid.leastSignificantBits)
+			.putInt(cell.x shr 4)
+			.putInt(cell.z shr 4)
+			.putLong(BlockPos.asLong(cell.x, cell.y, cell.z))
+			.array()
 
 	// Chunk index
 

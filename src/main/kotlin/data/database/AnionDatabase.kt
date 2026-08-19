@@ -35,6 +35,9 @@ object AnionDatabase {
 		// these instead of scanning every stored starship and machine.
 		"starship_chunks".toByteArray(),
 		"machine_chunks".toByteArray(),
+		// transport components, keyed by the chunk they sit in. cells rather than instances, because a
+		// pipe is a block and nothing else.
+		"transport".toByteArray(),
 	)
 
 	private const val IDX_METADATA        = 1
@@ -44,6 +47,7 @@ object AnionDatabase {
 	private const val IDX_NATIONS         = 5
 	private const val IDX_STARSHIP_CHUNKS = 6
 	private const val IDX_MACHINE_CHUNKS  = 7
+	private const val IDX_TRANSPORT       = 8
 
 	val metadata:  ColumnFamilyHandle get() = handles[IDX_METADATA]
 	val starships: ColumnFamilyHandle get() = handles[IDX_STARSHIPS]
@@ -54,6 +58,7 @@ object AnionDatabase {
 
 	val starshipChunks: ColumnFamilyHandle get() = handles[IDX_STARSHIP_CHUNKS]
 	val machineChunks:  ColumnFamilyHandle get() = handles[IDX_MACHINE_CHUNKS]
+	val transport:      ColumnFamilyHandle get() = handles[IDX_TRANSPORT]
 
 	fun open(dataFolder: File) {
 		RocksDB.loadLibrary()
@@ -76,6 +81,8 @@ object AnionDatabase {
 	}
 
 	fun get(cf: ColumnFamilyHandle, key: ByteArray): ByteArray? = db.get(cf, key)
+
+	fun put(cf: ColumnFamilyHandle, key: ByteArray, value: ByteArray) = db.put(cf, key, value)
 
 	fun delete(cf: ColumnFamilyHandle, key: ByteArray) = db.delete(cf, key)
 

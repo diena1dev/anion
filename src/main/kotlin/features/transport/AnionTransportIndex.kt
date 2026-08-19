@@ -1,0 +1,96 @@
+package dev.diena.anion.features.transport
+
+import dev.diena.anion.data.database.AnionPersistence
+import dev.diena.anion.extensions.anionBlock
+import dev.diena.anion.extensions.vec3i
+import dev.diena.anion.features.custom.blocks.AnionBlocks
+import net.minecraft.core.Vec3i
+import org.bukkit.Material
+import org.bukkit.World
+import org.bukkit.block.Block
+import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
+
+/**
+ * Where every transport component sits, so a pass can find one without scanning the world.
+ *
+ * Components are cells rather than instances — a pipe is a block and nothing else — so this is a set
+ * of positions per world, persisted per chunk in the `transport` column family and paged in and out
+ * with its chunk. Entries are a hint: a cell that no longer holds a component is dropped the next
+ * time it is read, which is what keeps WorldEdit and other event-bypassing edits from rotting it.
+ *
+ * This is what lets transport run without a machine anywhere on the network. Ports are only ever
+ * looked up here, never iterated to drive anything.
+ *
+ * TODO: cells placed without firing a block event stay invisible until something re-places them. An
+ *       admin rescan command is the obvious escape hatch.
+ */
+object AnionTransportIndex {
+
+	/** component cells per world uuid */
+	private val cells: MutableMap<UUID, MutableSet<Vec3i>> = ConcurrentHashMap()
+
+	/** Every indexed component cell in [world]. */
+	fun cellsIn(world: World): Set<Vec3i> = cells[world.uid] ?: emptySet()
+
+	/** Whether transport drives items from [block], or carries them through it. */
+	fun isComponent(block: Block): Boolean {
+
+		// a crafting table is the vanilla-inventory import adapter, so it counts as a component
+		if (block.type == Material.CRAFTING_TABLE) return true
+
+		return when (block.anionBlock) {
+
+			AnionBlocks.COPPER_PIPE,
+			AnionBlocks.COPPER_PIPE_VERTICAL,
+			AnionBlocks.COPPER_PIPE_JUNCTION,
+			AnionBlocks.COPPER_CHUTE -> true
+
+			else -> false
+
+		}
+
+	}
+
+	/** Records [block] as a component, in memory and on disk. No-op if it is not one. */
+	fun register(block: Block) {
+
+		if (!isComponent(block)) return
+
+		val worldUid = block.world.uid
+		if (!cells.computeIfAbsent(worldUid) { ConcurrentHashMap.newKeySet() }.add(block.vec3i)) return
+
+		AnionPersistence.saveTransportCell(worldUid, block.vec3i)
+
+	}
+
+	/** Drops [block]'s cell. Safe to call on anything — a cell that was never indexed just misses. */
+	fun unregister(block: Block) {
+
+		val worldUid = block.world.uid
+		if (cells[worldUid]?.remove(block.vec3i) != true) return
+
+		AnionPersistence.deleteTransportCell(worldUid, block.vec3i)
+
+	}
+
+	/** Pages in every component recorded for a chunk. */
+	fun loadChunk(world: World, chunkX: Int, chunkZ: Int) {
+
+		val stored = AnionPersistence.transportCellsInChunk(world.uid, chunkX, chunkZ)
+		if (stored.isEmpty()) return
+
+		cells.computeIfAbsent(world.uid) { ConcurrentHashMap.newKeySet() }.addAll(stored)
+
+	}
+
+	/** Pages out a chunk's components. They stay on disk — this only frees memory. */
+	fun unloadChunk(world: World, chunkX: Int, chunkZ: Int) {
+
+		val worldCells = cells[world.uid] ?: return
+
+		worldCells.removeIf { (it.x shr 4) == chunkX && (it.z shr 4) == chunkZ }
+
+	}
+
+}

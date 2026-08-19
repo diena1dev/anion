@@ -100,7 +100,7 @@ class AnionResourcePackDatagen(private val outputDir: File) {
 	private fun placeholderModelParent(block: AnionBlock): String? = when {
 
 		block is AnionDirectionalBlock -> "minecraft:block/purpur_pillar"
-		block === AnionBlocks.COPPER_CONDUIT_JUNCTION -> "minecraft:block/purpur_block"
+		block === AnionBlocks.COPPER_PIPE_JUNCTION -> "minecraft:block/purpur_block"
 
 		else -> null
 

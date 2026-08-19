@@ -67,17 +67,28 @@ TRANSPORT
 
 first pass, items only.
 
-flow is the conduit's own facing rather than anything configured. a straight conduit takes items in through its back face and passes them out of its front, so a run is one-way by construction and the network is a directed graph read straight off the world. turning a corner is what the junction is for — it takes items in on any face and passes them out of every other one.
+**components drive, ports do not.** a MachinePort exists only to bridge to an internal buffer, so transport never iterates ports — it iterates its own blocks and looks a port up when one happens to be on the other side. the adapters are the intermediary blocks that attach on the outside of a port: a chute on a bus, and later a pump on a valve and a connector on a conduit.
 
-that means there is nothing to configure and nothing to cache, which is also why breaking a conduit needs no invalidation. the cost is that every pass re-walks its routes from scratch; once networks get large that wants a cached graph rebuilt off block events, the same way MachineIndex handles machine cells.
+drivers:
+- **chute** — exports the buffer of the bus port behind it. facing away from the port pushes items out; a chute with nothing behind it is just another length of pipe.
+- **crafting table** — the vanilla-inventory import adapter. pulls from any container touching it and pushes into whatever the network offers. asymmetric on purpose: a chest feeds the network through a table rather than being drained by any pipe that happens to run past.
 
-vanilla containers join in at both ends. a container touching a conduit's *output* face is a valid drop-off. a crafting table sitting behind a run is the import node — it pulls from any container touching *it*, so a chest feeds the network through a crafting table rather than being drained by any pipe that happens to run past. asymmetric on purpose.
+carriers are the pipes and the junction. flow is a pipe's own facing, so a run only takes items in through its back face and only passes them out of its front, which makes the network a directed graph read straight off the world with nothing to configure. turning a corner is what the junction is for.
 
-discovery is anchored on machine bus ports, because nothing indexes conduits in the world. that means a run with no machine anywhere on it (chest -> table -> conduit -> chest) is invisible to the tick. fixing it properly means a persisted conduit index, the same shape as the machine_chunks column family.
+drop-offs are a bus port or any vanilla container on an open side. so both of these work, and neither needs a machine anywhere on the run:
 
-endpoints are machine BUS ports. a port with items pushes into any conduit whose back face touches it, the walk follows facings until it reaches a port that will take the item, and the handoff debits and credits in one step so nothing is dropped when the far end is full. ports are still just accessors — transport never reaches past one into a machine.
+```
+chest -> crafting table -> pipe -> chest
+chest -> crafting table -> chute -> bus port -> buffer
+```
 
-blocks: `COPPER_CONDUIT` (four horizontal facings), `COPPER_CONDUIT_VERTICAL` (up/down), `COPPER_CONDUIT_JUNCTION`. a directional block claims one note per facing and every one of them resolves back to the same AnionBlock, so a BlockSet accepting a conduit accepts it in any rotation. the resource pack reuses a single north-facing model and spins it in the blockstate, so a facing costs a note and nothing else.
+**discovery** is a cell index in the `transport` column family, keyed by world+chunk, paged in and out with its chunk. the database rather than chunk PDC because PDC access is main-thread-only Bukkit, and the graph work wants to go async later. entries are a hint: a cell that no longer holds a component drops out the next time it is read, so WorldEdit and other event-bypassing edits degrade instead of rotting. cells added without an event stay invisible until something re-places them — an admin rescan is the escape hatch.
+
+how far async can go, when the graph lands: loading the index and resolving routes is pure memory and can move off-thread. vanilla Inventory access and world block reads cannot. so the graph work goes async and the actual item handoff stays sync, the same snapshot-then-revalidate discipline the starship slowTick uses.
+
+blocks: `COPPER_PIPE` (four horizontal facings), `COPPER_PIPE_VERTICAL` (up/down), `COPPER_PIPE_JUNCTION`, `COPPER_CHUTE` (six facings). a directional block claims one note per facing and every one of them resolves back to the same AnionBlock, so a BlockSet accepting a pipe accepts it in any rotation. the resource pack reuses a single north-facing model and spins it in the blockstate, so a facing costs a note and nothing else.
+
+-# note budget: the ZOMBIE instrument is at 23 of 25 after this. the next block family needs a second instrument.
 
 ---
 RECIPE RAMBLING

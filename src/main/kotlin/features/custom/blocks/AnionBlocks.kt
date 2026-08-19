@@ -119,9 +119,9 @@ object AnionBlocks {
 
 	// transport conduits. flow follows the block's facing, so a straight run only takes items in
 	// through its back face — turning a corner is what the junction is for.
-	val COPPER_CONDUIT = registerDirectionalBlock(
+	val COPPER_PIPE = registerDirectionalBlock(
 		AnionDirectionalBlock(
-			"Copper Conduit",
+			"Copper Pipe",
 			Instrument.ZOMBIE,
 			mapOf(
 				BlockFace.NORTH to 10,
@@ -129,31 +129,50 @@ object AnionBlocks {
 				BlockFace.SOUTH to 12,
 				BlockFace.WEST  to 13,
 			),
-			styledDisplayName = Component.text("Copper Conduit")
+			styledDisplayName = Component.text("Copper Pipe")
 				.gradient(COPPER_TEXT_START, COPPER_TEXT_END)
 		)
 	)
 
-	val COPPER_CONDUIT_VERTICAL = registerDirectionalBlock(
+	val COPPER_PIPE_VERTICAL = registerDirectionalBlock(
 		AnionDirectionalBlock(
-			"Copper Conduit Vertical",
+			"Copper Pipe Vertical",
 			Instrument.ZOMBIE,
 			mapOf(
 				BlockFace.UP   to 14,
 				BlockFace.DOWN to 15,
 			),
-			styledDisplayName = Component.text("Copper Conduit Vertical")
+			styledDisplayName = Component.text("Copper Pipe Vertical")
 				.gradient(COPPER_TEXT_START, COPPER_TEXT_END)
 		)
 	)
 
 	// takes items in on any face and passes them out of every other one
-	val COPPER_CONDUIT_JUNCTION = registerBlock(
+	val COPPER_PIPE_JUNCTION = registerBlock(
 		AnionBlock(
-			"Copper Conduit Junction",
+			"Copper Pipe Junction",
 			Instrument.ZOMBIE,
 			16,
-			styledDisplayName = Component.text("Copper Conduit Junction")
+			styledDisplayName = Component.text("Copper Pipe Junction")
+				.gradient(COPPER_TEXT_START, COPPER_TEXT_END)
+		)
+	)
+
+	// item adapter. sits against a machine's bus port and drives what the port only provides access to —
+	// facing away from the port exports, facing into one delivers.
+	val COPPER_CHUTE = registerDirectionalBlock(
+		AnionDirectionalBlock(
+			"Copper Chute",
+			Instrument.ZOMBIE,
+			mapOf(
+				BlockFace.NORTH to 17,
+				BlockFace.EAST  to 18,
+				BlockFace.SOUTH to 19,
+				BlockFace.WEST  to 20,
+				BlockFace.UP    to 21,
+				BlockFace.DOWN  to 22,
+			),
+			styledDisplayName = Component.text("Copper Chute")
 				.gradient(COPPER_TEXT_START, COPPER_TEXT_END)
 		)
 	)
