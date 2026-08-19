@@ -1,6 +1,7 @@
 package dev.diena.anion.features.machine.component
 
 import dev.diena.anion.features.custom.AnionResource
+import dev.diena.anion.features.custom.ItemKey
 import kotlin.reflect.KClass
 
 /**
@@ -25,8 +26,10 @@ open class MachineBuffer(
 
 ) {
 
-	var resource: AnionResource? = null; protected set
-	var amount: Long = 0L; protected set
+	// the base's own storage. a subclass overriding contents() holds its items elsewhere and leaves
+	// these untouched, so nothing outside should read them — go through contents()/amountOf().
+	protected var resource: AnionResource? = null
+	protected var amount: Long = 0L
 
 	/** ports bound to this buffer. capacity scales with the count, up to [hardCap]. */
 	val boundPorts: MutableSet<MachinePort> = mutableSetOf()
@@ -116,6 +119,79 @@ open class MachineBuffer(
 
 		this.resource = held
 		this.amount = units
+
+	}
+
+}
+
+/**
+ * Item store that holds several variants at once: up to [typeLimit] distinct ones, and [totalCapacity]
+ * items summed across all of them. Two caps, and they bite independently — a container with room by
+ * count still refuses a variant it has no type slot for.
+ *
+ * Variants are [ItemKey]s, so a damaged tool and a pristine one occupy two type slots.
+ */
+open class BulkItemBuffer(
+
+	key: String,
+	val typeLimit: Int,
+	val totalCapacity: Long,
+
+) : MachineBuffer(key, ItemKey::class, totalCapacity, totalCapacity) {
+
+	// insertion-ordered so a readout lists things in the order they first arrived
+	private val stored: MutableMap<AnionResource, Long> = LinkedHashMap()
+
+	override fun contents(): Map<AnionResource, Long> = stored
+
+	/** Distinct variants held, against [typeLimit]. */
+	fun typesUsed(): Int = stored.size
+
+	// storage capacity is a property of the structure, not of how many ports were bolted onto it
+	override fun capacity(): Long = totalCapacity
+
+	override fun accepts(resource: AnionResource): Boolean {
+
+		if (resource !is ItemKey) return false
+
+		return stored.containsKey(resource) || stored.size < typeLimit
+
+	}
+
+	override fun insert(resource: AnionResource, units: Long): Long {
+
+		if (units <= 0L) return 0L
+		if (!accepts(resource)) return 0L
+
+		val accepted = minOf(units, free())
+		if (accepted <= 0L) return 0L
+
+		stored[resource] = (stored[resource] ?: 0L) + accepted
+
+		return accepted
+
+	}
+
+	override fun extract(resource: AnionResource, units: Long): Long {
+
+		if (units <= 0L) return 0L
+
+		val held = stored[resource] ?: return 0L
+		val drawn = minOf(units, held)
+
+		// drop the entry outright at zero, otherwise it would hold a type slot hostage
+		if (drawn == held) stored.remove(resource) else stored[resource] = held - drawn
+
+		return drawn
+
+	}
+
+	override fun clear() = stored.clear()
+
+	override fun restore(contents: Map<AnionResource, Long>) {
+
+		stored.clear()
+		stored.putAll(contents)
 
 	}
 

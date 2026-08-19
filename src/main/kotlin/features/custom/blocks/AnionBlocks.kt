@@ -51,6 +51,17 @@ object AnionBlocks {
 	private val COPPER_TEXT_START = TextColor.color(232, 144, 121)
 	private val COPPER_TEXT_END   = TextColor.color(125, 74, 54)
 
+	// anchor block every machine structure is measured from, and the pivot it rotates about
+	val COPPER_MACHINE_CORE = registerBlock(
+		AnionBlock(
+			"Copper Machine Core",
+			Instrument.ZOMBIE,
+			10,
+			styledDisplayName = Component.text("Copper Machine Core")
+				.gradient(COPPER_TEXT_START, COPPER_TEXT_END)
+		)
+	)
+
 	// copper machine casings
 	val COPPER_MACHINE_CASING = registerBlock(
 		AnionBlock(

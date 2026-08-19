@@ -56,6 +56,7 @@ object AnionItems {
 	val URANIUM_ORE_BLOCK = registerBlock(AnionBlocks.URANIUM_ORE_BLOCK)
 	val URANIUM_BLOCK     = registerBlock(AnionBlocks.URANIUM_BLOCK)
 
+	val COPPER_MACHINE_CORE     = registerBlock(AnionBlocks.COPPER_MACHINE_CORE)
 	val COPPER_MACHINE_CASING   = registerBlock(AnionBlocks.COPPER_MACHINE_CASING)
 	val COPPER_MACHINE_DISPLAY  = registerBlock(AnionBlocks.COPPER_MACHINE_DISPLAY)
 	val COPPER_MACHINE_BUS      = registerBlock(AnionBlocks.COPPER_MACHINE_BUS)
