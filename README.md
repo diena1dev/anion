@@ -70,7 +70,7 @@ first pass, items only.
 **components drive, ports do not.** a MachinePort exists only to bridge to an internal buffer, so transport never iterates ports — it iterates its own blocks and looks a port up when one happens to be on the other side. the adapters are the intermediary blocks that attach on the outside of a port: a chute on a bus, and later a pump on a valve and a connector on a conduit.
 
 drivers:
-- **chute** — exports the buffer of the bus port behind it. facing away from the port pushes items out; a chute with nothing behind it is just another length of pipe.
+- **chute** — exports the buffer of any bus port touching it, out of any of its other sides. no facing: the name suggests one, but making it directional only ever created a way to build it backwards. with no port beside it, it carries like a junction.
 - **crafting table** — the vanilla-inventory import adapter. pulls from any container touching it and pushes into whatever the network offers. asymmetric on purpose: a chest feeds the network through a table rather than being drained by any pipe that happens to run past.
 
 carriers are the pipes and the junction. flow is a pipe's own facing, so a run only takes items in through its back face and only passes them out of its front, which makes the network a directed graph read straight off the world with nothing to configure. turning a corner is what the junction is for.
@@ -86,9 +86,11 @@ chest -> crafting table -> chute -> bus port -> buffer
 
 how far async can go, when the graph lands: loading the index and resolving routes is pure memory and can move off-thread. vanilla Inventory access and world block reads cannot. so the graph work goes async and the actual item handoff stays sync, the same snapshot-then-revalidate discipline the starship slowTick uses.
 
-blocks: `COPPER_PIPE` (four horizontal facings), `COPPER_PIPE_VERTICAL` (up/down), `COPPER_PIPE_JUNCTION`, `COPPER_CHUTE` (six facings). a directional block claims one note per facing and every one of them resolves back to the same AnionBlock, so a BlockSet accepting a pipe accepts it in any rotation. the resource pack reuses a single north-facing model and spins it in the blockstate, so a facing costs a note and nothing else.
+blocks: `COPPER_PIPE` (four horizontal facings), `COPPER_PIPE_VERTICAL` (up/down), `COPPER_PIPE_JUNCTION`, `COPPER_CHUTE`. a directional block claims one note per facing and every one of them resolves back to the same AnionBlock, so a BlockSet accepting a pipe accepts it in any rotation. the resource pack reuses a single north-facing model and spins it in the blockstate, so a facing costs a note and nothing else.
 
--# note budget: the ZOMBIE instrument is at 23 of 25 after this. the next block family needs a second instrument.
+placement: a directional block placed off the *output end* of a pipe carries on the same way, so clicking along a run extends it. anything else — a machine face, the ground — falls through to aim, because those say nothing about which way you want to point. steep aim (>=45 degrees) means vertical, shallow means heading.
+
+-# note budget: the ZOMBIE instrument is at 18 of 25. dropping the chute's five extra facings gave 18-24 back.
 
 ---
 RECIPE RAMBLING

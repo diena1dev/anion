@@ -6,7 +6,6 @@ import dev.diena.anion.extensions.anionFacing
 import dev.diena.anion.extensions.drawItem
 import dev.diena.anion.extensions.hasRoomFor
 import dev.diena.anion.extensions.itemKeys
-import dev.diena.anion.extensions.minus
 import dev.diena.anion.extensions.plus
 import dev.diena.anion.extensions.pushItem
 import dev.diena.anion.extensions.vec3i
@@ -97,29 +96,44 @@ object AnionTransport {
 	///// DRIVERS
 	/////////////
 
-	/** Exports the buffer of the bus port behind the chute at [cell] into whatever is in front of it. */
+	/** Exports the buffer of any bus port touching the chute at [cell] out of any of its other sides. */
+	// a chute has no front. the name suggests one, but making it directional only ever created a way to
+	// build it backwards, so it takes the port on whichever side has one and pushes out of the rest.
 	private fun driveChute(world: World, cell: Vec3i, ports: Map<Vec3i, MachinePort>) {
 
-		val facing = world.getBlockAt(cell.x, cell.y, cell.z).anionFacing ?: return
+		for (portFace in CARTESIAN_FACES) {
 
-		// a chute with no port behind it is just another length of pipe
-		val port = ports[cell - facing.vec3i] ?: return
-		val buffer = port.buffer() ?: return
-		if (buffer.contents().isEmpty()) return
+			val portCell = cell + portFace.vec3i
+			val port = ports[portCell] ?: continue
+			val buffer = port.buffer() ?: continue
+			if (buffer.contents().isEmpty()) continue
 
-		val ahead = cell + facing.vec3i
+			// never let a run curl back into the chute or the port it is draining
+			val blocked = setOf(cell, portCell)
 
-		// snapshot: handing off mutates the buffer we are reading
-		for (resource in buffer.contents().keys.toList()) {
+			// snapshot: handing off mutates the buffer we are reading
+			for (resource in buffer.contents().keys.toList()) {
 
-			val key = resource as? ItemKey ?: continue
-			val sink = findSink(world, ahead, facing.oppositeFace, key, ports, cell, HashSet(), 0) ?: continue
+				val key = resource as? ItemKey ?: continue
 
-			val taken = buffer.extract(key, THROUGHPUT)
-			if (taken <= 0L) continue
+				for (exit in CARTESIAN_FACES) {
 
-			val accepted = sink.push(key, taken)
-			if (accepted < taken) buffer.insert(key, taken - accepted) // never drop what did not fit
+					if (exit == portFace) continue // straight back into the machine it came from
+
+					val sink = findSink(world, cell + exit.vec3i, exit.oppositeFace, key, ports, blocked, HashSet(), 0)
+						?: continue
+
+					val taken = buffer.extract(key, THROUGHPUT)
+					if (taken <= 0L) continue
+
+					val accepted = sink.push(key, taken)
+					if (accepted < taken) buffer.insert(key, taken - accepted) // never drop what did not fit
+
+					break
+
+				}
+
+			}
 
 		}
 
@@ -128,20 +142,24 @@ object AnionTransport {
 	/** Imports from any vanilla container touching the crafting table at [cell]. */
 	private fun driveTable(world: World, cell: Vec3i, ports: Map<Vec3i, MachinePort>) {
 
-		val sources = CARTESIAN_FACES.mapNotNull { containerAt(world, cell + it.vec3i) }
-		if (sources.isEmpty()) return
+		val sourceCells = CARTESIAN_FACES.map { cell + it.vec3i }.filter { containerAt(world, it) != null }
+		if (sourceCells.isEmpty()) return
 
-		for (container in sources) {
+		// the table itself and the chests it pulls from are never valid drop-offs
+		val blocked = (sourceCells + cell).toSet()
+
+		for (sourceCell in sourceCells) {
+
+			val container = containerAt(world, sourceCell) ?: continue
+
 			for (key in container.itemKeys()) {
 
 				for (direction in CARTESIAN_FACES) {
 
 					val target = cell + direction.vec3i
+					if (target in blocked) continue
 
-					// a table imports into the network; it does not shuffle between neighbouring chests
-					if (containerAt(world, target) != null) continue
-
-					val sink = findSink(world, target, direction.oppositeFace, key, ports, cell, HashSet(), 0)
+					val sink = findSink(world, target, direction.oppositeFace, key, ports, blocked, HashSet(), 0)
 						?: continue
 
 					val taken = container.drawItem(key, THROUGHPUT)
@@ -155,6 +173,7 @@ object AnionTransport {
 				}
 
 			}
+
 		}
 
 	}
@@ -176,13 +195,14 @@ object AnionTransport {
 		entryFace: BlockFace,
 		key: ItemKey,
 		ports: Map<Vec3i, MachinePort>,
-		originCell: Vec3i,
+		blocked: Set<Vec3i>,
 		visited: MutableSet<Vec3i>,
 		depth: Int,
 
 	): Sink? {
 
 		if (depth > MAX_ROUTE_LENGTH) return null
+		if (cell in blocked) return null // where the items came from is not somewhere to put them
 
 		// this cell may be the drop-off itself
 		sinkAt(world, cell, key, ports)?.let { return it }
@@ -193,10 +213,8 @@ object AnionTransport {
 
 		for (exit in exits) {
 
-			val next = cell + exit.vec3i
-			if (next == originCell) continue // straight back where it came from is not transport
-
-			findSink(world, next, exit.oppositeFace, key, ports, originCell, visited, depth + 1)?.let { return it }
+			findSink(world, cell + exit.vec3i, exit.oppositeFace, key, ports, blocked, visited, depth + 1)
+				?.let { return it }
 
 		}
 
@@ -211,12 +229,12 @@ object AnionTransport {
 
 		return when (block.anionBlock) {
 
-			AnionBlocks.COPPER_PIPE_JUNCTION -> CARTESIAN_FACES.filter { it != entryFace }
+			// both take items in on any face and pass them out of every other one
+			AnionBlocks.COPPER_PIPE_JUNCTION,
+			AnionBlocks.COPPER_CHUTE -> CARTESIAN_FACES.filter { it != entryFace }
 
-			// a chute carries like any straight run when it is not the one driving
 			AnionBlocks.COPPER_PIPE,
-			AnionBlocks.COPPER_PIPE_VERTICAL,
-			AnionBlocks.COPPER_CHUTE -> {
+			AnionBlocks.COPPER_PIPE_VERTICAL -> {
 
 				val facing = block.anionFacing ?: return null
 				if (entryFace != facing.oppositeFace) return null // entered against the flow
@@ -292,16 +310,24 @@ object AnionTransport {
 
 			}
 
-			block.anionBlock === AnionBlocks.COPPER_CHUTE && facing != null -> {
+			block.anionBlock === AnionBlocks.COPPER_CHUTE -> {
 
-				val behind = cell - facing.vec3i
-				val port = ports[behind]
+				val portFaces = CARTESIAN_FACES.filter { ports[cell + it.vec3i] != null }
+				lines += "  bus ports touching: ${portFaces.joinToString(" ").ifEmpty { "none, so it only carries" }}"
 
-				lines += "  behind $behind: ${port?.let { "bus port -> ${it.bufferKey ?: "unbound"}" } ?: "no bus port, so it only carries"}"
-				port?.buffer()?.let { lines += "  buffer ${it.used()}/${it.capacity()}" }
+				for (portFace in portFaces) {
+					ports[cell + portFace.vec3i]?.buffer()?.let {
+						lines += "  $portFace buffer ${it.used()}/${it.capacity()}"
+					}
+				}
 
-				lines += "  ahead:"
-				traceLine(world, cell + facing.vec3i, facing.oppositeFace, ports, lines)
+				for (exit in CARTESIAN_FACES) {
+					if (exit in portFaces) continue
+					if (exitsOf(world, cell + exit.vec3i, exit.oppositeFace) == null && ports[cell + exit.vec3i] == null) continue
+
+					lines += "  out $exit:"
+					traceLine(world, cell + exit.vec3i, exit.oppositeFace, ports, lines)
+				}
 
 			}
 

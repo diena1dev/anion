@@ -5,6 +5,7 @@ import dev.astralchroma.processor.annotations.Register
 import dev.diena.anion.data.registry.AnionRegistryKey
 import dev.diena.anion.data.registry.registries.AnionRegistries
 import dev.diena.anion.extensions.toAnionItem
+import dev.diena.anion.extensions.anionFacing
 import dev.diena.anion.extensions.vec3i
 import dev.diena.anion.features.custom.blocks.AnionBlock
 import dev.diena.anion.features.custom.blocks.AnionBlocks
@@ -142,13 +143,13 @@ object AnionBlockListeners : Listener {
 	private fun placementFacing(directional: AnionDirectionalBlock, event: BlockPlaceEvent): BlockFace {
 
 		val against = event.blockAgainst
-		val away = against.getFace(event.blockPlaced)
 
-		// placed against a pipe or a machine, it points away from it. that is what continues a run in
-		// the direction you are already building, and what makes a chute on a bus port export rather
-		// than import — aiming alone cannot express either.
-		if (away != null && away in directional.facings) {
-			if (anionBlockAt(against) != null || AnionTransportIndex.isComponent(against)) return away
+		// placed off the output end of a pipe, it carries on the same way. only the output end: placing
+		// against a machine or the ground says nothing about which way you want to point, so those fall
+		// through to aim rather than guessing an orientation you did not ask for.
+		val runFacing = against.anionFacing
+		if (runFacing != null && runFacing in directional.facings && against.getFace(event.blockPlaced) == runFacing) {
+			return runFacing
 		}
 
 		val pitch = event.player.location.pitch

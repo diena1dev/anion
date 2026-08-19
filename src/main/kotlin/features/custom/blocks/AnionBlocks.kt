@@ -158,20 +158,13 @@ object AnionBlocks {
 		)
 	)
 
-	// item adapter. sits against a machine's bus port and drives what the port only provides access to —
-	// facing away from the port exports, facing into one delivers.
-	val COPPER_CHUTE = registerDirectionalBlock(
-		AnionDirectionalBlock(
+	// item adapter. sits against a machine's bus port and drives what the port only provides access to.
+	// no facing: it takes the port on whichever side has one and passes items out of any other.
+	val COPPER_CHUTE = registerBlock(
+		AnionBlock(
 			"Copper Chute",
 			Instrument.ZOMBIE,
-			mapOf(
-				BlockFace.NORTH to 17,
-				BlockFace.EAST  to 18,
-				BlockFace.SOUTH to 19,
-				BlockFace.WEST  to 20,
-				BlockFace.UP    to 21,
-				BlockFace.DOWN  to 22,
-			),
+			17,
 			styledDisplayName = Component.text("Copper Chute")
 				.gradient(COPPER_TEXT_START, COPPER_TEXT_END)
 		)
