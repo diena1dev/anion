@@ -9,6 +9,7 @@ import dev.diena.anion.extensions.minus
 import dev.diena.anion.extensions.plus
 import dev.diena.anion.extensions.rotate
 import dev.diena.anion.features.custom.AnionResource
+import dev.diena.anion.features.custom.ItemKey
 import dev.diena.anion.features.custom.items.AnionItem
 import dev.diena.anion.features.machine.component.MachineBuffer
 import dev.diena.anion.features.machine.component.MachinePort
@@ -255,7 +256,7 @@ abstract class Machine(
 	private var occupiedChunks: Set<Long> = emptySet()
 
 	/** buffer contents read back from disk, applied once the type has declared its buffers */
-	private var restoredBuffers: Map<String, Pair<String, Long>> = emptyMap()
+	private var restoredBuffers: Map<String, Map<AnionResource, Long>> = emptyMap()
 
 	/** Called every game tick, main thread. */
 	abstract fun tick()
@@ -393,10 +394,24 @@ abstract class Machine(
 		val storedBuffers = ListTag()
 		for (buffer in buffers.values) {
 
+			val storedContents = ListTag()
+			for ((held, units) in buffer.contents()) {
+
+				val slot = CompoundTag()
+
+				// an item variant carries its own data components; every other resource is a registry
+				// singleton and only needs its key
+				if (held is ItemKey) slot.putByteArray("item", held.toBytes())
+				else slot.putString("resource", held.namespacedKey.key)
+
+				slot.putLong("amount", units)
+				storedContents.add(slot)
+
+			}
+
 			val entry = CompoundTag()
 			entry.putString("key", buffer.key)
-			entry.putString("resource", buffer.resource?.namespacedKey?.key ?: "")
-			entry.putLong("amount", buffer.amount)
+			entry.put("contents", storedContents)
 
 			storedBuffers.add(entry)
 
@@ -433,7 +448,24 @@ abstract class Machine(
 		restoredBuffers = tag.getListOrEmpty("buffers")
 			.filterIsInstance<CompoundTag>()
 			.associate { entry ->
-				entry.getStringOr("key", "") to (entry.getStringOr("resource", "") to entry.getLongOr("amount", 0L))
+
+				val contents = mutableMapOf<AnionResource, Long>()
+
+				for (slot in entry.getListOrEmpty("contents").filterIsInstance<CompoundTag>()) {
+
+					val itemBytes = slot.getByteArray("item").orElse(null)
+					val held: AnionResource? =
+						if (itemBytes != null) ItemKey.fromBytes(itemBytes)
+						else AnionRegistries.resourceOf(AnionRegistryKey(slot.getStringOr("resource", "")))
+
+					if (held == null) continue // resource was unregistered while this machine sat on disk
+
+					contents[held] = slot.getLongOr("amount", 0L)
+
+				}
+
+				entry.getStringOr("key", "") to contents.toMap()
+
 			}
 
 		loadState(tag)
@@ -487,17 +519,7 @@ abstract class Machine(
 
 		if (restoredBuffers.isEmpty()) return
 
-		for ((bufferKey, stored) in restoredBuffers) {
-
-			val buffer = buffers[bufferKey] ?: continue
-			val (resourceKey, amount) = stored
-
-			val resource = if (resourceKey.isEmpty()) null
-						   else AnionRegistries.resourceOf(AnionRegistryKey(resourceKey))
-
-			buffer.restore(resource, if (resource == null) 0L else amount)
-
-		}
+		for ((bufferKey, contents) in restoredBuffers) buffers[bufferKey]?.restore(contents)
 
 		restoredBuffers = emptyMap()
 
@@ -617,16 +639,25 @@ abstract class Machine(
 
 		for (buffer in buffers.values) {
 
-			val item = buffer.resource as? AnionItem
-			var remaining = if (item == null) 0L else buffer.amount
-			val stackSize = if (item == null) 1L else item.asItemStack().maxStackSize.toLong()
+			for ((held, units) in buffer.contents()) {
 
-			// gas, fluid and energy have nowhere to be put down, so they are voided by design
-			while (item != null && remaining > 0L) {
+				// gas, fluid and energy have nowhere to be put down, so they are voided by design
+				val stack = when (held) {
+					is ItemKey -> held.stack
+					is AnionItem -> held.asItemStack()
+					else -> continue
+				}
 
-				val quantity = minOf(remaining, stackSize).toInt()
-				level.world.dropItem(dropLocation, item.asItemStack(quantity))
-				remaining -= quantity
+				val stackSize = stack.maxStackSize.coerceAtLeast(1).toLong()
+				var remaining = units
+
+				while (remaining > 0L) {
+
+					val quantity = minOf(remaining, stackSize).toInt()
+					level.world.dropItem(dropLocation, stack.asQuantity(quantity))
+					remaining -= quantity
+
+				}
 
 			}
 

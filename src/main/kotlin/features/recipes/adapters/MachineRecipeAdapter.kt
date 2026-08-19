@@ -1,8 +1,8 @@
 package dev.diena.anion.features.recipes.adapters
 
+import dev.diena.anion.features.custom.AnionResource
 import dev.diena.anion.features.recipes.AnionIngredient
 import dev.diena.anion.features.recipes.AnionRecipe
-import org.bukkit.NamespacedKey
 
 /**
  * Adapter that drives an [AnionRecipe] as a per-tick machine operation.
@@ -49,8 +49,8 @@ class MachineRecipeAdapter(
 	 */
 	fun tick(
 
-		supply: (NamespacedKey) -> Long,
-		draw: (NamespacedKey, Long) -> Long,
+		supply: (AnionResource) -> Long,
+		draw: (AnionResource, Long) -> Long,
 
 	): TickResult {
 
@@ -67,7 +67,7 @@ class MachineRecipeAdapter(
 			val demand = ingredient.tickDemand()
 			if (demand <= 0L) continue
 
-			val available = minOf(supply(ingredient.resource.namespacedKey), demand)
+			val available = minOf(supply(ingredient.resource), demand)
 			val ratio = available.toDouble() / demand.toDouble()
 			if (ratio < minRatio) minRatio = ratio
 
@@ -80,17 +80,17 @@ class MachineRecipeAdapter(
 
 		// consume each ingredient in proportion to the bottleneck ratio so
 		// no input is over-drawn relative to the achieved progress
-		val consumed = mutableMapOf<NamespacedKey, Long>()
+		val consumed = mutableMapOf<AnionResource, Long>()
 		for (ingredient in recipe.ingredients) {
 
 			val demand = ingredient.tickDemand()
 			if (demand <= 0L) continue
 
 			val wanted = (demand.toDouble() * minRatio).toLong().coerceAtLeast(0L)
-			val drawn = draw(ingredient.resource.namespacedKey, wanted)
+			val drawn = draw(ingredient.resource, wanted)
 
 			ingredient.feed(drawn) // debit first, then credit progress — the two can never drift apart
-			if (drawn > 0L) consumed[ingredient.resource.namespacedKey] = drawn
+			if (drawn > 0L) consumed[ingredient.resource] = drawn
 
 		}
 
@@ -106,12 +106,12 @@ class MachineRecipeAdapter(
 	}
 
 	/**
-	 * @param consumed        resource.id -> units drawn from the machine buffer this tick.
+	 * @param consumed        resource -> units drawn from the machine buffer this tick.
 	 * @param progressGained  Fractional operations gained (0.0..1.0).
 	 * @param completed       True on the tick the recipe finished.
 	 */
 	data class TickResult(
-		val consumed: Map<NamespacedKey, Long>,
+		val consumed: Map<AnionResource, Long>,
 		val progressGained: Double,
 		val completed: Boolean,
 	)

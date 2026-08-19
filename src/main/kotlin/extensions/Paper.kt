@@ -4,6 +4,7 @@ package dev.diena.anion.extensions
 
 import dev.diena.anion.data.registry.AnionRegistryKey
 import dev.diena.anion.data.registry.registries.AnionRegistries
+import dev.diena.anion.features.custom.ItemKey
 import dev.diena.anion.features.custom.items.AnionItem
 import io.papermc.paper.datacomponent.DataComponentType
 import io.papermc.paper.datacomponent.DataComponentTypes
@@ -24,6 +25,7 @@ import org.bukkit.block.BlockFace
 import org.bukkit.entity.Entity
 import org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason
 import org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason.CUSTOM
+import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.ItemStack
 import org.bukkit.util.Vector
 import org.jetbrains.annotations.ApiStatus.Experimental
@@ -262,4 +264,79 @@ fun TextComponent.gradient(from: TextColor, to: TextColor): TextComponent {
 	builder.append(children())
 
 	return builder.build()
+}
+
+//////////////////////
+///// VANILLA INVENTORY
+//////////////////////
+
+// item moves are matched with ItemStack.isSimilar, which compares data components but not amount —
+// so a damaged tool never merges with a pristine one. this is the whole of the item movement the
+// transport system will own; buffers never touch an Inventory themselves.
+
+/** Units of [key]'s exact variant held across every slot. */
+fun Inventory.countOf(key: ItemKey): Long {
+
+	var total = 0L
+
+	for (slot in 0 until size) {
+		val stack = getItem(slot) ?: continue
+		if (stack.isSimilar(key.stack)) total += stack.amount
+	}
+
+	return total
+
+}
+
+/** Takes up to [units] of [key] out. Returns how many were actually taken. */
+fun Inventory.drawItem(key: ItemKey, units: Long): Long {
+
+	if (units <= 0L) return 0L
+
+	var remaining = units
+
+	for (slot in 0 until size) {
+
+		if (remaining <= 0L) break
+
+		val stack = getItem(slot) ?: continue
+		if (!stack.isSimilar(key.stack)) continue
+
+		val taken = minOf(remaining, stack.amount.toLong()).toInt()
+
+		if (taken == stack.amount) setItem(slot, null)
+		else setItem(slot, stack.asQuantity(stack.amount - taken))
+
+		remaining -= taken
+
+	}
+
+	return units - remaining
+
+}
+
+/** Puts up to [units] of [key] in. Returns how many actually landed. */
+// addItem does the partial-stack merging and stack-size clamping, and hands back whatever did not fit
+fun Inventory.pushItem(key: ItemKey, units: Long): Long {
+
+	if (units <= 0L) return 0L
+
+	val stackSize = key.stack.maxStackSize.coerceAtLeast(1).toLong()
+	var remaining = units
+	var placed = 0L
+
+	while (remaining > 0L) {
+
+		val batch = minOf(remaining, stackSize).toInt()
+		val leftover = addItem(key.asItemStack(batch)).values.sumOf { it.amount }
+
+		placed += batch - leftover
+		remaining -= batch
+
+		if (leftover > 0) break // inventory is full, further batches would only fail the same way
+
+	}
+
+	return placed
+
 }

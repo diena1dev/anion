@@ -61,6 +61,7 @@ object AnionItems {
 	val COPPER_MACHINE_BUS      = registerBlock(AnionBlocks.COPPER_MACHINE_BUS)
 	val COPPER_MACHINE_VALVE    = registerBlock(AnionBlocks.COPPER_MACHINE_VALVE)
 	val COPPER_MACHINE_DATAPORT = registerBlock(AnionBlocks.COPPER_MACHINE_DATAPORT)
+	val COPPER_MACHINE_CONDUIT  = registerBlock(AnionBlocks.COPPER_MACHINE_CONDUIT)
 
 	private fun registerItem(item: AnionItem) = item.also {
 		AnionRegistries.ITEM_REGISTRY.register(AnionRegistryKey(it.namespacedKey.key), it)

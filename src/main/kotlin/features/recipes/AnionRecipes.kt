@@ -134,8 +134,8 @@ import org.bukkit.inventory.ItemType
  *
  * // Per-tick call from the owning machine's tick loop:
  * val tick = STEEL_INGOT.tick(
- *     supply = { resourceKey -> buffers.forResource(resourceKey)?.amount ?: 0L },
- *     draw   = { resourceKey, units -> buffers.forResource(resourceKey)?.extract(units) ?: 0L },
+ *     supply = { resource -> buffers["oxygen_in"]?.amountOf(resource) ?: 0L },
+ *     draw   = { resource, units -> buffers["oxygen_in"]?.extract(resource, units) ?: 0L },
  * )
  * if (tick.completed) machine.output(STEEL_INGOT.recipe.result)
  * ```

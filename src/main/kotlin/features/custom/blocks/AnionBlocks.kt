@@ -104,6 +104,18 @@ object AnionBlocks {
 		)
 	)
 
+	// power port. a machine draws its whole energy demand through these, so the conduit count on the
+	// casing is what caps how fast it can be fed.
+	val COPPER_MACHINE_CONDUIT = registerBlock(
+		AnionBlock(
+			"Copper Machine Conduit",
+			Instrument.ZOMBIE,
+			9,
+			styledDisplayName = Component.text("Copper Machine Conduit")
+				.gradient(COPPER_TEXT_START, COPPER_TEXT_END)
+		)
+	)
+
 	fun fromState(instrument: Instrument, note: Int): AnionBlock? = byState[instrument to note]
 
 	private fun registerBlock(block: AnionBlock): AnionBlock {

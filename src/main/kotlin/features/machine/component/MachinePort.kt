@@ -45,13 +45,14 @@ class MachinePort(
 	}
 
 	/** What a port is for. Readouts and data links are ports too — they just expose a different thing. */
-	enum class Kind { BUS, VALVE, DATA, DISPLAY }
+	enum class Kind { BUS, VALVE, CONDUIT, DATA, DISPLAY }
 
 	companion object {
 
 		private val kindsByBlock: Map<AnionBlock, Kind> = mapOf(
 			AnionBlocks.COPPER_MACHINE_BUS to Kind.BUS,
 			AnionBlocks.COPPER_MACHINE_VALVE to Kind.VALVE,
+			AnionBlocks.COPPER_MACHINE_CONDUIT to Kind.CONDUIT,
 			AnionBlocks.COPPER_MACHINE_DATAPORT to Kind.DATA,
 			AnionBlocks.COPPER_MACHINE_DISPLAY to Kind.DISPLAY,
 		)
