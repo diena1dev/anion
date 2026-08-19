@@ -128,10 +128,10 @@ object AnionBlockListeners : Listener {
 
 	}
 
-	/** Turns a freshly placed directional block to point wherever the player was aiming. */
-	private fun faceOnPlacement(block: Block, directional: AnionDirectionalBlock, player: Player) {
+	/** Turns a freshly placed directional block to point the way the placement implies. */
+	private fun faceOnPlacement(block: Block, directional: AnionDirectionalBlock, event: BlockPlaceEvent) {
 
-		val note = directional.noteFor(placementFacing(directional, player)) ?: return
+		val note = directional.noteFor(placementFacing(directional, event)) ?: return
 		val data = noteData(block) ?: return
 
 		data.note = Note(note)
@@ -139,14 +139,35 @@ object AnionBlockListeners : Listener {
 
 	}
 
-	private fun placementFacing(directional: AnionDirectionalBlock, player: Player): BlockFace {
+	private fun placementFacing(directional: AnionDirectionalBlock, event: BlockPlaceEvent): BlockFace {
 
-		// a block that can point up or down follows the player's pitch; one that cannot follows their heading
-		val looking = if (player.location.pitch <= 0f) BlockFace.UP else BlockFace.DOWN
-		if (looking in directional.facings) return looking
+		val against = event.blockAgainst
+		val away = against.getFace(event.blockPlaced)
 
-		val heading = player.facing
+		// placed against a pipe or a machine, it points away from it. that is what continues a run in
+		// the direction you are already building, and what makes a chute on a bus port export rather
+		// than import — aiming alone cannot express either.
+		if (away != null && away in directional.facings) {
+			if (anionBlockAt(against) != null || AnionTransportIndex.isComponent(against)) return away
+		}
+
+		val pitch = event.player.location.pitch
+
+		// steep aim asks for a vertical placement. a shallow one must NOT, or a block that can point
+		// both ways round could never be placed horizontally at all.
+		val vertical = when {
+			pitch <= -45f -> BlockFace.UP
+			pitch >= 45f -> BlockFace.DOWN
+			else -> null
+		}
+		if (vertical != null && vertical in directional.facings) return vertical
+
+		val heading = event.player.facing
 		if (heading in directional.facings) return heading
+
+		// a block that can only point up or down still has to resolve from a shallow aim
+		val shallow = if (pitch <= 0f) BlockFace.UP else BlockFace.DOWN
+		if (shallow in directional.facings) return shallow
 
 		return directional.defaultFacing
 
@@ -182,7 +203,7 @@ object AnionBlockListeners : Listener {
 
 		val anionBlock = anionBlockAt(block) ?: return
 
-		if (anionBlock is AnionDirectionalBlock) faceOnPlacement(block, anionBlock, event.player)
+		if (anionBlock is AnionDirectionalBlock) faceOnPlacement(block, anionBlock, event)
 
 		anionBlock.onPlace(block, event.player)
 	}

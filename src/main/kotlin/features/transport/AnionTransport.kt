@@ -251,6 +251,120 @@ object AnionTransport {
 
 	}
 
+	/////////////////
+	///// DIAGNOSTICS
+	/////////////////
+
+	/**
+	 * One line per fact about the component at [cell] — what it is, which way it points, and where a
+	 * run leaving it actually stops. A pipe's facing is invisible in world, so this is how you tell a
+	 * north-facing pipe from a south-facing one without breaking it.
+	 */
+	fun describe(world: World, cell: Vec3i): List<String> {
+
+		val lines = mutableListOf<String>()
+		val block = world.getBlockAt(cell.x, cell.y, cell.z)
+		val ports = portsIn(world)
+
+		val name = block.anionBlock?.namespacedKey?.key ?: block.type.key.key
+		val facing = block.anionFacing
+		val indexed = cell in AnionTransportIndex.cellsIn(world)
+
+		lines += "$cell $name facing=${facing ?: "-"} indexed=$indexed driver=${AnionTransportIndex.isComponent(block)}"
+
+		ports[cell]?.let { lines += "  is a bus port -> ${it.bufferKey ?: "unbound"}" }
+
+		when {
+
+			block.type == Material.CRAFTING_TABLE -> {
+
+				val touching = CARTESIAN_FACES.filter { containerAt(world, cell + it.vec3i) != null }
+				lines += "  containers touching: ${touching.joinToString(" ").ifEmpty { "none" }}"
+
+				for (direction in CARTESIAN_FACES) {
+					val target = cell + direction.vec3i
+					if (containerAt(world, target) != null) continue
+					if (exitsOf(world, target, direction.oppositeFace) == null && ports[target] == null) continue
+
+					lines += "  out $direction:"
+					traceLine(world, target, direction.oppositeFace, ports, lines)
+				}
+
+			}
+
+			block.anionBlock === AnionBlocks.COPPER_CHUTE && facing != null -> {
+
+				val behind = cell - facing.vec3i
+				val port = ports[behind]
+
+				lines += "  behind $behind: ${port?.let { "bus port -> ${it.bufferKey ?: "unbound"}" } ?: "no bus port, so it only carries"}"
+				port?.buffer()?.let { lines += "  buffer ${it.used()}/${it.capacity()}" }
+
+				lines += "  ahead:"
+				traceLine(world, cell + facing.vec3i, facing.oppositeFace, ports, lines)
+
+			}
+
+			facing != null -> {
+				lines += "  carries from ${facing.oppositeFace} to $facing"
+				lines += "  ahead:"
+				traceLine(world, cell + facing.vec3i, facing.oppositeFace, ports, lines)
+			}
+
+		}
+
+		return lines
+
+	}
+
+	/** Follows single exits from [from] until something stops it, saying why at each step. */
+	// junctions branch, so this reports the first exit only — enough to find the break in a straight run
+	private fun traceLine(
+
+		world: World,
+		from: Vec3i,
+		entryFace: BlockFace,
+		ports: Map<Vec3i, MachinePort>,
+		lines: MutableList<String>,
+
+	) {
+
+		var cell = from
+		var face = entryFace
+
+		repeat(MAX_ROUTE_LENGTH) {
+
+			val block = world.getBlockAt(cell.x, cell.y, cell.z)
+			val name = block.anionBlock?.namespacedKey?.key ?: block.type.key.key
+
+			ports[cell]?.let {
+				lines += "   $cell bus port -> ${it.bufferKey ?: "unbound"} [END]"
+				return
+			}
+
+			if (containerAt(world, cell) != null) {
+				lines += "   $cell $name container [END]"
+				return
+			}
+
+			val exits = exitsOf(world, cell, face)
+			if (exits == null) {
+				lines += "   $cell $name will not carry in through $face [DEAD END]"
+				return
+			}
+
+			lines += "   $cell $name exits ${exits.joinToString(",")}"
+
+			val exit = exits.first()
+			cell += exit.vec3i
+			face = exit.oppositeFace
+
+		}
+
+		lines += "   ... gave up after $MAX_ROUTE_LENGTH"
+
+	}
+
 	/////////////
 	///// LOOKUPS
 	/////////////

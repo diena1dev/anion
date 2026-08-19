@@ -15,7 +15,7 @@ val MEDIUM_CARGO_CONTAINER_STRUCTURE =
 	BlockSet.new("medium_cargo_container")
 		// no dedicated core block: a crate is casing all the way round, so the first casing cell in
 		// the floor anchors it. the casing is listed under assign() below too — core() de-duplicates.
-		.core('I', AnionBlocks.COPPER_MACHINE_CASING)
+		.core('C', AnionBlocks.TEST_BLOCK)
 
 		// any casing cell may be swapped for a port at build time. no valve — nothing here is a fluid
 		.assign('I', AnionBlocks.COPPER_MACHINE_CASING)
@@ -30,7 +30,7 @@ val MEDIUM_CARGO_CONTAINER_STRUCTURE =
 			"III",
 			"III",
 			"III",
-			"III",
+			"ICI",
 		)
 		// walls. the blanks are the cargo void — unchecked, so anything may sit in there
 		.slice(
