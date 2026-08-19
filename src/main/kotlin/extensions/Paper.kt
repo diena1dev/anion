@@ -164,20 +164,20 @@ fun BlockFace.rotateLeft() = when (this) {
 // three private copies this replaced — do not "fix" it without checking the rotation path still lines up.
 fun Double.toFace(): BlockFace = when (this) {
 
-    in 0.0..90.0 -> BlockFace.SOUTH
-    in 90.0..180.0 -> BlockFace.EAST
-    in 180.0..270.0 -> BlockFace.NORTH
-    in 270.0..360.0 -> BlockFace.WEST
-    else -> throw IllegalStateException("what the fuck did you do")
+	in 0.0..90.0 -> BlockFace.SOUTH
+	in 90.0..180.0 -> BlockFace.EAST
+	in 180.0..270.0 -> BlockFace.NORTH
+	in 270.0..360.0 -> BlockFace.WEST
+	else -> throw IllegalStateException("what the fuck did you do")
 
 }
 
 /** Clockwise quarter turns needed to get [from] onto [to]. 0 when they already match. */
 fun stepsFromTo(from: BlockFace, to: BlockFace): Int {
 
-    var steps = 0; var cur = from
-    while (cur != to && steps < 4) { cur = cur.rotateRight(); steps++ }
-    return steps
+	var steps = 0; var currentFace = from
+	while (currentFace != to && steps < 4) { currentFace = currentFace.rotateRight(); steps++ }
+	return steps
 
 }
 
@@ -192,24 +192,24 @@ inline fun Vec3i.rotate(rotation: Rotation): Vec3i =
 
 /** Rotate [point] around [origin] by [rotation]. */
 fun Vec3i.rotateAround(origin: Vec3i, rotation: Rotation): Vec3i {
-    val relative = this - origin
-    return origin + relative.rotate(rotation)
+	val relative = this - origin
+	return origin + relative.rotate(rotation)
 }
 
 /** Clockwise quarter turns this [Rotation] represents, 0..3. */
 val Rotation.quarterTurns: Int get() = when (this) {
-    Rotation.NONE -> 0
-    Rotation.CLOCKWISE_90 -> 1
-    Rotation.CLOCKWISE_180 -> 2
-    Rotation.COUNTERCLOCKWISE_90 -> 3
+	Rotation.NONE -> 0
+	Rotation.CLOCKWISE_90 -> 1
+	Rotation.CLOCKWISE_180 -> 2
+	Rotation.COUNTERCLOCKWISE_90 -> 3
 }
 
 /** [Rotation] for a count of clockwise quarter turns. Wraps, negatives included. */
 fun rotationOf(quarterTurns: Int): Rotation = when (((quarterTurns % 4) + 4) % 4) {
-    0 -> Rotation.NONE
-    1 -> Rotation.CLOCKWISE_90
-    2 -> Rotation.CLOCKWISE_180
-    else -> Rotation.COUNTERCLOCKWISE_90
+	0 -> Rotation.NONE
+	1 -> Rotation.CLOCKWISE_90
+	2 -> Rotation.CLOCKWISE_180
+	else -> Rotation.COUNTERCLOCKWISE_90
 }
 
 /** Compose two rotations. Rotations about the same axis commute, so order is irrelevant. */
@@ -218,17 +218,17 @@ operator fun Rotation.plus(other: Rotation): Rotation = rotationOf(this.quarterT
 /** Rotate [Location] around [origin] by [rotation]. World/yaw/pitch preserved. */
 fun Location.rotateAround(origin: Vec3i, rotation: Rotation): Location {
 
-    val relativeX = x - origin.x
-    val relativeZ = z - origin.z
+	val relativeX = x - origin.x
+	val relativeZ = z - origin.z
 
-    val (rotatedX, rotatedZ) = when (rotation) {
-        Rotation.CLOCKWISE_90 -> -relativeZ to relativeX
-        Rotation.CLOCKWISE_180 -> -relativeX to -relativeZ
-        Rotation.COUNTERCLOCKWISE_90 -> relativeZ to -relativeX
-        Rotation.NONE -> relativeX to relativeZ
-    }
+	val (rotatedX, rotatedZ) = when (rotation) {
+		Rotation.CLOCKWISE_90 -> -relativeZ to relativeX
+		Rotation.CLOCKWISE_180 -> -relativeX to -relativeZ
+		Rotation.COUNTERCLOCKWISE_90 -> relativeZ to -relativeX
+		Rotation.NONE -> relativeX to relativeZ
+	}
 
-    return Location(world, origin.x + rotatedX, y, origin.z + rotatedZ, yaw, pitch)
+	return Location(world, origin.x + rotatedX, y, origin.z + rotatedZ, yaw, pitch)
 
 }
 
@@ -250,16 +250,16 @@ inline val Location.blockPos get() = BlockPos(x.toInt(), y.toInt(), z.toInt())
 
 /** Colors each character of this component's content as a gradient between [from] and [to]. Children are kept as-is. */
 fun TextComponent.gradient(from: TextColor, to: TextColor): TextComponent {
-    val text = content()
-    if (text.isEmpty()) return this
+	val text = content()
+	if (text.isEmpty()) return this
 
-    val lastIndex = text.length - 1
-    val builder = Component.text().style(style())
-    for (i in text.indices) {
-        val fraction = if (lastIndex == 0) 0f else i / lastIndex.toFloat()
-        builder.append(Component.text(text[i], TextColor.lerp(fraction, from, to)))
-    }
-    builder.append(children())
+	val lastIndex = text.length - 1
+	val builder = Component.text().style(style())
+	for (i in text.indices) {
+		val fraction = if (lastIndex == 0) 0f else i / lastIndex.toFloat()
+		builder.append(Component.text(text[i], TextColor.lerp(fraction, from, to)))
+	}
+	builder.append(children())
 
-    return builder.build()
+	return builder.build()
 }

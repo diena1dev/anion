@@ -16,51 +16,51 @@ import org.bukkit.block.data.type.NoteBlock
  */
 sealed interface BlockMatcher {
 
-    /** stable id, stored in a machine's resolved structure and read back on load */
-    val key: String
+	/** stable id, stored in a machine's resolved structure and read back on load */
+	val key: String
 
-    fun matches(blockData: BlockData): Boolean
+	fun matches(blockData: BlockData): Boolean
 
-    /** a block that satisfies this matcher. for previews and debug placement, never for comparison. */
-    fun representative(): BlockData
+	/** a block that satisfies this matcher. for previews and debug placement, never for comparison. */
+	fun representative(): BlockData
 
-    /** an [AnionBlock], identified by the note block instrument+note pair that encodes it */
-    data class Custom(val block: AnionBlock) : BlockMatcher {
+	/** an [AnionBlock], identified by the note block instrument+note pair that encodes it */
+	data class Custom(val block: AnionBlock) : BlockMatcher {
 
-        override val key: String get() = "anion/${block.namespacedKey.key}"
+		override val key: String get() = "anion/${block.namespacedKey.key}"
 
-        override fun matches(blockData: BlockData): Boolean {
+		override fun matches(blockData: BlockData): Boolean {
 
-            val noteBlock = blockData as? NoteBlock ?: return false
+			val noteBlock = blockData as? NoteBlock ?: return false
 
-            return AnionBlocks.fromState(noteBlock.instrument, noteBlock.note.id.toInt()) === block
+			return AnionBlocks.fromState(noteBlock.instrument, noteBlock.note.id.toInt()) === block
 
-        }
+		}
 
-        override fun representative(): BlockData {
+		override fun representative(): BlockData {
 
-            val noteBlock = BlockType.NOTE_BLOCK.createBlockData() as NoteBlock
-            noteBlock.instrument = block.instrument
-            noteBlock.note = Note(block.note)
+			val noteBlock = BlockType.NOTE_BLOCK.createBlockData() as NoteBlock
+			noteBlock.instrument = block.instrument
+			noteBlock.note = Note(block.note)
 
-            return noteBlock
+			return noteBlock
 
-        }
+		}
 
-    }
+	}
 
-    /** a vanilla block, identified by material alone */
-    data class Vanilla(val type: BlockType) : BlockMatcher {
+	/** a vanilla block, identified by material alone */
+	data class Vanilla(val type: BlockType) : BlockMatcher {
 
-        private val material: Material = type.createBlockData().material
+		private val material: Material = type.createBlockData().material
 
-        override val key: String get() = "vanilla/${material.name}"
+		override val key: String get() = "vanilla/${material.name}"
 
-        override fun matches(blockData: BlockData): Boolean = blockData.material == material
+		override fun matches(blockData: BlockData): Boolean = blockData.material == material
 
-        override fun representative(): BlockData = type.createBlockData()
+		override fun representative(): BlockData = type.createBlockData()
 
-    }
+	}
 
 }
 
@@ -70,146 +70,146 @@ sealed interface BlockMatcher {
  * */
 open class BlockSet private constructor(
 
-    val name: String,
-    /** every acceptable variant per offset — a cell matches if the world block matches ANY entry */
-    val blockMap: Map<Vec3i, List<BlockMatcher>>,
+	val name: String,
+	/** every acceptable variant per offset — a cell matches if the world block matches ANY entry */
+	val blockMap: Map<Vec3i, List<BlockMatcher>>,
 
 ) {
 
-    companion object {
+	companion object {
 
-        /** returns Builder */
-        fun new(name: String): Builder = Builder(name)
+		/** returns Builder */
+		fun new(name: String): Builder = Builder(name)
 
-    }
+	}
 
-    class Builder(
+	class Builder(
 
-        val name: String,
+		val name: String,
 
-    ) {
+	) {
 
-        // internal values
-        private var blockMap: MutableMap<Vec3i, List<BlockMatcher>> = mutableMapOf()
-        // multiple blocks can be assigned to the same char — any of them is accepted at that position
-        private var charMatchers: MutableMap<Char, MutableList<BlockMatcher>> = mutableMapOf()
-        private var coreChar: Char? = null
-        private var coreOffset: Vec3i? = null
+		// internal values
+		private var blockMap: MutableMap<Vec3i, List<BlockMatcher>> = mutableMapOf()
+		// multiple blocks can be assigned to the same char — any of them is accepted at that position
+		private var charMatchers: MutableMap<Char, MutableList<BlockMatcher>> = mutableMapOf()
+		private var coreChar: Char? = null
+		private var coreOffset: Vec3i? = null
 
-        // machine structure definition
-        var width: Int = 0
-        var length: Int = 0
-        var height: Int = 0
+		// machine structure definition
+		var width: Int = 0
+		var length: Int = 0
+		var height: Int = 0
 
-        // store if we have added a core block yet
-        var hasCoreBlock = false
+		// store if we have added a core block yet
+		var hasCoreBlock = false
 
-        /**
-         *  holy FUCK astral is so much smarter than i am
-         *
-         *  astral if you read this i swear i have not looked at MachineType in the past two months....
-         *  i took great care to make of this myself, even if it's functionally the same for some bits-
-         *  i actually adapted the spigot code for ShapedRecipe (really just the fact that they used a vararg)
-         * */
+		/**
+		 *  holy FUCK astral is so much smarter than i am
+		 *
+		 *  astral if you read this i swear i have not looked at MachineType in the past two months....
+		 *  i took great care to make of this myself, even if it's functionally the same for some bits-
+		 *  i actually adapted the spigot code for ShapedRecipe (really just the fact that they used a vararg)
+		 * */
 
-        /** run final checks and return structure */
-        fun build(): BlockSet {
+		/** run final checks and return structure */
+		fun build(): BlockSet {
 
-            if (!hasCoreBlock) throw IllegalStateException("attempted to build a MachineStructure without a core assignment. fix your registrations!")
-            val offset = this.coreOffset ?: throw IllegalStateException("coreBlock was never initialized!")
+			if (!hasCoreBlock) throw IllegalStateException("attempted to build a MachineStructure without a core assignment. fix your registrations!")
+			val offset = this.coreOffset ?: throw IllegalStateException("coreBlock was never initialized!")
 
-            // re-center every entry so the core's own cell lands on (0, 0, 0) — that's the
-            // pivot assemble()/isIntact() actually measure every other offset against.
-            val recentered = blockMap.mapKeys { (pos, _) -> pos - offset }
+			// re-center every entry so the core's own cell lands on (0, 0, 0) — that's the
+			// pivot assemble()/isIntact() actually measure every other offset against.
+			val recentered = blockMap.mapKeys { (pos, _) -> pos - offset }
 
-            return BlockSet(
-                this.name,
-                recentered
-            )
+			return BlockSet(
+				this.name,
+				recentered
+			)
 
-        }
+		}
 
-        /** Assign Machine Core position */
-        fun core(char: Char, block: AnionBlock): Builder {
+		/** Assign Machine Core position */
+		fun core(char: Char, block: AnionBlock): Builder {
 
-            if (coreChar != null) throw IllegalStateException("duplicate core registration in machine structure")
-            charMatchers.getOrPut(char) { mutableListOf() }.add(BlockMatcher.Custom(block))
+			if (coreChar != null) throw IllegalStateException("duplicate core registration in machine structure")
+			charMatchers.getOrPut(char) { mutableListOf() }.add(BlockMatcher.Custom(block))
 
-            coreChar = char
-            return this
+			coreChar = char
+			return this
 
-        }
+		}
 
-        /** Assign AnionBlock. Call multiple times on the same char to accept any of several block variants there. */
-        fun assign(char: Char, block: AnionBlock): Builder {
+		/** Assign AnionBlock. Call multiple times on the same char to accept any of several block variants there. */
+		fun assign(char: Char, block: AnionBlock): Builder {
 
-            charMatchers.getOrPut(char) { mutableListOf() }.add(BlockMatcher.Custom(block))
-            return this
+			charMatchers.getOrPut(char) { mutableListOf() }.add(BlockMatcher.Custom(block))
+			return this
 
-        }
+		}
 
-        /** Assign Vanilla (Bukkit) Block. Call multiple times on the same char to accept any of several block variants there. */
-        fun assign(char: Char, block: BlockType): Builder {
+		/** Assign Vanilla (Bukkit) Block. Call multiple times on the same char to accept any of several block variants there. */
+		fun assign(char: Char, block: BlockType): Builder {
 
-            charMatchers.getOrPut(char) { mutableListOf() }.add(BlockMatcher.Vanilla(block))
-            return this
+			charMatchers.getOrPut(char) { mutableListOf() }.add(BlockMatcher.Vanilla(block))
+			return this
 
-        }
+		}
 
-        // vararg stands for a variable number of arguments
-        /** call [slice()] *after* assigning blocks, ports, and cores. */
-        fun slice(vararg shape: String): Builder {
+		// vararg stands for a variable number of arguments
+		/** call [slice()] *after* assigning blocks, ports, and cores. */
+		fun slice(vararg shape: String): Builder {
 
-            // shape.size tells us the total number of chars vertically (length)
-            // row in shape and row length tells us number of chars horizontally (width)
-            // and slice() call count tells us overall height
+			// shape.size tells us the total number of chars vertically (length)
+			// row in shape and row length tells us number of chars horizontally (width)
+			// and slice() call count tells us overall height
 
-            // validate that all slices match the same length (array entries)
-            if (this.length != 0 && shape.size != this.length) throw IllegalStateException("length is not equal across all slices!")
-            this.length = shape.size
+			// validate that all slices match the same length (array entries)
+			if (this.length != 0 && shape.size != this.length) throw IllegalStateException("length is not equal across all slices!")
+			this.length = shape.size
 
-            /////////// logic start
+			/////////// logic start
 
-            // rows run along x
-            for ((localX, row) in shape.iterator().withIndex()) {
+			// rows run along x
+			for ((localX, row) in shape.iterator().withIndex()) {
 
-                // validate that all slices match the same width (array entry string length)
-                if (this.width != 0 && row.length != this.width) throw IllegalStateException("width is not equal across all slices!")
+				// validate that all slices match the same width (array entry string length)
+				if (this.width != 0 && row.length != this.width) throw IllegalStateException("width is not equal across all slices!")
 
-                // characters within a row run along z
-                for ((localZ, char) in row.toCharArray().iterator().withIndex()) {
+				// characters within a row run along z
+				for ((localZ, char) in row.toCharArray().iterator().withIndex()) {
 
-                    if (char == ' ') continue
+					if (char == ' ') continue
 
-                    // gather every acceptable variant for this char — vanilla and custom can coexist
-                    val variants = charMatchers[char]
-                        ?: throw IllegalStateException("block mapping missing for char '$char'")
+					// gather every acceptable variant for this char — vanilla and custom can coexist
+					val variants = charMatchers[char]
+						?: throw IllegalStateException("block mapping missing for char '$char'")
 
-                    // record where the core actually sits in the raw grid so build() can
-                    // re-center the whole structure around it.
-                    if (char == coreChar) {
-                        if (hasCoreBlock) throw IllegalStateException("duplicate core block assignment in structure")
-                        hasCoreBlock = true
-                        coreOffset = Vec3i(localX, this.height, localZ)
-                    }
+					// record where the core actually sits in the raw grid so build() can
+					// re-center the whole structure around it.
+					if (char == coreChar) {
+						if (hasCoreBlock) throw IllegalStateException("duplicate core block assignment in structure")
+						hasCoreBlock = true
+						coreOffset = Vec3i(localX, this.height, localZ)
+					}
 
-                    // now finally assign the blockmap
-                    blockMap[Vec3i(localX, this.height, localZ)] = variants.toList()
+					// now finally assign the blockmap
+					blockMap[Vec3i(localX, this.height, localZ)] = variants.toList()
 
-                }
+				}
 
-            }
+			}
 
-            // add one to height for every slice if everything else passes
-            height += 1
+			// add one to height for every slice if everything else passes
+			height += 1
 
-            /////////// logic end
+			/////////// logic end
 
-            // for chaining
-            return this
+			// for chaining
+			return this
 
-        }
+		}
 
-    }
+	}
 
 }

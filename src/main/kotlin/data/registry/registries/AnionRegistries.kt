@@ -44,16 +44,16 @@ object AnionRegistries {
 		override val all: MutableMap<AnionRegistryKey, AnionRecipe> = mutableMapOf()
 	}
 
-    val MACHINE_TYPE_REGISTRY = object : AnionRegistry<() -> Machine>() {
-        override val registryKey = AnionRegistryKeys.MACHINE_TYPE_REGISTRY
-        override val all: MutableMap<AnionRegistryKey, () -> Machine> = mutableMapOf()
-    }
+	val MACHINE_TYPE_REGISTRY = object : AnionRegistry<() -> Machine>() {
+		override val registryKey = AnionRegistryKeys.MACHINE_TYPE_REGISTRY
+		override val all: MutableMap<AnionRegistryKey, () -> Machine> = mutableMapOf()
+	}
 
-    /** Finds a resource by key across every resource registry. Used to rebuild saved machine buffers. */
-    fun resourceOf(key: AnionRegistryKey): AnionResource? =
-        ITEM_REGISTRY.getValue(key)
-            ?: GAS_REGISTRY.getValue(key)
-            ?: FLUID_REGISTRY.getValue(key)
-            ?: ENERGY_REGISTRY.getValue(key)
+	/** Finds a resource by key across every resource registry. Used to rebuild saved machine buffers. */
+	fun resourceOf(key: AnionRegistryKey): AnionResource? =
+		ITEM_REGISTRY.getValue(key)
+			?: GAS_REGISTRY.getValue(key)
+			?: FLUID_REGISTRY.getValue(key)
+			?: ENERGY_REGISTRY.getValue(key)
 
 }

@@ -26,75 +26,75 @@ import java.util.logging.Level
  */
 object MachineSerializer {
 
-    fun serialize(machine: Machine): ByteArray {
-        val baos = ByteArrayOutputStream()
-        val dos = DataOutputStream(baos)
+	fun serialize(machine: Machine): ByteArray {
+		val baos = ByteArrayOutputStream()
+		val dos = DataOutputStream(baos)
 
-        dos.writeShort(MACHINES_VERSION.toInt())
+		dos.writeShort(MACHINES_VERSION.toInt())
 
-        dos.writeInt(machine.origin.x)
-        dos.writeInt(machine.origin.y)
-        dos.writeInt(machine.origin.z)
+		dos.writeInt(machine.origin.x)
+		dos.writeInt(machine.origin.y)
+		dos.writeInt(machine.origin.z)
 
-        dos.writeByte(machine.rotation.quarterTurns)
+		dos.writeByte(machine.rotation.quarterTurns)
 
-        // registry path only — MACHINE_TYPE_REGISTRY keys on the path, not the full namespaced key
-        dos.writeUTF(machine.namespacedKey.key)
+		// registry path only — MACHINE_TYPE_REGISTRY keys on the path, not the full namespaced key
+		dos.writeUTF(machine.namespacedKey.key)
 
-        val tag = CompoundTag()
-        machine.saveTo(tag) // frozen structure + buffer contents + the type's own saveState()
+		val tag = CompoundTag()
+		machine.saveTo(tag) // frozen structure + buffer contents + the type's own saveState()
 
-        val tagBaos = ByteArrayOutputStream()
-        NbtIo.write(tag, DataOutputStream(tagBaos))
-        val arr = tagBaos.toByteArray()
-        dos.writeInt(arr.size)
-        dos.write(arr)
+		val tagBaos = ByteArrayOutputStream()
+		NbtIo.write(tag, DataOutputStream(tagBaos))
+		val arr = tagBaos.toByteArray()
+		dos.writeInt(arr.size)
+		dos.write(arr)
 
-        dos.flush()
-        return baos.toByteArray()
-    }
+		dos.flush()
+		return baos.toByteArray()
+	}
 
-    /** null when the stored machine type is no longer registered — the entry is skipped, not dropped. */
-    fun deserialize(uuid: UUID, bytes: ByteArray, world: ServerLevel): Machine? {
-        val dis = DataInputStream(ByteArrayInputStream(bytes))
+	/** null when the stored machine type is no longer registered — the entry is skipped, not dropped. */
+	fun deserialize(uuid: UUID, bytes: ByteArray, world: ServerLevel): Machine? {
+		val dis = DataInputStream(ByteArrayInputStream(bytes))
 
-        val schemaVersion = dis.readShort()
-        check(schemaVersion == MACHINES_VERSION) {
-            "unsupported machine schema v$schemaVersion (code at v$MACHINES_VERSION)"
-        }
+		val schemaVersion = dis.readShort()
+		check(schemaVersion == MACHINES_VERSION) {
+			"unsupported machine schema v$schemaVersion (code at v$MACHINES_VERSION)"
+		}
 
-        val originX = dis.readInt()
-        val originY = dis.readInt()
-        val originZ = dis.readInt()
-        val origin = Vec3i(originX, originY, originZ)
+		val originX = dis.readInt()
+		val originY = dis.readInt()
+		val originZ = dis.readInt()
+		val origin = Vec3i(originX, originY, originZ)
 
-        val rotation = rotationOf(dis.readByte().toInt())
-        val typeKey = dis.readUTF()
+		val rotation = rotationOf(dis.readByte().toInt())
+		val typeKey = dis.readUTF()
 
-        val factory = AnionRegistries.MACHINE_TYPE_REGISTRY.getValue(AnionRegistryKey(typeKey))
-        if (factory == null) {
-            // a machine type was removed from the code but its placements are still in the database.
-            // leaving the row alone means it comes back if the type is ever re-registered.
-            Anion.plugin.logger.log(Level.WARNING, "skipping saved machine $uuid: unknown type '$typeKey'")
-            return null
-        }
+		val factory = AnionRegistries.MACHINE_TYPE_REGISTRY.getValue(AnionRegistryKey(typeKey))
+		if (factory == null) {
+			// a machine type was removed from the code but its placements are still in the database.
+			// leaving the row alone means it comes back if the type is ever re-registered.
+			Anion.plugin.logger.log(Level.WARNING, "skipping saved machine $uuid: unknown type '$typeKey'")
+			return null
+		}
 
-        val nbtLen = dis.readInt()
-        val nbtBytes = ByteArray(nbtLen)
-        dis.readFully(nbtBytes)
-        val tag = NbtIo.read(DataInputStream(ByteArrayInputStream(nbtBytes)))
+		val nbtLen = dis.readInt()
+		val nbtBytes = ByteArray(nbtLen)
+		dis.readFully(nbtBytes)
+		val tag = NbtIo.read(DataInputStream(ByteArrayInputStream(nbtBytes)))
 
-        return factory().load(uuid, world, origin, rotation, tag)
-    }
+		return factory().load(uuid, world, origin, rotation, tag)
+	}
 
-    /** Reads the core block position out of a stored blob without deserializing the machine. */
-    fun readOrigin(bytes: ByteArray): Vec3i? {
-        return try {
-            val dis = DataInputStream(ByteArrayInputStream(bytes))
-            dis.readShort() // schema version
-            Vec3i(dis.readInt(), dis.readInt(), dis.readInt())
-        } catch (_: Exception) {
-            null
-        }
-    }
+	/** Reads the core block position out of a stored blob without deserializing the machine. */
+	fun readOrigin(bytes: ByteArray): Vec3i? {
+		return try {
+			val dis = DataInputStream(ByteArrayInputStream(bytes))
+			dis.readShort() // schema version
+			Vec3i(dis.readInt(), dis.readInt(), dis.readInt())
+		} catch (_: Exception) {
+			null
+		}
+	}
 }
