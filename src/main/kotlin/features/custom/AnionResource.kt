@@ -2,7 +2,9 @@ package dev.diena.anion.features.custom
 
 import dev.diena.anion.extensions.toAnionItem
 import org.bukkit.NamespacedKey
+import dev.diena.anion.features.custom.items.AnionItem
 import org.bukkit.inventory.ItemStack
+import org.bukkit.inventory.ItemType
 
 interface AnionResource {
 
@@ -48,6 +50,12 @@ class ItemKey private constructor(
 
 		/** The key for whatever variant [stack] is, ignoring how many of it there are. */
 		fun of(stack: ItemStack): ItemKey = ItemKey(stack.asQuantity(1))
+
+		/** The key for a registered Anion item. */
+		fun of(item: AnionItem): ItemKey = of(item.asItemStack())
+
+		/** The key for a plain vanilla item, in its default state. */
+		fun of(type: ItemType): ItemKey = of(type.createItemStack())
 
 		/** Rebuilds a key from [toBytes]. */
 		fun fromBytes(bytes: ByteArray): ItemKey = of(ItemStack.deserializeBytes(bytes))

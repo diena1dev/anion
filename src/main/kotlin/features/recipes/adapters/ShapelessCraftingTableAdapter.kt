@@ -1,7 +1,7 @@
 package dev.diena.anion.features.recipes.adapters
 
 import dev.diena.anion.Anion
-import dev.diena.anion.features.custom.items.AnionItem
+import dev.diena.anion.features.custom.ItemKey
 import dev.diena.anion.features.recipes.AnionRecipe
 import dev.diena.anion.features.recipes.AnionResult
 import org.bukkit.Bukkit
@@ -10,18 +10,18 @@ import org.bukkit.inventory.ShapelessRecipe
 
 /**
  * Adapter for a vanilla shapeless crafting-table recipe. Ingredients are
- * given as a flat list of AnionItems; each entry contributes one
+ * given as a flat list of ItemKeys; each entry contributes one
  * corresponding item to the required grid contents (order-agnostic).
  *
  * The [recipe]'s [AnionRecipe.result] must be [AnionResult.Item].
  *
  * @param recipe       Generic recipe backing this adapter.
- * @param ingredients  Flat list of AnionItems required. Max 9 (vanilla rule).
+ * @param ingredients  Flat list of ItemKeys required. Max 9 (vanilla rule).
  */
 class ShapelessCraftingTableAdapter(
 
 	override val recipe: AnionRecipe,
-	val ingredients: List<AnionItem>,
+	val ingredients: List<ItemKey>,
 
 	) : RecipeAdapter {
 
@@ -36,8 +36,8 @@ class ShapelessCraftingTableAdapter(
 		}
 
 		val bukkitRecipe = ShapelessRecipe(recipe.namespacedKey, result.item.asItemStack(result.quantity))
-		for (item in ingredients) {
-			bukkitRecipe.addIngredient(RecipeChoice.ExactChoice(item.asItemStack()))
+		for (itemKey in ingredients) {
+			bukkitRecipe.addIngredient(RecipeChoice.ExactChoice(itemKey.asItemStack()))
 		}
 
 		Anion.instance.addRecipe(bukkitRecipe)

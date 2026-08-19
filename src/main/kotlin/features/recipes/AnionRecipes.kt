@@ -3,8 +3,8 @@ package dev.diena.anion.features.recipes
 import dev.diena.anion.data.registry.AnionRegistryKey
 import dev.diena.anion.data.registry.registries.AnionRegistries
 import dev.diena.anion.features.custom.blocks.AnionBlocks
+import dev.diena.anion.features.custom.ItemKey
 import dev.diena.anion.features.custom.items.AnionItems
-import dev.diena.anion.features.custom.items.AnionVanillaItem
 import dev.diena.anion.features.recipes.adapters.FurnaceFuelAdapter
 import dev.diena.anion.features.recipes.adapters.FurnaceSmeltAdapter
 import dev.diena.anion.features.recipes.adapters.RecipeAdapter
@@ -41,7 +41,7 @@ import org.bukkit.inventory.ItemType
  *             "III",
  *             "III",
  *         ),
- *         key = mapOf('I' to AnionItems.URANIUM_INGOT),
+ *         key = mapOf('I' to ItemKey.of(AnionItems.URANIUM_INGOT)),
  *     )
  * )
  * ```
@@ -58,7 +58,7 @@ import org.bukkit.inventory.ItemType
  *             processingTicks = 0,
  *             result         = AnionResult.Item(AnionItems.URANIUM_INGOT, quantity = 9),
  *         ),
- *         ingredients = List(9) { AnionItems.RAW_URANIUM_ORE },
+ *         ingredients = List(9) { ItemKey.of(AnionItems.RAW_URANIUM_ORE) },
  *     )
  * )
  * ```
@@ -161,8 +161,8 @@ object AnionRecipes {
 				"S  ",
 			),
 			key = mapOf(
-				'U' to AnionItems.URANIUM_INGOT,
-				'S' to AnionVanillaItem(ItemType.STICK.createItemStack())
+				'U' to ItemKey.of(AnionItems.URANIUM_INGOT),
+				'S' to ItemKey.of(ItemType.STICK)
 			),
 		)
 	)
@@ -181,7 +181,7 @@ object AnionRecipes {
 				"III",
 				"III",
 			),
-			key = mapOf('I' to AnionItems.URANIUM_INGOT),
+			key = mapOf('I' to ItemKey.of(AnionItems.URANIUM_INGOT)),
 		)
 	)
 
@@ -199,7 +199,7 @@ object AnionRecipes {
 				"OOO",
 				"OOO",
 			),
-			key = mapOf('O' to AnionItems.RAW_URANIUM_ORE),
+			key = mapOf('O' to ItemKey.of(AnionItems.RAW_URANIUM_ORE)),
 		)
 	)
 
@@ -212,7 +212,7 @@ object AnionRecipes {
 				processingTicks = 0,
 				result = AnionResult.Item(AnionItems.URANIUM_INGOT, quantity = 9),
 			),
-			ingredients = listOf(AnionItems.URANIUM_BLOCK),
+			ingredients = listOf(ItemKey.of(AnionItems.URANIUM_BLOCK)),
 		)
 	)
 
@@ -225,7 +225,7 @@ object AnionRecipes {
 				processingTicks = 0,
 				result = AnionResult.Item(AnionItems.RAW_URANIUM_ORE, quantity = 9),
 			),
-			ingredients = listOf(AnionItems.URANIUM_ORE_BLOCK),
+			ingredients = listOf(ItemKey.of(AnionItems.URANIUM_ORE_BLOCK)),
 		)
 	)
 

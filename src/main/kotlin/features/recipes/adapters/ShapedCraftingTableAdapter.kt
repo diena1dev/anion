@@ -1,7 +1,7 @@
 package dev.diena.anion.features.recipes.adapters
 
 import dev.diena.anion.Anion
-import dev.diena.anion.features.custom.items.AnionItem
+import dev.diena.anion.features.custom.ItemKey
 import dev.diena.anion.features.recipes.AnionRecipe
 import dev.diena.anion.features.recipes.AnionResult
 import org.bukkit.Bukkit
@@ -20,13 +20,13 @@ import kotlin.collections.iterator
  *
  * @param recipe  Generic recipe backing this adapter.
  * @param shape   Row strings, 1-3 rows of up to 3 chars each (Bukkit rules).
- * @param key     Char -> AnionItem mapping used in [shape]. Whitespace = empty.
+ * @param key     Char -> ItemKey mapping used in [shape]. Whitespace = empty.
  */
 class ShapedCraftingTableAdapter(
 
 	override val recipe: AnionRecipe,
 	val shape: List<String>,
-	val key: Map<Char, AnionItem>,
+	val key: Map<Char, ItemKey>,
 
 ) : RecipeAdapter {
 
@@ -40,8 +40,8 @@ class ShapedCraftingTableAdapter(
 		val bukkitRecipe = ShapedRecipe(recipe.namespacedKey, result.item.asItemStack(result.quantity))
 			.shape(*shape.toTypedArray())
 
-		for ((char, item) in key) {
-			bukkitRecipe.setIngredient(char, RecipeChoice.ExactChoice(item.asItemStack()))
+		for ((char, itemKey) in key) {
+			bukkitRecipe.setIngredient(char, RecipeChoice.ExactChoice(itemKey.asItemStack()))
 		}
 
 		Anion.instance.addRecipe(bukkitRecipe)

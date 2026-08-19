@@ -79,7 +79,7 @@ so it would benefit people to actually switch off machines
 
 so really i would need a generic api with adapters for each context
 boils down to:
-- ingredients (any resource/resources, AnionVanillaItem can be used internally)
+- ingredients (any resource/resources; a plain vanilla item is an `ItemKey`, which is just an amount-1 ItemStack used as an identity)
 - time (in ticks)
 - result (each function takes a different type, so you'd have ItemResult, GasResult, EnergyResult, CompoundResult (builder, can return more than one result with more than one type (used in machines)), FluidResult, etc)
 
