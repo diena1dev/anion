@@ -18,6 +18,7 @@ import net.minecraft.core.Vec3i
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.World
+import org.bukkit.block.Block
 import org.bukkit.block.BlockFace
 import org.bukkit.block.Container
 import org.bukkit.inventory.Inventory
@@ -274,9 +275,12 @@ object AnionTransport {
 	/////////////////
 
 	/**
-	 * One line per fact about the component at [cell] — what it is, which way it points, and where a
-	 * run leaving it actually stops. A pipe's facing is invisible in world, so this is how you tell a
-	 * north-facing pipe from a south-facing one without breaking it.
+	 * What transport sees at [cell]: what it is, what is on each of its six sides and the state of it,
+	 * and where a run leaving it actually stops.
+	 *
+	 * Every side is listed whether or not it is useful, because the failures worth debugging are the
+	 * ones where a side you expected to matter does not — a pipe pointing the wrong way, or a chest
+	 * that has simply filled up.
 	 */
 	fun describe(world: World, cell: Vec3i): List<String> {
 
@@ -284,62 +288,62 @@ object AnionTransport {
 		val block = world.getBlockAt(cell.x, cell.y, cell.z)
 		val ports = portsIn(world)
 
-		val name = block.anionBlock?.namespacedKey?.key ?: block.type.key.key
 		val facing = block.anionFacing
 		val indexed = cell in AnionTransportIndex.cellsIn(world)
 
-		lines += "$cell $name facing=${facing ?: "-"} indexed=$indexed driver=${AnionTransportIndex.isComponent(block)}"
+		lines += "$cell ${nameOf(block)}${facing?.let { " facing=$it" } ?: ""} indexed=$indexed driver=${AnionTransportIndex.isComponent(block)}"
+		ports[cell]?.let { lines += "  this cell is a bus port -> ${it.bufferKey ?: "unbound"}" }
 
-		ports[cell]?.let { lines += "  is a bus port -> ${it.bufferKey ?: "unbound"}" }
+		// every side, so a missing one is visible rather than silently skipped
+		for (side in CARTESIAN_FACES) {
+			lines += "  $side ${describeNeighbour(world, cell + side.vec3i, ports)}"
+		}
 
-		when {
+		for (side in CARTESIAN_FACES) {
 
-			block.type == Material.CRAFTING_TABLE -> {
+			val target = cell + side.vec3i
 
-				val touching = CARTESIAN_FACES.filter { containerAt(world, cell + it.vec3i) != null }
-				lines += "  containers touching: ${touching.joinToString(" ").ifEmpty { "none" }}"
+			// a side worth tracing is one a run could actually leave through
+			val leads = ports[target] != null ||
+				containerAt(world, target) != null ||
+				exitsOf(world, target, side.oppositeFace) != null
 
-				for (direction in CARTESIAN_FACES) {
-					val target = cell + direction.vec3i
-					if (containerAt(world, target) != null) continue
-					if (exitsOf(world, target, direction.oppositeFace) == null && ports[target] == null) continue
+			if (!leads) continue
 
-					lines += "  out $direction:"
-					traceLine(world, target, direction.oppositeFace, ports, lines)
-				}
-
-			}
-
-			block.anionBlock === AnionBlocks.COPPER_CHUTE -> {
-
-				val portFaces = CARTESIAN_FACES.filter { ports[cell + it.vec3i] != null }
-				lines += "  bus ports touching: ${portFaces.joinToString(" ").ifEmpty { "none, so it only carries" }}"
-
-				for (portFace in portFaces) {
-					ports[cell + portFace.vec3i]?.buffer()?.let {
-						lines += "  $portFace buffer ${it.used()}/${it.capacity()}"
-					}
-				}
-
-				for (exit in CARTESIAN_FACES) {
-					if (exit in portFaces) continue
-					if (exitsOf(world, cell + exit.vec3i, exit.oppositeFace) == null && ports[cell + exit.vec3i] == null) continue
-
-					lines += "  out $exit:"
-					traceLine(world, cell + exit.vec3i, exit.oppositeFace, ports, lines)
-				}
-
-			}
-
-			facing != null -> {
-				lines += "  carries from ${facing.oppositeFace} to $facing"
-				lines += "  ahead:"
-				traceLine(world, cell + facing.vec3i, facing.oppositeFace, ports, lines)
-			}
+			lines += "  out $side:"
+			traceLine(world, target, side.oppositeFace, ports, lines)
 
 		}
 
 		return lines
+
+	}
+
+	/** One phrase describing whatever is at [cell] and whether it can take anything. */
+	private fun describeNeighbour(world: World, cell: Vec3i, ports: Map<Vec3i, MachinePort>): String {
+
+		val block = world.getBlockAt(cell.x, cell.y, cell.z)
+		val name = nameOf(block)
+
+		ports[cell]?.let { port ->
+			val buffer = port.buffer()
+				?: return "$name BUS PORT -> ${port.bufferKey ?: "unbound"} (no buffer: machine broken or unbound)"
+
+			return "$name BUS PORT -> ${port.bufferKey} ${buffer.used()}/${buffer.capacity()}"
+		}
+
+		containerAt(world, cell)?.let { container ->
+			val filled = container.contents.count { it != null && !it.type.isAir }
+			val full = container.firstEmpty() == -1
+			return "$name CONTAINER $filled/${container.size} slots${if (full) " [FULL — nothing more fits in an empty slot]" else ""}"
+		}
+
+		val blockFacing = block.anionFacing
+		if (blockFacing != null) return "$name facing=$blockFacing (takes items in through ${blockFacing.oppositeFace})"
+
+		if (block.anionBlock === AnionBlocks.COPPER_PIPE_JUNCTION) return "$name (any side in, any other out)"
+
+		return name
 
 	}
 
@@ -361,15 +365,15 @@ object AnionTransport {
 		repeat(MAX_ROUTE_LENGTH) {
 
 			val block = world.getBlockAt(cell.x, cell.y, cell.z)
-			val name = block.anionBlock?.namespacedKey?.key ?: block.type.key.key
+			val name = nameOf(block)
 
 			ports[cell]?.let {
-				lines += "   $cell bus port -> ${it.bufferKey ?: "unbound"} [END]"
+				lines += "   $cell ${describeNeighbour(world, cell, ports)} [END]"
 				return
 			}
 
 			if (containerAt(world, cell) != null) {
-				lines += "   $cell $name container [END]"
+				lines += "   $cell ${describeNeighbour(world, cell, ports)} [END]"
 				return
 			}
 
@@ -390,6 +394,8 @@ object AnionTransport {
 		lines += "   ... gave up after $MAX_ROUTE_LENGTH"
 
 	}
+
+	private fun nameOf(block: Block): String = block.anionBlock?.namespacedKey?.key ?: block.type.key.key
 
 	/////////////
 	///// LOOKUPS
