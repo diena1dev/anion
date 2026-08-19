@@ -5,6 +5,7 @@ import dev.diena.anion.features.custom.AnionResource
 import net.kyori.adventure.text.Component
 import org.bukkit.Instrument
 import org.bukkit.NamespacedKey
+import org.bukkit.SoundGroup
 import org.bukkit.Note
 import org.bukkit.block.Block
 import org.bukkit.block.BlockState
@@ -23,6 +24,8 @@ open class AnionBlock(
 	val styledDisplayName: Component = Component.text(displayName),
 	override val namespacedKey: NamespacedKey = NamespacedKey(Anion.NAMESPACE, displayName.replace(" ", "_").lowercase()),
 	val drops: ItemStack? = null,
+	/** sound this block places with. null follows the note block it is encoded as. */
+	val soundGroup: SoundGroup? = null,
 
 	private val placeHandler: ((block: Block, player: Player?) -> Unit)? = null,
 	private val breakHandler: ((block: Block, player: Player?) -> Unit)? = null,

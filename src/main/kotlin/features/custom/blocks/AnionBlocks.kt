@@ -10,6 +10,7 @@ import net.kyori.adventure.text.format.TextColor
 import net.kyori.adventure.util.RGBLike
 import org.bukkit.Color
 import org.bukkit.Instrument
+import org.bukkit.block.BlockFace
 
 object AnionBlocks {
 
@@ -116,11 +117,64 @@ object AnionBlocks {
 		)
 	)
 
+	// transport conduits. flow follows the block's facing, so a straight run only takes items in
+	// through its back face — turning a corner is what the junction is for.
+	val COPPER_CONDUIT = registerDirectionalBlock(
+		AnionDirectionalBlock(
+			"Copper Conduit",
+			Instrument.ZOMBIE,
+			mapOf(
+				BlockFace.NORTH to 10,
+				BlockFace.EAST  to 11,
+				BlockFace.SOUTH to 12,
+				BlockFace.WEST  to 13,
+			),
+			styledDisplayName = Component.text("Copper Conduit")
+				.gradient(COPPER_TEXT_START, COPPER_TEXT_END)
+		)
+	)
+
+	val COPPER_CONDUIT_VERTICAL = registerDirectionalBlock(
+		AnionDirectionalBlock(
+			"Copper Conduit Vertical",
+			Instrument.ZOMBIE,
+			mapOf(
+				BlockFace.UP   to 14,
+				BlockFace.DOWN to 15,
+			),
+			styledDisplayName = Component.text("Copper Conduit Vertical")
+				.gradient(COPPER_TEXT_START, COPPER_TEXT_END)
+		)
+	)
+
+	// takes items in on any face and passes them out of every other one
+	val COPPER_CONDUIT_JUNCTION = registerBlock(
+		AnionBlock(
+			"Copper Conduit Junction",
+			Instrument.ZOMBIE,
+			16,
+			styledDisplayName = Component.text("Copper Conduit Junction")
+				.gradient(COPPER_TEXT_START, COPPER_TEXT_END)
+		)
+	)
+
 	fun fromState(instrument: Instrument, note: Int): AnionBlock? = byState[instrument to note]
 
 	private fun registerBlock(block: AnionBlock): AnionBlock {
 		val key = block.instrument to block.note
 		byState[key] = block
+
+		AnionRegistries.BLOCK_REGISTRY.register(
+			AnionRegistryKey(block.namespacedKey.key),
+			block
+		)
+
+		return block
+	}
+
+	/** every facing's note resolves back to the same block, so structure checks ignore rotation */
+	private fun registerDirectionalBlock(block: AnionDirectionalBlock): AnionDirectionalBlock {
+		for (note in block.notesByFacing.values) byState[block.instrument to note] = block
 
 		AnionRegistries.BLOCK_REGISTRY.register(
 			AnionRegistryKey(block.namespacedKey.key),

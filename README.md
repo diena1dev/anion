@@ -63,6 +63,19 @@ Nothing supplies energy yet. Until the energy and transport subsystems land, a m
 
 
 ---
+TRANSPORT
+
+first pass, items only.
+
+flow is the conduit's own facing rather than anything configured. a straight conduit takes items in through its back face and passes them out of its front, so a run is one-way by construction and the network is a directed graph read straight off the world. turning a corner is what the junction is for — it takes items in on any face and passes them out of every other one.
+
+that means there is nothing to configure and nothing to cache, which is also why breaking a conduit needs no invalidation. the cost is that every pass re-walks its routes from scratch; once networks get large that wants a cached graph rebuilt off block events, the same way MachineIndex handles machine cells.
+
+endpoints are machine BUS ports. a port with items pushes into any conduit whose back face touches it, the walk follows facings until it reaches a port that will take the item, and the handoff debits and credits in one step so nothing is dropped when the far end is full. ports are still just accessors — transport never reaches past one into a machine.
+
+blocks: `COPPER_CONDUIT` (four horizontal facings), `COPPER_CONDUIT_VERTICAL` (up/down), `COPPER_CONDUIT_JUNCTION`. a directional block claims one note per facing and every one of them resolves back to the same AnionBlock, so a BlockSet accepting a conduit accepts it in any rotation. the resource pack reuses a single north-facing model and spins it in the blockstate, so a facing costs a note and nothing else.
+
+---
 RECIPE RAMBLING
 
 time to ramble

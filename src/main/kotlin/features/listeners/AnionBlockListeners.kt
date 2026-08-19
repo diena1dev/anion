@@ -6,7 +6,9 @@ import dev.diena.anion.data.registry.AnionRegistryKey
 import dev.diena.anion.data.registry.registries.AnionRegistries
 import dev.diena.anion.extensions.toAnionItem
 import dev.diena.anion.extensions.vec3i
+import dev.diena.anion.features.custom.blocks.AnionBlock
 import dev.diena.anion.features.custom.blocks.AnionBlocks
+import dev.diena.anion.features.custom.blocks.AnionDirectionalBlock
 import dev.diena.anion.features.custom.items.AnionBlockItem
 import dev.diena.anion.features.machine.MachineIndex
 import dev.diena.anion.features.starship.Starship
@@ -21,11 +23,13 @@ import net.minecraft.world.phys.Vec3
 import org.bukkit.GameMode
 import org.bukkit.Material
 import org.bukkit.Note
+import org.bukkit.SoundCategory
 import org.bukkit.block.Block
 import org.bukkit.block.BlockFace
 import org.bukkit.block.data.BlockData
 import org.bukkit.block.data.type.NoteBlock
 import org.bukkit.craftbukkit.entity.CraftPlayer
+import org.bukkit.entity.Player
 import org.bukkit.event.Event
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
@@ -90,7 +94,59 @@ object AnionBlockListeners : Listener {
 					 else Vec3(clicked.x + 0.5, clicked.y + 0.5, clicked.z + 0.5)
 		val hit = BlockHitResult(hitVec, nmsDir, BlockPos(clicked.x, clicked.y, clicked.z), false)
 		val useContext = UseOnContext(nmsPlayer.level(), nmsPlayer, nmsHand, nmsItem, hit)
+
+		// the cell a placement would land in, so we can tell whether one actually happened
+		val target = clicked.getRelative(event.blockFace)
+		val occupiedBefore = anionBlockAt(target)
+
 		nmsItem.useOn(useContext)
+
+		val placed = anionBlockAt(target) ?: return
+		if (occupiedBefore != null) return
+
+		playPlaceSound(target, placed, event.player)
+	}
+
+	/** Plays [anionBlock]'s place sound to [player], who would otherwise not hear it. */
+	// BlockItem.place() plays the sound with the placer excluded, because vanilla expects their client
+	// to have predicted it. this placement is driven server-side, so without this it is silent for the
+	// one person who should definitely hear it.
+	private fun playPlaceSound(block: Block, anionBlock: AnionBlock, player: Player) {
+
+		val group = anionBlock.soundGroup ?: block.blockData.soundGroup
+
+		player.playSound(
+			block.location.toCenterLocation(),
+			group.placeSound,
+			SoundCategory.BLOCKS,
+			group.volume,
+			group.pitch,
+		)
+
+	}
+
+	/** Turns a freshly placed directional block to point wherever the player was aiming. */
+	private fun faceOnPlacement(block: Block, directional: AnionDirectionalBlock, player: Player) {
+
+		val note = directional.noteFor(placementFacing(directional, player)) ?: return
+		val data = noteData(block) ?: return
+
+		data.note = Note(note)
+		block.setBlockData(data, false) // no physics: the note swap is not a world change worth firing on
+
+	}
+
+	private fun placementFacing(directional: AnionDirectionalBlock, player: Player): BlockFace {
+
+		// a block that can point up or down follows the player's pitch; one that cannot follows their heading
+		val looking = if (player.location.pitch <= 0f) BlockFace.UP else BlockFace.DOWN
+		if (looking in directional.facings) return looking
+
+		val heading = player.facing
+		if (heading in directional.facings) return heading
+
+		return directional.defaultFacing
+
 	}
 
 	// helpers endregion
@@ -121,6 +177,9 @@ object AnionBlockListeners : Listener {
 		}
 
 		val anionBlock = anionBlockAt(block) ?: return
+
+		if (anionBlock is AnionDirectionalBlock) faceOnPlacement(block, anionBlock, event.player)
+
 		anionBlock.onPlace(block, event.player)
 	}
 

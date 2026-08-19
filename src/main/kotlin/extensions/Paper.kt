@@ -5,6 +5,9 @@ package dev.diena.anion.extensions
 import dev.diena.anion.data.registry.AnionRegistryKey
 import dev.diena.anion.data.registry.registries.AnionRegistries
 import dev.diena.anion.features.custom.ItemKey
+import dev.diena.anion.features.custom.blocks.AnionBlock
+import dev.diena.anion.features.custom.blocks.AnionBlocks
+import dev.diena.anion.features.custom.blocks.AnionDirectionalBlock
 import dev.diena.anion.features.custom.items.AnionItem
 import io.papermc.paper.datacomponent.DataComponentType
 import io.papermc.paper.datacomponent.DataComponentTypes
@@ -19,9 +22,11 @@ import net.minecraft.core.Vec3i
 import net.minecraft.world.level.block.Rotation
 import net.minecraft.world.phys.Vec3
 import org.bukkit.Location
+import org.bukkit.Material
 import org.bukkit.RegionAccessor
 import org.bukkit.block.Block
 import org.bukkit.block.BlockFace
+import org.bukkit.block.data.type.NoteBlock
 import org.bukkit.entity.Entity
 import org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason
 import org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason.CUSTOM
@@ -340,3 +345,37 @@ fun Inventory.pushItem(key: ItemKey, units: Long): Long {
 	return placed
 
 }
+
+///////////////////
+///// ANION BLOCKS
+///////////////////
+
+/** the six cartesian faces, in the order everything that walks a grid should use */
+val CARTESIAN_FACES = listOf(
+	BlockFace.NORTH,
+	BlockFace.EAST,
+	BlockFace.SOUTH,
+	BlockFace.WEST,
+	BlockFace.UP,
+	BlockFace.DOWN,
+)
+
+inline val BlockFace.vec3i get() = Vec3i(modX, modY, modZ)
+
+/** The registered AnionBlock this world block encodes, or null if it is not one. */
+val Block.anionBlock: AnionBlock?
+	get() {
+		if (type != Material.NOTE_BLOCK) return null
+		val noteBlock = blockData as? NoteBlock ?: return null
+
+		return AnionBlocks.fromState(noteBlock.instrument, noteBlock.note.id.toInt())
+	}
+
+/** Which way this block points, or null when it is not a placed [AnionDirectionalBlock]. */
+val Block.anionFacing: BlockFace?
+	get() {
+		val directional = anionBlock as? AnionDirectionalBlock ?: return null
+		val noteBlock = blockData as? NoteBlock ?: return null
+
+		return directional.facingOf(noteBlock.note.id.toInt())
+	}

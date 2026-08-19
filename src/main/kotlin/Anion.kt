@@ -9,6 +9,7 @@ import dev.diena.anion.features.machine.AnionMachines
 import dev.diena.anion.features.machine.Machine
 import dev.diena.anion.features.machine.MachineIndex
 import dev.diena.anion.features.starship.Starship
+import dev.diena.anion.features.transport.AnionTransport
 import dev.diena.anion.features.recipes.AnionRecipes
 import io.papermc.paper.plugin.bootstrap.BootstrapContext
 import io.papermc.paper.plugin.bootstrap.PluginBootstrap
@@ -75,6 +76,11 @@ class Anion : JavaPlugin() {
 			MachineIndex.drainPending()
 
 			for (machine in Machine.activeMachines.values) machine.runSlowTick()
+		})
+
+		// transport passes. sync: it reads conduit blocks out of the world and writes machine buffers
+		Tasks.scheduleSync(10, 10, Runnable {
+			AnionTransport.tick()
 		})
 
 		// machine saving. off-thread, since RocksDB writes have no business on the main thread

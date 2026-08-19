@@ -3,6 +3,7 @@ package dev.diena.anion.data.datagen.resourcepack
 import com.google.gson.GsonBuilder
 import com.google.gson.JsonObject
 import dev.diena.anion.data.registry.registries.AnionRegistries
+import dev.diena.anion.features.custom.blocks.AnionDirectionalBlock
 import net.minecraft.world.level.block.state.properties.NoteBlockInstrument
 import org.bukkit.craftbukkit.block.data.CraftBlockData
 import java.io.File
@@ -117,19 +118,40 @@ class AnionResourcePackDatagen(private val outputDir: File) {
 		val blockstatesDir = File(packRoot, "assets/minecraft/blockstates")
 		blockstatesDir.mkdirs()
 
-		// (serialized instrument name, note 0-24) model identifier
-		val anionStateModels: Map<Pair<String, Int>, String> = AnionRegistries.BLOCK_REGISTRY.all.values.associate { block ->
+		// (serialized instrument name, note 0-24) -> model identifier, plus the x/y spin to apply.
+		// a directional block claims one note per facing and reuses the single north-facing model,
+		// so a facing costs a note and nothing else — no extra model, no extra texture.
+		val anionStateModels = HashMap<Pair<String, Int>, Pair<String, Pair<Int, Int>>>()
+
+		for (block in AnionRegistries.BLOCK_REGISTRY.all.values) {
+
 			val nmsInstrument = CraftBlockData.toVanilla(block.instrument, NoteBlockInstrument::class.java)
-			(nmsInstrument.serializedName to block.note) to "anion:block/${block.namespacedKey.key}"
+			val model = "anion:block/${block.namespacedKey.key}"
+
+			if (block is AnionDirectionalBlock) {
+				for ((facing, note) in block.notesByFacing) {
+					anionStateModels[nmsInstrument.serializedName to note] = model to block.modelRotation(facing)
+				}
+			} else {
+				anionStateModels[nmsInstrument.serializedName to block.note] = model to (0 to 0)
+			}
+
 		}
 
 		val variants = JsonObject()
 		for (instrument in NoteBlockInstrument.entries) {
 			for (note in 0..24) {
-				val model = anionStateModels[instrument.serializedName to note] ?: "minecraft:block/note_block"
+				val entry = anionStateModels[instrument.serializedName to note]
+				val model = entry?.first ?: "minecraft:block/note_block"
+				val (rotationX, rotationY) = entry?.second ?: (0 to 0)
+
 				for (powered in listOf(false, true)) {
 					val variantKey = "instrument=${instrument.serializedName},note=$note,powered=$powered"
-					variants.add(variantKey, JsonObject().apply { addProperty("model", model) })
+					variants.add(variantKey, JsonObject().apply {
+						addProperty("model", model)
+						if (rotationX != 0) addProperty("x", rotationX)
+						if (rotationY != 0) addProperty("y", rotationY)
+					})
 				}
 			}
 		}
