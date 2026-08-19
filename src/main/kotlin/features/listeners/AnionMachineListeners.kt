@@ -11,7 +11,7 @@ import org.bukkit.event.world.ChunkUnloadEvent
 
 /**
  * Chunk lifecycle for machines, mirroring [AnionStarshipListeners]. A machine lives and dies with the
- * chunk its **core block** sits in, which is the same chunk `MachineSerializer.matchesChunk` keys on.
+ * chunk its **core block** sits in, which is the same chunk the `machine_chunks` index keys on.
  */
 @Register
 object AnionMachineListeners: Listener {

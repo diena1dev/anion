@@ -3,7 +3,9 @@ package dev.diena.anion.features.starship
 import dev.diena.anion.extensions.plus
 import dev.diena.anion.extensions.rotateAround
 import dev.diena.anion.features.machine.Machine
+import dev.diena.anion.features.machine.MachineIndex
 import net.minecraft.core.Vec3i
+import net.minecraft.server.level.ServerLevel
 import net.minecraft.world.level.block.Rotation
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -53,6 +55,9 @@ class StarshipMachines private constructor() {
 		this.machines[machine.uuid] = machine
 		machine.starship = this.starship
 
+		// a carried machine's cells move every tick, so it leaves the world-cell index entirely
+		MachineIndex.unregister(machine)
+
 	}
 
 	/** releases [machine]. if machine in function doesn't exist on the starship, nothing happens. */
@@ -64,6 +69,8 @@ class StarshipMachines private constructor() {
 
 		this.machines.remove(machine.uuid)
 		if (machine.starship === this.starship) machine.starship = null
+
+		if (machine.starship == null) MachineIndex.register(machine) // grounded again, so it goes back in
 
 	}
 
@@ -100,6 +107,25 @@ class StarshipMachines private constructor() {
 		vec: Vec3i
 
 	) : Machine? = this.machines.values.firstOrNull { it.origin == vec }
+
+	/** every carried machine with a structure cell at [vec]. machines may share cells. */
+	// carried machines are absent from MachineIndex, so their cell lookup lives here instead
+	fun machinesHolding(
+
+		vec: Vec3i
+
+	) : List<Machine> = this.machines.values.filter { vec in it.worldCells() }
+
+	/** Moves every carried machine into [newLevel]. Used when the ship crosses worlds. */
+	fun reassignLevel(
+
+		newLevel: ServerLevel
+
+	) {
+
+		for (machine in this.machines.values) machine.reassignLevel(newLevel)
+
+	}
 
 	/////////////////////////
 	///// MOVEMENT OPERATIONS

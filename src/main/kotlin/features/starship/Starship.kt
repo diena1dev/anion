@@ -11,6 +11,7 @@ import dev.diena.anion.extensions.rotationOf
 import dev.diena.anion.extensions.stepsFromTo
 import dev.diena.anion.extensions.toFace
 import dev.diena.anion.extensions.vec3i
+import dev.diena.anion.features.machine.MachineIndex
 import dev.diena.anion.features.starship.simluated.StarshipSimulator
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Vec3i
@@ -252,8 +253,8 @@ class Starship {
 
     }
 
-    // TODO: carried machines need their level reassigned here, not just their origin — relocate() only
-    //       moves them within a level. see StarshipMachines.
+    // TODO: call machines.reassignLevel(newLevel) alongside the block rewrite — relocate() only moves
+    //       carried machines within a level.
     fun changeWorld(
 
         newWorld: World,
@@ -297,9 +298,9 @@ class Starship {
 
         this.blockHashMap.remove(block.vec3i)
 
-        // a machine that just lost its core block has no anchor left to be found by — tear it down.
-        // machines losing a non-core block need no handling here, isIntact() catches those.
-        this.machines.coreAt(block.vec3i)?.disassemble()
+        // a machine that lost a block goes inactive and waits for that exact block to come back. it only
+        // tears itself down once more than half its structure is wrong — see Machine.revalidate().
+        for (machine in this.machines.machinesHolding(block.vec3i)) MachineIndex.markChanged(machine)
 
         // deregister and remove ship if all blocks gone
         if (blockHashMap.isEmpty()) {

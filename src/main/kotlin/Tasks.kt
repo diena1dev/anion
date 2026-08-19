@@ -19,6 +19,15 @@ object Tasks {
         return executor.schedule(block.logExceptions(), 0, TimeUnit.MILLISECONDS)
     }
 
+    /** Repeating task on the main thread. Use for anything that touches the world or the Bukkit API. */
+    fun scheduleSync(
+        delayTicks: Long,
+        periodTicks: Long,
+        block: Runnable
+    ) {
+        Anion.instance.scheduler.runTaskTimer(Anion.plugin, block, delayTicks, periodTicks)
+    }
+
     /** [ScheduledExecutorService.scheduleAtFixedRate] silently and permanently stops future executions
      *  if [block] ever throws — no log, no crash, it just never runs again. wrap so a single bad tick
      *  logs and gets skipped instead of killing the whole periodic task forever. */

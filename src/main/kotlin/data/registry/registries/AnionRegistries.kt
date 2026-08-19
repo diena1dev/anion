@@ -3,6 +3,7 @@ package dev.diena.anion.data.registry.registries
 import dev.diena.anion.data.registry.AnionRegistry
 import dev.diena.anion.data.registry.AnionRegistryKey
 import dev.diena.anion.data.registry.keys.AnionRegistryKeys
+import dev.diena.anion.features.custom.AnionResource
 import dev.diena.anion.features.custom.blocks.AnionBlock
 import dev.diena.anion.features.custom.energies.AnionEnergy
 import dev.diena.anion.features.custom.fluids.AnionFluid
@@ -47,5 +48,12 @@ object AnionRegistries {
         override val registryKey = AnionRegistryKeys.MACHINE_TYPE_REGISTRY
         override val all: MutableMap<AnionRegistryKey, () -> Machine> = mutableMapOf()
     }
+
+    /** Finds a resource by key across every resource registry. Used to rebuild saved machine buffers. */
+    fun resourceOf(key: AnionRegistryKey): AnionResource? =
+        ITEM_REGISTRY.getValue(key)
+            ?: GAS_REGISTRY.getValue(key)
+            ?: FLUID_REGISTRY.getValue(key)
+            ?: ENERGY_REGISTRY.getValue(key)
 
 }

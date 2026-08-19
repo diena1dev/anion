@@ -7,6 +7,7 @@ import dev.diena.anion.features.custom.blocks.AnionBlocks
 import dev.diena.anion.features.custom.items.AnionItems
 import dev.diena.anion.features.machine.AnionMachines
 import dev.diena.anion.features.machine.Machine
+import dev.diena.anion.features.machine.MachineIndex
 import dev.diena.anion.features.starship.Starship
 import dev.diena.anion.features.recipes.AnionRecipes
 import io.papermc.paper.plugin.bootstrap.BootstrapContext
@@ -41,6 +42,7 @@ class Anion : JavaPlugin() {
         plugin = this
 
         AnionDatabase.open(dataFolder)
+        AnionPersistence.rebuildChunkIndices() // no-op unless a pre-index database is being opened
 
         // init our feature classes that call registries
         AnionItems
@@ -62,20 +64,23 @@ class Anion : JavaPlugin() {
             }
         })
 
-        // machine tick updates (every game tick)
-        Tasks.scheduleAsync(0, 50, TimeUnit.MILLISECONDS, Runnable {
+        // machine tick updates (every game tick). sync: tick() reads and writes the world
+        Tasks.scheduleSync(0, 1, Runnable {
             for (machine in Machine.activeMachines.values) machine.runTick()
         })
 
-        // machine slowTick updates (structure check + slowTick, once a second)
+        // machine slowTick updates (once a second). structure re-checks ride the same pass, but only
+        // for machines a block change actually queued
+        Tasks.scheduleSync(20, 20, Runnable {
+            MachineIndex.drainPending()
+
+            for (machine in Machine.activeMachines.values) machine.runSlowTick()
+        })
+
+        // machine saving. off-thread, since RocksDB writes have no business on the main thread
         Tasks.scheduleAsync(1, 1, TimeUnit.SECONDS, Runnable {
             for ((uuid, machine) in Machine.activeMachines) {
-
-                // saving
                 if (machine.dirty) AnionPersistence.saveMachine(uuid, machine)
-
-                machine.runSlowTick()
-
             }
         })
 

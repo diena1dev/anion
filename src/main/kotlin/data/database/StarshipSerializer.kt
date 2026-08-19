@@ -101,21 +101,16 @@ object StarshipSerializer {
         return Starship().load(uuid, world, origin, yaw, blocks)
     }
 
-    /** Peeks at the blob header to check if this starship's origin falls in the given chunk. */
-    fun matchesChunk(bytes: ByteArray, world: ServerLevel, chunkX: Int, chunkZ: Int): Boolean {
+    /** Reads the origin out of a stored blob without deserializing the whole ship. */
+    fun readOrigin(bytes: ByteArray): Vec3i? {
         return try {
             val dis = DataInputStream(ByteArrayInputStream(bytes))
             dis.readShort() // schema version
-            val msb = dis.readLong()
-            val lsb = dis.readLong()
-            val storedWorldUid = UUID(msb, lsb)
-            if (storedWorldUid != world.world.uid) return false
-            val originX = dis.readInt()
-            dis.readInt()   // originY
-            val originZ = dis.readInt()
-            (originX shr 4) == chunkX && (originZ shr 4) == chunkZ
+            dis.readLong()  // world uuid MSB
+            dis.readLong()  // world uuid LSB
+            Vec3i(dis.readInt(), dis.readInt(), dis.readInt())
         } catch (_: Exception) {
-            false
+            null
         }
     }
 }

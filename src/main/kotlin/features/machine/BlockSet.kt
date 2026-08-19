@@ -2,10 +2,67 @@ package dev.diena.anion.features.machine
 
 import dev.diena.anion.extensions.minus
 import dev.diena.anion.features.custom.blocks.AnionBlock
-import dev.diena.anion.features.custom.blocks.AnionBlock.Companion.getBlockState
+import dev.diena.anion.features.custom.blocks.AnionBlocks
 import net.minecraft.core.Vec3i
-import org.bukkit.block.BlockState
+import org.bukkit.Material
+import org.bukkit.Note
 import org.bukkit.block.BlockType
+import org.bukkit.block.data.BlockData
+import org.bukkit.block.data.type.NoteBlock
+
+/**
+ * One acceptable fill for a single [BlockSet] cell. Matches on block identity only — incidental
+ * state (powered, waterlogged, ...) is never compared.
+ */
+sealed interface BlockMatcher {
+
+    /** stable id, stored in a machine's resolved structure and read back on load */
+    val key: String
+
+    fun matches(blockData: BlockData): Boolean
+
+    /** a block that satisfies this matcher. for previews and debug placement, never for comparison. */
+    fun representative(): BlockData
+
+    /** an [AnionBlock], identified by the note block instrument+note pair that encodes it */
+    data class Custom(val block: AnionBlock) : BlockMatcher {
+
+        override val key: String get() = "anion/${block.namespacedKey.key}"
+
+        override fun matches(blockData: BlockData): Boolean {
+
+            val noteBlock = blockData as? NoteBlock ?: return false
+
+            return AnionBlocks.fromState(noteBlock.instrument, noteBlock.note.id.toInt()) === block
+
+        }
+
+        override fun representative(): BlockData {
+
+            val noteBlock = BlockType.NOTE_BLOCK.createBlockData() as NoteBlock
+            noteBlock.instrument = block.instrument
+            noteBlock.note = Note(block.note)
+
+            return noteBlock
+
+        }
+
+    }
+
+    /** a vanilla block, identified by material alone */
+    data class Vanilla(val type: BlockType) : BlockMatcher {
+
+        private val material: Material = type.createBlockData().material
+
+        override val key: String get() = "vanilla/${material.name}"
+
+        override fun matches(blockData: BlockData): Boolean = blockData.material == material
+
+        override fun representative(): BlockData = type.createBlockData()
+
+    }
+
+}
 
 /**
  * Structure of a Machine! Defines the bounds and the origin point of the Machine's structure.
@@ -14,8 +71,8 @@ import org.bukkit.block.BlockType
 open class BlockSet private constructor(
 
     val name: String,
-    /** every acceptable block variant per offset — a cell matches if the world block equals ANY entry */
-    val blockMap: Map<Vec3i, List<BlockState>>,
+    /** every acceptable variant per offset — a cell matches if the world block matches ANY entry */
+    val blockMap: Map<Vec3i, List<BlockMatcher>>,
 
 ) {
 
@@ -33,12 +90,10 @@ open class BlockSet private constructor(
     ) {
 
         // internal values
-        private var blockMap: MutableMap<Vec3i, MutableList<BlockState>> = mutableMapOf()
+        private var blockMap: MutableMap<Vec3i, List<BlockMatcher>> = mutableMapOf()
         // multiple blocks can be assigned to the same char — any of them is accepted at that position
-        private var charCustomRepresentations: MutableMap<Char, MutableList<AnionBlock>> = mutableMapOf()
-        private var charVanillaRepresentations: MutableMap<Char, MutableList<BlockType>> = mutableMapOf()
+        private var charMatchers: MutableMap<Char, MutableList<BlockMatcher>> = mutableMapOf()
         private var coreChar: Char? = null
-        private var coreAnionBlock: AnionBlock? = null
         private var coreOffset: Vec3i? = null
 
         // machine structure definition
@@ -78,10 +133,9 @@ open class BlockSet private constructor(
         fun core(char: Char, block: AnionBlock): Builder {
 
             if (coreChar != null) throw IllegalStateException("duplicate core registration in machine structure")
-            charCustomRepresentations.getOrPut(char) { mutableListOf() }.add(block)
+            charMatchers.getOrPut(char) { mutableListOf() }.add(BlockMatcher.Custom(block))
 
             coreChar = char
-            coreAnionBlock = block
             return this
 
         }
@@ -89,7 +143,7 @@ open class BlockSet private constructor(
         /** Assign AnionBlock. Call multiple times on the same char to accept any of several block variants there. */
         fun assign(char: Char, block: AnionBlock): Builder {
 
-            charCustomRepresentations.getOrPut(char) { mutableListOf() }.add(block)
+            charMatchers.getOrPut(char) { mutableListOf() }.add(BlockMatcher.Custom(block))
             return this
 
         }
@@ -97,7 +151,7 @@ open class BlockSet private constructor(
         /** Assign Vanilla (Bukkit) Block. Call multiple times on the same char to accept any of several block variants there. */
         fun assign(char: Char, block: BlockType): Builder {
 
-            charVanillaRepresentations.getOrPut(char) { mutableListOf() }.add(block)
+            charMatchers.getOrPut(char) { mutableListOf() }.add(BlockMatcher.Vanilla(block))
             return this
 
         }
@@ -116,40 +170,31 @@ open class BlockSet private constructor(
 
             /////////// logic start
 
-            // length (x)
-            for ((localX, wEntry) in shape.iterator().withIndex()) {
+            // rows run along x
+            for ((localX, row) in shape.iterator().withIndex()) {
 
                 // validate that all slices match the same width (array entry string length)
-                if (this.width != 0 && wEntry.length != this.width) throw IllegalStateException("width is not equal across all slices!")
+                if (this.width != 0 && row.length != this.width) throw IllegalStateException("width is not equal across all slices!")
 
-                // width (y)
-                for ((localY, char) in wEntry.toCharArray().iterator().withIndex()) {
+                // characters within a row run along z
+                for ((localZ, char) in row.toCharArray().iterator().withIndex()) {
 
                     if (char == ' ') continue
 
                     // gather every acceptable variant for this char — vanilla and custom can coexist
-                    val variants = mutableListOf<BlockState>()
-
-                    charVanillaRepresentations[char]?.forEach { blockType ->
-                        variants += blockType.createBlockData().createBlockState()
-                    }
-
-                    charCustomRepresentations[char]?.forEach { anionBlock ->
-                        anionBlock.getBlockState()?.let { variants += it }
-                    }
-
-                    if (variants.isEmpty()) throw IllegalStateException("block mapping missing for char '$char'")
+                    val variants = charMatchers[char]
+                        ?: throw IllegalStateException("block mapping missing for char '$char'")
 
                     // record where the core actually sits in the raw grid so build() can
                     // re-center the whole structure around it.
                     if (char == coreChar) {
                         if (hasCoreBlock) throw IllegalStateException("duplicate core block assignment in structure")
                         hasCoreBlock = true
-                        coreOffset = Vec3i(localX, this.height, localY)
+                        coreOffset = Vec3i(localX, this.height, localZ)
                     }
 
                     // now finally assign the blockmap
-                    blockMap[Vec3i(localX, this.height, localY)] = variants
+                    blockMap[Vec3i(localX, this.height, localZ)] = variants.toList()
 
                 }
 

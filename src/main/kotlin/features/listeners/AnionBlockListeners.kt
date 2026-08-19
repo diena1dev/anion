@@ -5,8 +5,12 @@ import dev.astralchroma.processor.annotations.Register
 import dev.diena.anion.data.registry.AnionRegistryKey
 import dev.diena.anion.data.registry.registries.AnionRegistries
 import dev.diena.anion.extensions.toAnionItem
+import dev.diena.anion.extensions.vec3i
 import dev.diena.anion.features.custom.blocks.AnionBlocks
 import dev.diena.anion.features.custom.items.AnionBlockItem
+import dev.diena.anion.features.machine.MachineIndex
+import dev.diena.anion.features.starship.Starship
+import org.bukkit.craftbukkit.CraftWorld
 import io.papermc.paper.event.player.PlayerPickBlockEvent
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Direction
@@ -51,6 +55,19 @@ object AnionBlockListeners : Listener {
         if (block.type != Material.NOTE_BLOCK) null
         else noteData(block)?.let { AnionBlocks.fromState(it.instrument, it.note.id.toInt()) }
 
+    /** queues any machine holding this cell for a structure re-check. vanilla blocks count — machines use them too. */
+    // block events fire while the block is still in the world, so this only queues. the drain on the
+    // next slow tick is what actually reads the world back.
+    private fun markMachineCell(block: Block) {
+        val level = (block.world as CraftWorld).handle
+        val vec = block.vec3i
+
+        MachineIndex.markChanged(level, vec)
+
+        // carried machines are not in the cell index — their ship holds the lookup instead
+        Starship.starshipAt(level, vec)?.machines?.machinesHolding(vec)?.forEach { MachineIndex.markChanged(it) }
+    }
+
     private fun simulateItemUse(event: PlayerInteractEvent) {
         val hand = event.hand ?: return
         val nmsHand = if (hand == EquipmentSlot.HAND) InteractionHand.MAIN_HAND else InteractionHand.OFF_HAND
@@ -84,6 +101,8 @@ object AnionBlockListeners : Listener {
     fun onBlockPlace(event: BlockPlaceEvent) {
         val block = event.blockPlaced
 
+        markMachineCell(block) // a replaced cell can repair a broken machine
+
         if (block.type == Material.NOTE_BLOCK) {
             val data = noteData(block) ?: return
             val isAnionBlockItem = event.itemInHand.toAnionItem() is AnionBlockItem
@@ -107,6 +126,8 @@ object AnionBlockListeners : Listener {
 
     @EventHandler
     fun onBlockBreak(event: BlockBreakEvent) {
+        markMachineCell(event.block)
+
         val anionBlock = anionBlockAt(event.block) ?: return
         event.isDropItems = false
         if (event.player.gameMode == GameMode.CREATIVE) return
@@ -303,6 +324,8 @@ object AnionBlockListeners : Listener {
 
         while (iter.hasNext()) {
             val block = iter.next()
+            markMachineCell(block)
+
             val anionBlock = anionBlockAt(block) ?: continue
 
             val item = anionBlock.drops ?: AnionRegistries.ITEM_REGISTRY.getValue(AnionRegistryKey(anionBlock.namespacedKey.key))?.asItemStack()

@@ -13,9 +13,18 @@ main
 |   |   |- fluids
 |   |   |- gasses
 |   |   \- items
-|   \- listeners
-|   \- machine
+|   |- listeners
+|   |- machine
+|   |   |- component            (MachineBuffer, MachinePort)
+|   |   |- examples             (BlinkerMachine)
+|   |   \- machine_types        (PortedMachine, PortedTankMachine)
+|   |       \- basic_test_machine
+|   |- recipes
+|   |   \- adapters             (crafting, furnace, machine)
+|   \- starship
+|       \- simluated
 \- data
+    |- database                 (RocksDB, serializers, migrators)
     |- datagen
     |   \- resourcepack
     \- registry
@@ -47,6 +56,10 @@ POWER
 - machines should take a fixed amount of power from a source, like a circuit. if a power line is starved of voltage, the machine stalls.
 - stalling can slow down or completely halt a machine, depending on the configuration.
 - BUT THE BASIC GIST IS THAT A MACHINE TAKES A FIXED AMOUNT OF POWER, AND IF THE LINE DOES NOT HAVE ENOUGH OF ENERGY AVAILANLE IT WILL STALL. LINES MUST HAVE A CONSTANT SUPPLY OF THIS POWER!
+
+-# Slow vs halt falls out of the recipe math rather than being a separate config flag. `MachineRecipeAdapter` finds the bottleneck ratio across every ingredient: a partially starved line drops that ratio and the machine runs slower, an ingredient at literally zero makes the ratio zero and the machine stops dead that tick. Draw and progress are the same operation — the adapter debits the buffer and credits progress with whatever the buffer actually gave up, so the two can never drift apart.
+Idle power draw is just a recipe with no item result, per the "if another subsystem already does this, use it" rule.
+Nothing supplies energy yet. Until the energy and transport subsystems land, a machine should hand the adapter a supply function that reports unlimited AnionEnergy — TODO in MachineRecipeAdapter.
 
 
 ---
@@ -122,6 +135,9 @@ BlockSet [Class]
 
 BlockSet ia an (objectively) more ergonomic solution to handle the Machine structure check issues. BlockSet also ensures simplicity, because it simply checks if all configured blocks are present in the structure. It does not *care* about ports, or displays, or any other Machine-specific component.
 
+-# Cells are matched by block *identity*, not blockstate.
+A BlockSet cell holds a list of BlockMatchers rather than a list of BlockStates. An AnionBlock matcher compares the note block's instrument+note pair; a vanilla matcher compares material only. Incidental state (`powered`, `waterlogged`, ...) is never compared, so a redstone signal or a bucket of water can't break a machine apart.
+
 -# To provide more context on how StructureSet functions:
 StructureSet consists of `slices()`  of assignments of character mappings. For a publicly available example, take a look at Bukkit's ShapedRecipe class, specifically how it uses a builder to construct a recipe, then uses checks in the recipe "shape" iterator to ensure the recipe is valid before registering it.
 Outside of the `slice()` function, the class contains:
@@ -131,3 +147,103 @@ Outside of the `slice()` function, the class contains:
 Past the given schema, this is all that BlockSet should contain, as it's only meant to be a convenient and ergonomic way of checking structures.
 
 *The last design hurdle for Machine structure sets is a fast iterator to match the surrounding blocks in every rotation and offset for a given structure to it's registered counterparts*
+
+-# Solved: `Machine.candidatesAt(level, clickedPosition)`.
+The clicked block is the anchor, not the core, so a player can wrench any face of the thing they built. For each registered type it first filters the BlockSet down to the cells the clicked block could possibly be filling (pure in-memory, rotation independent), then for each rotation × candidate cell derives the implied origin and rejects it on a single world read of the core cell before ever attempting a full structure resolve. Rotationally symmetric structures matching at the same origin under several rotations collapse to one candidate. Anything already assembled at that origin is skipped so re-wrenching can't duplicate a machine.
+Ambiguity is a hard error, not a coin flip: if two distinct structures both fully match, nothing assembles and the player is told to break one apart.
+
+---
+
+MACHINES PT.2
+
+Machine Inventories/Buffers
+
+Machines will have a set of buffers that can be added to a map of buffers, present in the (implemented) abstract Machine class.
+These buffers are keyed with strings, and automatically bind to ports placed in the "casing" blocks on the Machine.
+(A NamespacedKey is just a wrapper around a string, so "string key" and "NamespacedKey" mean the same thing here — buffers use plain strings, resources use NamespacedKeys because they're registry entries.)
+Buffers are given a ResourceType when assigned in the Machine definition, but can take any Resource within the assigned ResourceType, given that it is one at a time.
+On the off-chance that there are two buffers of the same resource type (e.g. two item inputs for a steel mill that operates without gas), the player will be able to cycle the buffer that the given port assigns to.
+Buffers will have two caps for item transfer- a softCap and a hardCap. softCap is the capacity that is given to each added port on the machine (e.g. 20Ep/Port), while hardCap is the limit for all additive ports (preventing someone from making a powerbank completely out of energy ports to instantly discharge it, for example.).
+
+Buffers, like every other Anion component, need to have a generic class that specific implementations can extend. As an example, most Machine buffers are just a simple key that exists purely in data- but some machines may contain vanilla inventories (of any shape) that must be treated as Buffers by the Machine as well! Entity buffers (reliance on an entity to be present to deposit or extract from), Vanilla Inventory buffers are two specific implementations that would benefit from a generic class that they can extend.
+
+Machine Ports/IO
+
+Machines in Anion will be fairly unique in their handling of dynamic Port assignments.
+As mentioned under the Structure Checks section, BlockSets can contain multiple potential assignments for the same character.
+The primary purpose of that specification is to allow for the dynamic assignment of Ports at Machine assembly time.
+
+-# Ports are frozen at assembly.
+Assembly records which variant actually filled every cell (`Machine.resolvedStructure`) and that map is what every later structure check compares against — not the original list of acceptable variants. So swapping a casing block for a bus block on a running machine *breaks* the machine instead of silently gaining it a port; the player has to re-wrench. That frozen map is also what port discovery filters over, so ports never need a second pass over the world, and it's serialized, so a machine comes back off disk with exactly the port layout it was built with.
+Structure cells may be shared between overlapping machines. Port cells may not — assembly refuses if a port cell already belongs to another machine.
+As seen in the Machine Inventories/Buffers section, ports have softCaps and hardCaps. Those caps come into play here,  because players can place as many ports as they would like in Machine BlockSet slices that allow it.
+
+The purposes of Ports is as follows:
+linking to a Machine Buffer, linking to internal systems (Machine Database/Logic Integration), or providing a status readout (for Machine Display blocks- status readouts are text displays shrunk down to fit onto a singe block).
+Ports will take no part in any future Transport System movement loop, as they only exist to provide access to internal Buffers and Machine readouts.
+Transport Systems will have their own adapter blocks that attach on the outside of MachinePorts, but that's for another section.
+
+Machine Processing
+
+Anion will accomplish Machine processing/results through it's relatively robust recipe backend.
+Machines, when idle, will consume a fixed amount of power via a recipe- giving players a reason to make logic-based switches and machine power breakers. (This is assuming that the Machine has a power requirement! Some machines do nothing when idle, like Steam Turbines!)
+Simply put: Machines will be able to simultaneously execute multiple recipes at once from the stored Resources in Machine Buffers.
+diena1 — 7/24/26, 2:24 PM
+Machine Class Layout
+
+Machine is an abstract class that more targeted implementations will extend. For example, in Minecraft, the Bucket item has several inheritors, like the BucketEntityContainerItem (going off of memory). So, in Anion, Machine can extend off into SimpleMachine (static structure with port substitutes), TankMachine (custom floodfill logic for tanks, this class gets extended into GasTankMachine or FluidTankMachine), or ComplexMachine (either hybrid detection or really complex tick loops would use this)
+
+-# As built, those are `PortedMachine` (static BlockSet, ports resolved off the frozen structure) and `PortedTankMachine` (no BlockSet, owns its own flood fill — still TODO). ComplexMachine hasn't been needed yet; a machine with a weird tick loop just extends Machine directly.
+
+we need:
+
+detection
+a way to make sure the machine is intact
+a way to check the structure (if it tiles, for example, we need to easily check the tiling slices) (WE HAVE THAT! BlockSet is a structure checker and supports alternate subtitutes/multi-defintions for one char)
+a way to floodfill the structure if it's a procedural multiblock (like a tank) (delegate structure checks and machine state to individual machines? no, better to have something extend Machine and add that logic)
+
+-# The intact check ended up split in two, because one of them runs constantly and the other allocates:
+- `isIntact(): Boolean` — fail fast, allocation free. This is what gates the tick loop.
+- `structureResult(): StructureResult` — also reports which cells are wrong. Drives tank draining and break particles through the `onStructureChanged(result)` hook.
+
+Structure is NOT re-checked on a timer. `MachineIndex` maps world cell -> machines occupying it, block break/place/explode events queue only the machines that actually own the changed cell, and the queue is drained once a second. Checking every machine's every block every slowTick doesn't survive contact with a few hundred machines.
+A broken machine stays assembled and goes inactive; it starts working again the moment the exact block it was assembled with is put back. Nothing regenerates itself. Past 50% of cells mismatched it gives up and disassembles — buffers spill (items drop, everything else voids) and the save is deleted.
+Carried machines are deliberately absent from MachineIndex: their cells move every tick, and the carrier already revalidates them once a move settles.
+
+storage/buffers
+generic class that can be extended by different buffer interfaces, provides basic get/set methods
+implementations of the class (ChestBufferBridge, FurnaceBufferBridge, MachineBuffer) implement the get/set methods and provide information on what they can store
+storage/buffers' storage layout is still TBD (namespaced key serialization for AnionResources? AnionItem has a vanilla item wrapper, so that could work? or providing a direct translation layer in the get function could work too)
+side note, the vanilla buffers would be used for certain machines, like a StorageAccessorTerminalMachine for a ItemSiloMachine (names not final)
+
+runtime
+machine tick loop
+passive ticking recipe- can be put in the slowTick runtime or primary tick runtime, TBD
+tick loop will handle scanning buffers
+tick loop will not care about I/O for machine ports because ports are literally just an accessor to the internal buffer- transfer rules will be handled by the transport subsystem
+
+data transmittance
+~~a way to assign channels to variables in the machine (give a variable an ID, like a dataMap(namespacedKey to DataChannel), then DataChannel can have different possible modes, like storing a number, a binary toggle, a string map (inventories), etc etc)~~
+~~a way to interact with those (get/set methods in DataChannel or generic in Machine, TBD)~~
+data transmittance will not care about linked machines, it is, just like ports, an interface
+the mainframe multiblock will handle every single intermediary connection between machines
+
+-# Scrapped the channel map. A machine doesn't hang a map of named channels off itself and let things read them — it *emits a signed signal down a line*, and whatever picks that signal up decides what to do with it. A mainframe grabs the signal and reroutes it based on the config stored for that signature. Same reasoning as ports: the machine exposes, it does not route.
+Not implemented yet, so the Machine layout below has no data field at all.
+```
+Machine
+|- displayName: String
+|- blockSet: BlockSet?      // null for machines that own their own isIntact()
+|- namespacedKey: NamespacedKey = adaptedFromDisplayNameVariable
+|- resolvedStructure: Map<Vec3i, BlockMatcher>  // frozen at assembly, serialized
+|- buffers: Map<String, MachineBuffer>
+| [FUNCTIONS]
+|- tick()
+|- slowTick()
+|- isIntact(): Boolean                  // fail fast, gates the tick loop
+|- structureResult(): StructureResult   // intact + which cells are broken
+|- onStructureChanged(result)           // drain, particles, whatever the machine wants
+```
+
+--- 
+

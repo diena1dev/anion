@@ -13,7 +13,7 @@ import java.nio.ByteBuffer
 
 const val DB_VERSION: Short         = 1
 const val STARSHIPS_VERSION: Short  = 1
-const val MACHINES_VERSION: Short   = 1
+const val MACHINES_VERSION: Short   = 2
 const val PLAYERS_VERSION: Short    = 1
 const val NATIONS_VERSION: Short    = 1
 
@@ -31,13 +31,19 @@ object AnionDatabase {
 		"machines".toByteArray(),
 		"players".toByteArray(),
 		"nations".toByteArray(),
+		// chunk -> instance indices. keys are world+chunk+uuid, values empty: a chunk load prefix-seeks
+		// these instead of scanning every stored starship and machine.
+		"starship_chunks".toByteArray(),
+		"machine_chunks".toByteArray(),
 	)
 
-	private const val IDX_METADATA  = 1
-	private const val IDX_STARSHIPS = 2
-	private const val IDX_MACHINES  = 3
-	private const val IDX_PLAYERS   = 4
-	private const val IDX_NATIONS   = 5
+	private const val IDX_METADATA        = 1
+	private const val IDX_STARSHIPS       = 2
+	private const val IDX_MACHINES        = 3
+	private const val IDX_PLAYERS         = 4
+	private const val IDX_NATIONS         = 5
+	private const val IDX_STARSHIP_CHUNKS = 6
+	private const val IDX_MACHINE_CHUNKS  = 7
 
 	val metadata:  ColumnFamilyHandle get() = handles[IDX_METADATA]
 	val starships: ColumnFamilyHandle get() = handles[IDX_STARSHIPS]
@@ -45,6 +51,9 @@ object AnionDatabase {
 
 	val players:   ColumnFamilyHandle get() = handles[IDX_PLAYERS]
 	val nations:   ColumnFamilyHandle get() = handles[IDX_NATIONS]
+
+	val starshipChunks: ColumnFamilyHandle get() = handles[IDX_STARSHIP_CHUNKS]
+	val machineChunks:  ColumnFamilyHandle get() = handles[IDX_MACHINE_CHUNKS]
 
 	fun open(dataFolder: File) {
 		RocksDB.loadLibrary()

@@ -7,6 +7,10 @@ import org.bukkit.NamespacedKey
 /**
  * Adapter that drives an [AnionRecipe] as a per-tick machine operation.
  *
+ * TODO: energy ingredients have nothing to draw from until the energy and transport subsystems land.
+ *       until then a machine should hand this adapter a [supply] that reports an unlimited amount for
+ *       AnionEnergy and a [draw] that always grants it, so recipes run at full rate for free.
+ *
  * @param recipe  The generic recipe backing this machine operation.
  */
 class MachineRecipeAdapter(
@@ -36,13 +40,19 @@ class MachineRecipeAdapter(
 	/**
 	 * Advance the recipe by one tick.
 	 *
-	 * @param available  Map of resource.namespacedKey -> units currently
-	 *                   available from the machine's buffers this tick.
-	 * @return           [TickResult] describing what was consumed, the
-	 *                   fractional progress gained, and whether the run
-	 *                   completed on this tick.
+	 * @param supply  How many units of a resource the machine's buffers can offer this tick.
+	 * @param draw    Removes up to the requested units from the machine's buffers and returns how many
+	 *                were actually taken. Progress follows this number, never the requested one, so a
+	 *                buffer that comes up short can never advance the recipe further than it paid for.
+	 * @return        [TickResult] describing what was consumed, the fractional progress gained, and
+	 *                whether the run completed on this tick.
 	 */
-	fun tick(available: Map<NamespacedKey, Long>): TickResult {
+	fun tick(
+
+		supply: (NamespacedKey) -> Long,
+		draw: (NamespacedKey, Long) -> Long,
+
+	): TickResult {
 
 		if (isComplete()) {
 
@@ -50,35 +60,37 @@ class MachineRecipeAdapter(
 
 		}
 
-		if (opsCompleted == 0.0) recipe.onStart()
-
 		// determine per-ingredient throughput ratio for this tick (bounded to demand)
 		var minRatio = 1.0
-		val demands = recipe.ingredients.map { ing ->
+		for (ingredient in recipe.ingredients) {
 
-			val demand = ing.tickDemand()
-			if (demand <= 0L) return@map Triple(ing, 0L, 1.0)
+			val demand = ingredient.tickDemand()
+			if (demand <= 0L) continue
 
-			val supply = available[ing.resource.namespacedKey] ?: 0L
-			val actual = minOf(supply, demand)
-			val ratio = actual.toDouble() / demand.toDouble()
+			val available = minOf(supply(ingredient.resource.namespacedKey), demand)
+			val ratio = available.toDouble() / demand.toDouble()
 			if (ratio < minRatio) minRatio = ratio
 
-			Triple(ing, actual, ratio)
-
 		}
+
+		// a starved line slows the machine down, an empty one stops it dead
+		if (minRatio <= 0.0) return TickResult(consumed = emptyMap(), progressGained = 0.0, completed = false)
+
+		if (opsCompleted == 0.0) recipe.onStart()
 
 		// consume each ingredient in proportion to the bottleneck ratio so
 		// no input is over-drawn relative to the achieved progress
 		val consumed = mutableMapOf<NamespacedKey, Long>()
-		for ((ing, _, _) in demands) {
+		for (ingredient in recipe.ingredients) {
 
-			val demand = ing.tickDemand()
+			val demand = ingredient.tickDemand()
 			if (demand <= 0L) continue
 
-			val toDraw = (demand.toDouble() * minRatio).toLong().coerceAtLeast(0L)
-			val actuallyDrawn = ing.feed(toDraw)
-			if (actuallyDrawn > 0L) consumed[ing.resource.namespacedKey] = actuallyDrawn
+			val wanted = (demand.toDouble() * minRatio).toLong().coerceAtLeast(0L)
+			val drawn = draw(ingredient.resource.namespacedKey, wanted)
+
+			ingredient.feed(drawn) // debit first, then credit progress — the two can never drift apart
+			if (drawn > 0L) consumed[ingredient.resource.namespacedKey] = drawn
 
 		}
 

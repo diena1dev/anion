@@ -102,9 +102,12 @@ import org.bukkit.inventory.ItemType
  * ```
  *
  * 5) MACHINE RECIPE (generic, multi-resource, starve-tolerant)
- *    Machines pull recipes from the registry and call adapter.tick(...) with
- *    whatever their buffers can supply this tick. Progress is proportional to
- *    the most-starved input.
+ *    Machines pull recipes from the registry and hand adapter.tick(...) two
+ *    functions: one that reports what a buffer can offer, one that actually
+ *    takes it. Progress is proportional to the most-starved input, and an
+ *    input at zero halts the machine outright.
+ *    The adapter debits through `draw` and credits progress with whatever came
+ *    back, so buffer contents and recipe progress cannot drift apart.
  *
  * ```kt
  * val STEEL_INGOT = registerRecipe(
@@ -130,11 +133,10 @@ import org.bukkit.inventory.ItemType
  * )
  *
  * // Per-tick call from the owning machine's tick loop:
- * val supply = mapOf(
- *     AnionResource.Gas(AnionGasses.OXYGEN).id     to oxygenBuffer.take(18L),
- *     AnionResource.Item(AnionItems.IRON_INGOT).id to ironBuffer.take(5L),
+ * val tick = STEEL_INGOT.tick(
+ *     supply = { resourceKey -> buffers.forResource(resourceKey)?.amount ?: 0L },
+ *     draw   = { resourceKey, units -> buffers.forResource(resourceKey)?.extract(units) ?: 0L },
  * )
- * val tick = STEEL_INGOT.tick(supply)
  * if (tick.completed) machine.output(STEEL_INGOT.recipe.result)
  * ```
  *

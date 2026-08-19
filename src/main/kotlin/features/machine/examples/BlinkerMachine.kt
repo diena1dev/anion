@@ -56,8 +56,6 @@ class BlinkerMachine : Machine("Blinker", BLINKER_MACHINE) {
         lampData = lightableData
 
         this.setBlockAt(lampOffset, lampData)
-
-        this.markDirty()
     }
 
 }

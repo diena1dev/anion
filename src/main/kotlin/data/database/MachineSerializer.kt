@@ -15,11 +15,14 @@ import java.util.UUID
 import java.util.logging.Level
 
 /**
- * Machines are stored per-instance in their own column family, keyed by machine uuid, and are loaded
- * by the chunk their core block sits in — exactly how [StarshipSerializer] handles ships.
+ * Machines are stored per-instance in their own column family, keyed by machine uuid, and are found
+ * by chunk through the `machine_chunks` index — exactly how [StarshipSerializer] handles ships.
  *
- * Carrier ships are deliberately *not* stored: which ship owns a machine is fully derivable from the
- * ship's blockHashMap, so it is re-established on load by whichever of the two comes up second.
+ * The world is not stored: a machine is only ever loaded through that index, whose key already carries
+ * the world uuid, so the caller always knows which world it is restoring into.
+ *
+ * Carrier ships are deliberately not stored either — which ship owns a machine is fully derivable from
+ * the ship's blockHashMap, so it is re-established on load by whichever of the two comes up second.
  */
 object MachineSerializer {
 
@@ -28,10 +31,6 @@ object MachineSerializer {
         val dos = DataOutputStream(baos)
 
         dos.writeShort(MACHINES_VERSION.toInt())
-
-        val worldUid = machine.level.world.uid
-        dos.writeLong(worldUid.mostSignificantBits)
-        dos.writeLong(worldUid.leastSignificantBits)
 
         dos.writeInt(machine.origin.x)
         dos.writeInt(machine.origin.y)
@@ -43,7 +42,7 @@ object MachineSerializer {
         dos.writeUTF(machine.namespacedKey.key)
 
         val tag = CompoundTag()
-        machine.saveTo(tag) // base components (buffers) + the type's own saveState()
+        machine.saveTo(tag) // frozen structure + buffer contents + the type's own saveState()
 
         val tagBaos = ByteArrayOutputStream()
         NbtIo.write(tag, DataOutputStream(tagBaos))
@@ -63,9 +62,6 @@ object MachineSerializer {
         check(schemaVersion == MACHINES_VERSION) {
             "unsupported machine schema v$schemaVersion (code at v$MACHINES_VERSION)"
         }
-
-        dis.readLong() // world uuid MSB
-        dis.readLong() // world uuid LSB
 
         val originX = dis.readInt()
         val originY = dis.readInt()
@@ -91,21 +87,14 @@ object MachineSerializer {
         return factory().load(uuid, world, origin, rotation, tag)
     }
 
-    /** Peeks at the blob header to check if this machine's core falls in the given chunk. */
-    fun matchesChunk(bytes: ByteArray, world: ServerLevel, chunkX: Int, chunkZ: Int): Boolean {
+    /** Reads the core block position out of a stored blob without deserializing the machine. */
+    fun readOrigin(bytes: ByteArray): Vec3i? {
         return try {
             val dis = DataInputStream(ByteArrayInputStream(bytes))
             dis.readShort() // schema version
-            val msb = dis.readLong()
-            val lsb = dis.readLong()
-            val storedWorldUid = UUID(msb, lsb)
-            if (storedWorldUid != world.world.uid) return false
-            val originX = dis.readInt()
-            dis.readInt()   // originY
-            val originZ = dis.readInt()
-            (originX shr 4) == chunkX && (originZ shr 4) == chunkZ
+            Vec3i(dis.readInt(), dis.readInt(), dis.readInt())
         } catch (_: Exception) {
-            false
+            null
         }
     }
 }

@@ -1,44 +1,22 @@
 package dev.diena.anion.features.machine.machine_types
 
-import dev.diena.anion.features.machine.Machine
+import dev.diena.anion.features.machine.StructureResult
 
-class PortedTankMachine(
+/**
+ * A tank: a procedural multiblock with no fixed [dev.diena.anion.features.machine.BlockSet], so it
+ * owns its own structure check via a flood fill over its walls.
+ */
+abstract class PortedTankMachine(
 
 	displayName: String
 
-) : Machine(displayName, null) {
+) : PortedMachine(displayName, null) {
 
-	// TODO: buffers and ports
-	lateinit var buffer: Any
-	lateinit var ports: Set<Any>
+	// TODO: flood-fill the wall shell from the origin, resolve the enclosed volume, and cache it as
+	//       resolvedStructure so ports and revalidation work the same way they do for a BlockSet machine.
+	override fun isIntact(): Boolean = false
 
-	/** used like the init {} block of a class, assign lateinit vars here */
-	override fun onAssemble() {
-
-		TODO("Not yet implemented")
-
-		super.onAssemble()
-
-	}
-
-	override fun isIntact(): Boolean {
-
-		TODO("Not yet implemented: flood-fill structure checks.")
-
-		return super.isIntact()
-
-	}
-
-	override fun tick() {
-
-		TODO("Not yet implemented")
-
-	}
-
-	override fun slowTick() {
-
-		TODO("Not yet implemented")
-
-	}
+	// TODO: report every broken wall cell so onStructureChanged() can drain the tank through them.
+	override fun structureResult(): StructureResult = StructureResult(false, emptySet())
 
 }
