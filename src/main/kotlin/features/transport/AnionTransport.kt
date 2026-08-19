@@ -12,6 +12,7 @@ import dev.diena.anion.extensions.vec3i
 import dev.diena.anion.features.custom.ItemKey
 import dev.diena.anion.features.custom.blocks.AnionBlocks
 import dev.diena.anion.features.machine.Machine
+import dev.diena.anion.features.machine.component.MachineBuffer
 import dev.diena.anion.features.machine.component.MachinePort
 import dev.diena.anion.features.machine.machine_types.PortedMachine
 import net.minecraft.core.Vec3i
@@ -54,10 +55,38 @@ object AnionTransport {
 	private const val THROUGHPUT = 64L
 
 	/** somewhere a run can put items down */
-	private fun interface Sink {
+	private class Sink(
+
+		/** the machine buffer behind this, or null for a vanilla container */
+		val buffer: MachineBuffer?,
+		private val accept: (key: ItemKey, units: Long) -> Long,
+
+	) {
 
 		/** puts up to [units] of [key] in, and returns how many landed */
-		fun push(key: ItemKey, units: Long): Long
+		fun push(key: ItemKey, units: Long): Long = accept(key, units)
+
+	}
+
+	/**
+	 * What each machine buffer has left to move this pass.
+	 *
+	 * Without this every driver got its own THROUGHPUT, so seven crafting tables feeding one machine
+	 * simply moved seven times as much. Ports are supposed to raise throughput, but the ceiling has to
+	 * come from the buffer being fed rather than from how many things happen to be pushing at it.
+	 */
+	private class Budget {
+
+		private val remaining = HashMap<MachineBuffer, Long>()
+
+		fun left(buffer: MachineBuffer?): Long =
+			if (buffer == null) Long.MAX_VALUE // a vanilla container is limited by its own slots
+			else remaining.getOrPut(buffer) { buffer.transferLimit() }
+
+		fun spend(buffer: MachineBuffer?, units: Long) {
+			if (buffer == null || units <= 0L) return
+			remaining[buffer] = (left(buffer) - units).coerceAtLeast(0L)
+		}
 
 	}
 
@@ -70,6 +99,7 @@ object AnionTransport {
 			if (components.isEmpty()) continue
 
 			val ports = portsIn(world)
+			val budget = Budget()
 
 			for (cell in components.toList()) {
 
@@ -83,8 +113,8 @@ object AnionTransport {
 
 				// pipes and the junction only carry, so there is nothing to drive for them
 				when {
-					block.type == Material.CRAFTING_TABLE -> driveTable(world, cell, ports)
-					block.anionBlock === AnionBlocks.COPPER_CHUTE -> driveChute(world, cell, ports)
+					block.type == Material.CRAFTING_TABLE -> driveTable(world, cell, ports, budget)
+					block.anionBlock === AnionBlocks.COPPER_CHUTE -> driveChute(world, cell, ports, budget)
 				}
 
 			}
@@ -100,7 +130,7 @@ object AnionTransport {
 	/** Exports the buffer of any bus port touching the chute at [cell] out of any of its other sides. */
 	// a chute has no front. the name suggests one, but making it directional only ever created a way to
 	// build it backwards, so it takes the port on whichever side has one and pushes out of the rest.
-	private fun driveChute(world: World, cell: Vec3i, ports: Map<Vec3i, MachinePort>) {
+	private fun driveChute(world: World, cell: Vec3i, ports: Map<Vec3i, MachinePort>, budget: Budget) {
 
 		for (portFace in CARTESIAN_FACES) {
 
@@ -124,11 +154,19 @@ object AnionTransport {
 					val sink = findSink(world, cell + exit.vec3i, exit.oppositeFace, key, ports, blocked, HashSet(), 0)
 						?: continue
 
-					val taken = buffer.extract(key, THROUGHPUT)
+					// both ends of the move are rationed, so neither a busy source nor a popular
+					// destination can be worked harder than its own ports allow
+					val allowance = minOf(THROUGHPUT, budget.left(buffer), budget.left(sink.buffer))
+					if (allowance <= 0L) break
+
+					val taken = buffer.extract(key, allowance)
 					if (taken <= 0L) continue
 
 					val accepted = sink.push(key, taken)
 					if (accepted < taken) buffer.insert(key, taken - accepted) // never drop what did not fit
+
+					budget.spend(buffer, accepted)
+					budget.spend(sink.buffer, accepted)
 
 					break
 
@@ -141,7 +179,7 @@ object AnionTransport {
 	}
 
 	/** Imports from any vanilla container touching the crafting table at [cell]. */
-	private fun driveTable(world: World, cell: Vec3i, ports: Map<Vec3i, MachinePort>) {
+	private fun driveTable(world: World, cell: Vec3i, ports: Map<Vec3i, MachinePort>, budget: Budget) {
 
 		val sourceCells = CARTESIAN_FACES.map { cell + it.vec3i }.filter { containerAt(world, it) != null }
 		if (sourceCells.isEmpty()) return
@@ -163,11 +201,17 @@ object AnionTransport {
 					val sink = findSink(world, target, direction.oppositeFace, key, ports, blocked, HashSet(), 0)
 						?: continue
 
-					val taken = container.drawItem(key, THROUGHPUT)
+					// the chest has no rate of its own, so the destination's limit is the whole ration
+					val allowance = minOf(THROUGHPUT, budget.left(sink.buffer))
+					if (allowance <= 0L) break
+
+					val taken = container.drawItem(key, allowance)
 					if (taken <= 0L) continue
 
 					val accepted = sink.push(key, taken)
 					if (accepted < taken) container.pushItem(key, taken - accepted) // never drop what did not fit
+
+					budget.spend(sink.buffer, accepted)
 
 					break
 
@@ -259,14 +303,14 @@ object AnionTransport {
 			val buffer = port.buffer() ?: return null
 			if (!buffer.accepts(key) || buffer.free() <= 0L) return null
 
-			return Sink { itemKey, units -> buffer.insert(itemKey, units) }
+			return Sink(buffer) { itemKey, units -> buffer.insert(itemKey, units) }
 
 		}
 
 		val container = containerAt(world, cell) ?: return null
 		if (!container.hasRoomFor(key)) return null
 
-		return Sink { itemKey, units -> container.pushItem(itemKey, units) }
+		return Sink(null) { itemKey, units -> container.pushItem(itemKey, units) }
 
 	}
 

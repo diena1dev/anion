@@ -73,6 +73,8 @@ drivers:
 - **chute** — exports the buffer of any bus port touching it, out of any of its other sides. no facing: the name suggests one, but making it directional only ever created a way to build it backwards. with no port beside it, it carries like a junction.
 - **crafting table** — the vanilla-inventory import adapter. pulls from any container touching it and pushes into whatever the network offers. asymmetric on purpose: a chest feeds the network through a table rather than being drained by any pipe that happens to run past.
 
+**throughput** is rationed per buffer per pass, not per driver. `transferLimit()` is `softTransfer` per bound port clamped by `hardTransfer`, so more ports genuinely is more throughput — the point of ports — but a wall of importers cannot stuff or drain a buffer in one tick. both ends of a handoff are charged, so neither a busy source nor a popular destination gets worked harder than its own ports allow. a vanilla container has no rate of its own and stays limited by its slots.
+
 carriers are the pipes and the junction. flow is a pipe's own facing, so a run only takes items in through its back face and only passes them out of its front, which makes the network a directed graph read straight off the world with nothing to configure. turning a corner is what the junction is for.
 
 drop-offs are a bus port or any vanilla container on an open side. so both of these work, and neither needs a machine anywhere on the run:

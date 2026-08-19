@@ -23,8 +23,19 @@ open class MachineBuffer(
 	val resourceType: KClass<out AnionResource>,
 	val softCap: Long,
 	val hardCap: Long,
+	/** units moved per transport pass, per bound port */
+	val softTransfer: Long = DEFAULT_TRANSFER_PER_PORT,
+	/** ceiling on units moved per pass, however many ports are bound */
+	val hardTransfer: Long = softTransfer * 8,
 
 ) {
+
+	companion object {
+
+		/** what one port is worth per pass when a buffer does not say otherwise */
+		const val DEFAULT_TRANSFER_PER_PORT = 64L
+
+	}
 
 	// the base's own storage. a subclass overriding contents() holds its items elsewhere and leaves
 	// these untouched, so nothing outside should read them — go through contents()/amountOf().
@@ -57,6 +68,16 @@ open class MachineBuffer(
 		return held == null || held == resource
 
 	}
+
+	/**
+	 * Units this buffer will take in or give up across one transport pass, however many drivers are
+	 * pushing at it.
+	 *
+	 * Scales with bound ports because that is the whole point of ports — a machine fed through seven
+	 * of them should genuinely run seven times harder — and [hardTransfer] is what stops it scaling
+	 * forever, so a wall of ports cannot drain a buffer in a single tick.
+	 */
+	open fun transferLimit(): Long = minOf(softTransfer * boundPorts.size, hardTransfer).coerceAtLeast(0L)
 
 	/** Current capacity: [softCap] per bound port, clamped to [hardCap]. */
 	// throughput scales with ports because that is what a machine input is. storage that scales with
@@ -136,8 +157,10 @@ open class BulkItemBuffer(
 	key: String,
 	val typeLimit: Int,
 	val totalCapacity: Long,
+	softTransfer: Long = DEFAULT_TRANSFER_PER_PORT,
+	hardTransfer: Long = softTransfer * 8,
 
-) : MachineBuffer(key, ItemKey::class, totalCapacity, totalCapacity) {
+) : MachineBuffer(key, ItemKey::class, totalCapacity, totalCapacity, softTransfer, hardTransfer) {
 
 	// insertion-ordered so a readout lists things in the order they first arrived
 	private val stored: MutableMap<AnionResource, Long> = LinkedHashMap()
