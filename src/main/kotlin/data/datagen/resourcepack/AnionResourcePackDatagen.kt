@@ -3,8 +3,11 @@ package dev.diena.anion.data.datagen.resourcepack
 import com.google.gson.GsonBuilder
 import com.google.gson.JsonObject
 import dev.diena.anion.data.registry.registries.AnionRegistries
+import dev.diena.anion.features.custom.blocks.AnionBlock
+import dev.diena.anion.features.custom.blocks.AnionBlocks
 import dev.diena.anion.features.custom.blocks.AnionDirectionalBlock
 import net.minecraft.world.level.block.state.properties.NoteBlockInstrument
+import org.bukkit.block.BlockFace
 import org.bukkit.craftbukkit.block.data.CraftBlockData
 import java.io.File
 import java.util.Base64
@@ -86,6 +89,42 @@ class AnionResourcePackDatagen(private val outputDir: File) {
 		}
 	}
 
+	/**
+	 * Vanilla model to stand in for a block whose own model has not been drawn yet, or null to emit the
+	 * usual cube_all pointing at an anion texture.
+	 *
+	 * Purpur reads as obviously-not-final in world, and the pillar makes a directional block's facing
+	 * visible, so a wrong rotation is spottable before any art exists. Drop an entry once its real
+	 * model is authored.
+	 */
+	private fun placeholderModelParent(block: AnionBlock): String? = when {
+
+		block is AnionDirectionalBlock -> "minecraft:block/purpur_pillar"
+		block === AnionBlocks.COPPER_CONDUIT_JUNCTION -> "minecraft:block/purpur_block"
+
+		else -> null
+
+	}
+
+	/**
+	 * Spin for a placeholder-modelled facing, replacing [AnionDirectionalBlock.modelRotation].
+	 *
+	 * That one assumes a model authored pointing north, which a real model will be. purpur_pillar's
+	 * column runs along Y instead, and a Y-axis column is invariant under a y spin — left alone, all
+	 * four horizontal facings would render as the same upright pillar. Tipping it first at least makes
+	 * the axis visible, which is the point of having a placeholder at all.
+	 */
+	// a pillar has no front, so north/south and east/west each share an orientation. that is a limit of
+	// the stand-in, not of the block.
+	private fun placeholderRotation(facing: BlockFace): Pair<Int, Int> = when (facing) {
+
+		BlockFace.NORTH, BlockFace.SOUTH -> 90 to 0
+		BlockFace.EAST, BlockFace.WEST   -> 90 to 90
+
+		else -> 0 to 0 // up and down leave it standing, which is already the right read
+
+	}
+
 	private fun writeBlockAndBlockItemModels(packRoot: File) {
 		val blockModelsDir = File(packRoot, "assets/anion/models/block")
 		val itemModelsDir = File(packRoot, "assets/anion/models/item")
@@ -93,11 +132,19 @@ class AnionResourcePackDatagen(private val outputDir: File) {
 		itemModelsDir.mkdirs()
 
 		AnionRegistries.BLOCK_REGISTRY.all.values.forEach { block ->
+			val placeholder = placeholderModelParent(block)
+
 			val model = JsonObject().apply {
-				addProperty("parent", "minecraft:block/cube_all")
-				add("textures", JsonObject().apply {
-					addProperty("all", "anion:block/${block.namespacedKey.key}")
-				})
+				if (placeholder != null) {
+					// stands in for an unauthored model. the blockstate still points here, so replacing
+					// this one file with a real cube_all + texture is the whole job.
+					addProperty("parent", placeholder)
+				} else {
+					addProperty("parent", "minecraft:block/cube_all")
+					add("textures", JsonObject().apply {
+						addProperty("all", "anion:block/${block.namespacedKey.key}")
+					})
+				}
 			}
 			File(blockModelsDir, "${block.namespacedKey.key}.json").writeText(gson.toJson(model))
 		}
@@ -129,9 +176,14 @@ class AnionResourcePackDatagen(private val outputDir: File) {
 			val model = "anion:block/${block.namespacedKey.key}"
 
 			if (block is AnionDirectionalBlock) {
+
+				val standingIn = placeholderModelParent(block) != null
+
 				for ((facing, note) in block.notesByFacing) {
-					anionStateModels[nmsInstrument.serializedName to note] = model to block.modelRotation(facing)
+					val rotation = if (standingIn) placeholderRotation(facing) else block.modelRotation(facing)
+					anionStateModels[nmsInstrument.serializedName to note] = model to rotation
 				}
+
 			} else {
 				anionStateModels[nmsInstrument.serializedName to block.note] = model to (0 to 0)
 			}
