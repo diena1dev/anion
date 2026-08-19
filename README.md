@@ -71,6 +71,10 @@ flow is the conduit's own facing rather than anything configured. a straight con
 
 that means there is nothing to configure and nothing to cache, which is also why breaking a conduit needs no invalidation. the cost is that every pass re-walks its routes from scratch; once networks get large that wants a cached graph rebuilt off block events, the same way MachineIndex handles machine cells.
 
+vanilla containers join in at both ends. a container touching a conduit's *output* face is a valid drop-off. a crafting table sitting behind a run is the import node — it pulls from any container touching *it*, so a chest feeds the network through a crafting table rather than being drained by any pipe that happens to run past. asymmetric on purpose.
+
+discovery is anchored on machine bus ports, because nothing indexes conduits in the world. that means a run with no machine anywhere on it (chest -> table -> conduit -> chest) is invisible to the tick. fixing it properly means a persisted conduit index, the same shape as the machine_chunks column family.
+
 endpoints are machine BUS ports. a port with items pushes into any conduit whose back face touches it, the walk follows facings until it reaches a port that will take the item, and the handoff debits and credits in one step so nothing is dropped when the far end is full. ports are still just accessors — transport never reaches past one into a machine.
 
 blocks: `COPPER_CONDUIT` (four horizontal facings), `COPPER_CONDUIT_VERTICAL` (up/down), `COPPER_CONDUIT_JUNCTION`. a directional block claims one note per facing and every one of them resolves back to the same AnionBlock, so a BlockSet accepting a conduit accepts it in any rotation. the resource pack reuses a single north-facing model and spins it in the blockstate, so a facing costs a note and nothing else.

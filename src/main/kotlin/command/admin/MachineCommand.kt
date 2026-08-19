@@ -6,7 +6,11 @@ import dev.astralchroma.processor.annotations.Sender
 import dev.astralchroma.processor.annotations.Subcommand
 import dev.diena.anion.extensions.vec3i
 import dev.diena.anion.features.machine.Machine
+import dev.diena.anion.features.machine.MachineIndex
+import dev.diena.anion.features.machine.component.BulkItemBuffer
 import dev.diena.anion.features.machine.examples.BlinkerMachine
+import dev.diena.anion.features.machine.machine_types.PortedMachine
+import dev.diena.anion.features.starship.Starship
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.TextColor
 import org.bukkit.Color
@@ -83,6 +87,92 @@ object MachineCommand {
 			}
 
 		sender.info("Assembled ${machine::class.simpleName} at ${candidate.origin} (${candidate.rotation}). Intact: ${machine.intact}")
+
+	}
+
+	/** Tears down every machine occupying the targeted block. */
+	@Subcommand
+	fun disassemble(
+
+		@Sender sender: Player
+
+	) {
+
+		val machines = machinesAt(sender) ?: return
+
+		// machines may share structure cells, so a single block can belong to more than one
+		for (machine in machines) {
+			val name = machine.namespacedKey.key
+			machine.disassemble()
+			sender.info("Disassembled $name.")
+		}
+
+	}
+
+	/** Dumps structure, port and buffer state for the machine(s) at the targeted block. */
+	@Subcommand
+	fun debug(
+
+		@Sender sender: Player
+
+	) {
+
+		val machines = machinesAt(sender) ?: return
+
+		for (machine in machines) {
+
+			val carrier = machine.starship?.uuid?.toString()?.take(8) ?: "none"
+			sender.info("${machine.namespacedKey.key} @ ${machine.origin} rot=${machine.rotation} intact=${machine.intact} ship=$carrier")
+			sender.info("  cells=${machine.resolvedStructure.size} dirty=${machine.dirty}")
+
+			val ports = (machine as? PortedMachine)?.ports?.values.orEmpty()
+			if (ports.isEmpty()) sender.info("  ports: none")
+			else {
+				val byKind = ports.groupingBy { it.kind }.eachCount().entries.joinToString(" ") { "${it.key}x${it.value}" }
+				sender.info("  ports=${ports.size} [$byKind]")
+
+				for (port in ports.sortedBy { it.kind }) {
+					sender.info("   ${port.offset} ${port.kind} -> ${port.bufferKey ?: "unbound"}")
+				}
+			}
+
+			if (machine.buffers.isEmpty()) sender.info("  buffers: none")
+			else for (buffer in machine.buffers.values) {
+
+				val types = if (buffer is BulkItemBuffer) " ${buffer.typesUsed()}/${buffer.typeLimit} types" else ""
+				sender.info("  buffer ${buffer.key} ${buffer.used()}/${buffer.capacity()}$types ports=${buffer.boundPorts.size}")
+
+				for ((resource, amount) in buffer.contents()) {
+					sender.info("   - ${resource.namespacedKey} x$amount")
+				}
+
+			}
+
+		}
+
+	}
+
+	/** Every machine holding the block the sender is looking at, or null once the sender has been told why not. */
+	private fun machinesAt(sender: Player): List<Machine>? {
+
+		val target = sender.getTargetBlockExact(16) ?: run {
+			sender.info("No block in range (max 16 blocks).")
+			return null
+		}
+
+		val level = (sender.world as CraftWorld).handle
+		val cell = target.vec3i
+
+		// grounded machines live in the cell index; carried ones are tracked by their ship instead
+		val machines = MachineIndex.machinesAt(level, cell) +
+			Starship.starshipAt(level, cell)?.machines?.machinesHolding(cell).orEmpty()
+
+		if (machines.isEmpty()) {
+			sender.info("No machine at $cell.")
+			return null
+		}
+
+		return machines.distinct()
 
 	}
 

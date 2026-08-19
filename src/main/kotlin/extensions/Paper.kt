@@ -320,6 +320,28 @@ fun Inventory.drawItem(key: ItemKey, units: Long): Long {
 
 }
 
+/** Whether [key] would fit anywhere: an empty slot, or on top of a stack that is not yet full. */
+fun Inventory.hasRoomFor(key: ItemKey): Boolean {
+
+	for (slot in 0 until size) {
+		val stack = getItem(slot)
+
+		if (stack == null || stack.type.isAir) return true
+		if (stack.isSimilar(key.stack) && stack.amount < stack.maxStackSize) return true
+	}
+
+	return false
+
+}
+
+/** Every distinct item variant held, one entry per variant no matter how many slots it spans. */
+fun Inventory.itemKeys(): List<ItemKey> =
+	contents
+		.filterNotNull()
+		.filterNot { it.type.isAir }
+		.map { ItemKey.of(it) }
+		.distinct()
+
 /** Puts up to [units] of [key] in. Returns how many actually landed. */
 // addItem does the partial-stack merging and stack-size clamping, and hands back whatever did not fit
 fun Inventory.pushItem(key: ItemKey, units: Long): Long {
