@@ -13,7 +13,8 @@ import dev.diena.anion.features.machine.component.MachinePort
  */
 val MEDIUM_CARGO_CONTAINER_STRUCTURE =
 	BlockSet.new("medium_cargo_container")
-		.core('C', AnionBlocks.COPPER_MACHINE_CORE)
+		// TODO: swap for a proper machine core block once one has a texture
+		.core('C', AnionBlocks.TEST_BLOCK)
 
 		// any casing cell may be swapped for a port at build time. no valve — nothing here is a fluid
 		.assign('I', AnionBlocks.COPPER_MACHINE_CASING)
