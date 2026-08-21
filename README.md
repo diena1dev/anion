@@ -81,6 +81,8 @@ drivers:
 
 carriers are the pipe and the junction. a pipe is a length of tube: it carries along the axis it was laid on, in at one end and out at the other, either way round. direction comes from where the items entered rather than from the block, so a run reads straight off the world with nothing to configure and no way to build one backwards. turning a corner is what the junction is for.
 
+**an uncapped pipe spills.** a pipe end with nothing in front of it drops its contents into the world, which is what makes capping a run matter — any block at all is a cap, a junction included. spilling is the last resort and never a race: the whole network is searched for somewhere that will actually take the items first, so an open end on one branch of a junction never beats a chest on the other, and a chest that has merely filled up makes items wait rather than hit the floor. that lives on `AnionItemPipeBlock.spillAt` rather than in the router, so gas venting or a conduit shorting out is the same hook and none of them inherit each other's rules.
+
 drop-offs are a bus port or any vanilla container on an open side. so both of these work, and neither needs a machine anywhere on the run:
 
 ```

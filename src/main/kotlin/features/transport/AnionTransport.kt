@@ -28,7 +28,8 @@ import org.bukkit.inventory.Inventory
  * be on the other side. The item adapter is the chute; a pump on a valve and a connector on a conduit
  * are the same idea for fluid and power, when those land.
  *
- * Drop-offs: a bus port, or any vanilla container on an open side.
+ * Drop-offs: a bus port, or any vanilla container on an open side. Failing both, a component may spill
+ * — an item pipe with nothing in front of one of its ends drops its contents on the floor.
  *
  * TODO: routes are re-walked from scratch every pass. Once networks get large this wants a cached
  *       graph rebuilt off block events, on top of the index rather than instead of it.
@@ -83,8 +84,9 @@ object AnionTransport {
 	 * Follows the run at [cell], entered through its [entryFace], to the first place that will take
 	 * [key]. Returns null when it dead-ends or nothing on it has room.
 	 */
-	// depth-first with a shared visited set: it finds a path rather than the best one, which is all a
-	// pipe run needs. the visited set is also what stops a junction loop spinning forever.
+	// a spill is the last resort. the whole network is searched for somewhere that will actually take
+	// the items before any open end is allowed to have them, so a pipe left open on one branch of a
+	// junction never beats a chest on the other.
 	internal fun findSink(
 
 		world: World,
@@ -93,8 +95,30 @@ object AnionTransport {
 		key: ItemKey,
 		ports: Map<Vec3i, MachinePort>,
 		blocked: Set<Vec3i>,
-		visited: MutableSet<Vec3i> = HashSet(),
-		depth: Int = 0,
+
+	): Sink? {
+
+		val spills = mutableListOf<Sink>()
+
+		return search(world, cell, entryFace, key, ports, blocked, HashSet(), 0, spills)
+			?: spills.firstOrNull()
+
+	}
+
+	/** One step of [findSink], collecting any open end it passes into [spills]. */
+	// depth-first with a shared visited set: it finds a path rather than the best one, which is all a
+	// pipe run needs. the visited set is also what stops a junction loop spinning forever.
+	private fun search(
+
+		world: World,
+		cell: Vec3i,
+		entryFace: BlockFace,
+		key: ItemKey,
+		ports: Map<Vec3i, MachinePort>,
+		blocked: Set<Vec3i>,
+		visited: MutableSet<Vec3i>,
+		depth: Int,
+		spills: MutableList<Sink>,
 
 	): Sink? {
 
@@ -106,12 +130,29 @@ object AnionTransport {
 
 		// otherwise it has to be something that carries
 		if (!visited.add(cell)) return null
-		val exits = exitsOf(world, cell, entryFace) ?: return null
+
+		val block = world.getBlockAt(cell.x, cell.y, cell.z)
+		val component = AnionTransportComponents.at(block) ?: return null
+		val exits = component.exitsFor(block, entryFace) ?: return null
 
 		for (exit in exits) {
 
-			findSink(world, cell + exit.vec3i, exit.oppositeFace, key, ports, blocked, visited, depth + 1)
+			search(world, cell + exit.vec3i, exit.oppositeFace, key, ports, blocked, visited, depth + 1, spills)
 				?.let { return it }
+
+		}
+
+		// remembered, not returned: the search carries on in case a real destination exists elsewhere
+		if (spills.isEmpty()) {
+
+			for (exit in exits) {
+
+				val spill = component.spillAt(block, exit) ?: continue
+
+				spills += spill
+				break
+
+			}
 
 		}
 
@@ -252,13 +293,17 @@ object AnionTransport {
 				return
 			}
 
-			val exits = exitsOf(world, cell, face)
-			if (exits == null) {
+			val component = AnionTransportComponents.at(block)
+			val exits = component?.exitsFor(block, face)
+			if (component == null || exits == null) {
 				lines += "   $cell $name will not carry in through $face [DEAD END]"
 				return
 			}
 
-			lines += "   $cell $name exits ${exits.joinToString(",")}"
+			val spilling = exits.filter { component.spillAt(block, it) != null }
+			val open = if (spilling.isEmpty()) "" else " [OPEN END — spills out ${spilling.joinToString(",")}]"
+
+			lines += "   $cell $name exits ${exits.joinToString(",")}$open"
 
 			val exit = exits.first()
 			cell += exit.vec3i

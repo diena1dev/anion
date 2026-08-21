@@ -32,6 +32,15 @@ interface AnionTransportComponent {
 	/** Moves whatever this component is responsible for moving. Carriers do nothing. */
 	fun drive(pass: TransportPass) {}
 
+	/**
+	 * Where this component lets go of what it could not pass on through [exit], or null to hold onto
+	 * it. An item pipe drops its contents into the world; a gas pipe would vent.
+	 *
+	 * Only consulted once the whole network has been searched and nothing on it had room, so a full
+	 * chest downstream never causes one.
+	 */
+	fun spillAt(block: Block, exit: BlockFace): Sink? = null
+
 	/** How this component behaves, for `/transport debug`. The caller prefixes the block's name. */
 	fun describe(block: Block): String
 

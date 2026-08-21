@@ -40,11 +40,43 @@ class AnionItemPipeBlock(
 
 	}
 
+	/** An end with nothing in front of it spills, which is what makes a pipe need capping. */
+	override fun spillAt(block: Block, exit: BlockFace): Sink? {
+
+		val ahead = block.getRelative(exit)
+		if (!ahead.isEmpty) return null // any block at all caps the run, a junction included
+
+		return Sink(null) { key, units -> spill(ahead, exit, key, units) }
+
+	}
+
 	override fun describe(block: Block): String {
 
 		val axis = block.anionAxis ?: return "(no axis: not a placed pipe)"
 
-		return "axis=$axis (takes items in through ${axis.faces.joinToString(" or ")})"
+		val open = axis.faces.filter { block.getRelative(it).isEmpty }
+		val ends = if (open.isEmpty()) "" else " [OPEN at ${open.joinToString(" and ")} — spills]"
+
+		return "axis=$axis (takes items in through ${axis.faces.joinToString(" or ")})$ends"
+
+	}
+
+	/** Drops [units] of [key] into [cell], pushed along [exit]. Always takes the lot. */
+	private fun spill(cell: Block, exit: BlockFace, key: ItemKey, units: Long): Long {
+
+		val location = cell.location.toCenterLocation()
+		val maxStack = key.stack.maxStackSize.toLong().coerceAtLeast(1L)
+		var left = units
+
+		while (left > 0L) {
+
+			val amount = minOf(left, maxStack).toInt()
+			cell.world.dropItem(location, key.asItemStack(amount)).velocity = exit.direction.multiply(0.15)
+			left -= amount
+
+		}
+
+		return units
 
 	}
 
