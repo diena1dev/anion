@@ -4,6 +4,7 @@ import com.example.plugin.Registration
 import dev.diena.anion.data.database.AnionDatabase
 import dev.diena.anion.data.database.AnionPersistence
 import dev.diena.anion.features.custom.blocks.AnionBlocks
+import dev.diena.anion.features.custom.items.AnionItemDispatcher
 import dev.diena.anion.features.custom.items.AnionItems
 import dev.diena.anion.features.machine.AnionMachines
 import dev.diena.anion.features.machine.Machine
@@ -76,6 +77,11 @@ class Anion : JavaPlugin() {
 			MachineIndex.drainPending()
 
 			for (machine in Machine.activeMachines.values) machine.runSlowTick()
+		})
+
+		// held-item readouts, once a second. sync: tools raytrace the world and write the action bar
+		Tasks.scheduleSync(20, 20, Runnable {
+			AnionItemDispatcher.slowTickEquipped()
 		})
 
 		// transport passes. sync: it reads conduit blocks out of the world and writes machine buffers

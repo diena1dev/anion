@@ -27,6 +27,13 @@ open class MachineBuffer(
 	val softTransfer: Long = DEFAULT_TRANSFER_PER_PORT,
 	/** ceiling on units moved per pass, however many ports are bound */
 	val hardTransfer: Long = softTransfer * 8,
+	/**
+	 * Whether a player may dump this buffer with a screwdriver.
+	 *
+	 * False for bulk storage, where emptying it is the opposite of the point and a full one is
+	 * thousands of items on the floor. Disassembly ignores this — the machine is going away either way.
+	 */
+	val spillable: Boolean = true,
 
 ) {
 
@@ -160,7 +167,18 @@ open class BulkItemBuffer(
 	softTransfer: Long = DEFAULT_TRANSFER_PER_PORT,
 	hardTransfer: Long = softTransfer * 8,
 
-) : MachineBuffer(key, ItemKey::class, totalCapacity, totalCapacity, softTransfer, hardTransfer) {
+) : MachineBuffer(
+
+	key,
+	ItemKey::class,
+	totalCapacity,
+	totalCapacity,
+	softTransfer,
+	hardTransfer,
+	// dumping a container is the opposite of what one is for, and a full one is 24000 items on the floor
+	spillable = false,
+
+) {
 
 	// insertion-ordered so a readout lists things in the order they first arrived
 	private val stored: MutableMap<AnionResource, Long> = LinkedHashMap()

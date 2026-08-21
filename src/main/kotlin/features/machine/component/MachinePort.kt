@@ -1,19 +1,12 @@
 package dev.diena.anion.features.machine.component
 
-import dev.diena.anion.extensions.vec3i
 import dev.diena.anion.features.custom.blocks.AnionBlock
 import dev.diena.anion.features.custom.blocks.AnionBlocks
 import dev.diena.anion.features.machine.BlockMatcher
 import dev.diena.anion.features.machine.Machine
-import dev.diena.anion.features.machine.MachineIndex
 import dev.diena.anion.features.machine.machine_types.PortedMachine
-import dev.diena.anion.features.starship.Starship
-import net.kyori.adventure.text.Component
 import net.minecraft.core.Vec3i
-import org.bukkit.craftbukkit.CraftWorld
-import org.bukkit.event.block.Action
-import org.bukkit.event.player.PlayerInteractEvent
-import org.bukkit.inventory.EquipmentSlot
+import net.minecraft.server.level.ServerLevel
 
 /**
  * An access point punched into a machine's casing. A port only exposes the buffer behind it — it
@@ -43,6 +36,36 @@ class MachinePort(
 
 	}
 
+	/**
+	 * Moves this port to the machine's next buffer, then round to unbound. Returns the key it landed
+	 * on, or null for unbound.
+	 *
+	 * A machine with one buffer can bind every port to it at assembly and never think about this. A
+	 * machine with three cannot, so which port feeds which is the player's to say.
+	 */
+	// TODO: a bus has no business bridging a gas buffer. gating the cycle by port kind needs the
+	//       resource family each kind maps to to be settled first, and it is not. until then the
+	//       buffer's own resourceType gate makes a wrong binding inert rather than harmful.
+	fun cycle(): String? {
+
+		val keys = machine.buffers.keys.toList()
+		if (keys.isEmpty()) return null
+
+		val index = keys.indexOf(bufferKey)
+		val next = when {
+			bufferKey == null -> keys.first() // unbound, so start at the top
+			index < 0 -> keys.first()          // bound to something that no longer exists
+			index == keys.lastIndex -> null    // round back off the end
+			else -> keys[index + 1]
+		}
+
+		bind(next)
+		machine.dirty = true
+
+		return next
+
+	}
+
 	/** Binds this port to [bufferKey], releasing whatever it was bound to. */
 	fun bind(bufferKey: String?) {
 
@@ -58,58 +81,18 @@ class MachinePort(
 
 	companion object {
 
-		/**
-		 * Moves the port the player right-clicked on to the machine's next buffer, then round to
-		 * unbound. Bare hand only, since a full hand means they were trying to place a block.
-		 *
-		 * A machine with one buffer can bind every port to it at assembly and never think about this.
-		 * A machine with three cannot, so which port feeds which is the player's to say.
-		 */
-		// TODO: a bus has no business bridging a gas buffer. gating the cycle by port kind needs the
-		//       resource family each kind maps to to be settled first, and it is not. until then the
-		//       buffer's own resourceType gate makes a wrong binding inert rather than harmful.
-		fun cycleBinding(event: PlayerInteractEvent) {
+		/** The port occupying [cell], on whichever machine owns it, or null if that cell is not one. */
+		fun at(level: ServerLevel, cell: Vec3i): MachinePort? {
 
-			if (event.action != Action.RIGHT_CLICK_BLOCK) return
-			if (event.hand != EquipmentSlot.HAND) return
-			if (!event.player.inventory.itemInMainHand.isEmpty) return
+			for (machine in Machine.machinesAt(level, cell).filterIsInstance<PortedMachine>()) {
 
-			val block = event.clickedBlock ?: return
-			val level = (block.world as CraftWorld).handle
-			val cell = block.vec3i
-
-			// grounded machines live in the cell index; carried ones are tracked by their ship instead
-			val machines = MachineIndex.machinesAt(level, cell) +
-				Starship.starshipAt(level, cell)?.machines?.machinesHolding(cell).orEmpty()
-
-			for (machine in machines.distinct().filterIsInstance<PortedMachine>()) {
-
-				val port = machine.ports.values.firstOrNull { machine.localToWorld(it.offset) == cell } ?: continue
-
-				val keys = machine.buffers.keys.toList()
-				if (keys.isEmpty()) {
-					event.player.sendMessage(Component.text("${machine.namespacedKey.key} has no buffers to bind to."))
-					return
-				}
-
-				val index = keys.indexOf(port.bufferKey)
-				val next = when {
-					port.bufferKey == null -> keys.first()   // unbound, so start at the top
-					index < 0 -> keys.first()                 // bound to something that no longer exists
-					index == keys.lastIndex -> null           // round back off the end
-					else -> keys[index + 1]
-				}
-
-				port.bind(next)
-				machine.dirty = true
-
-				event.player.sendMessage(
-					Component.text("${port.kind} port at ${port.offset} -> ${next ?: "unbound"}")
-				)
-
-				return
+				machine.ports.values
+					.firstOrNull { machine.localToWorld(it.offset) == cell }
+					?.let { return it }
 
 			}
+
+			return null
 
 		}
 

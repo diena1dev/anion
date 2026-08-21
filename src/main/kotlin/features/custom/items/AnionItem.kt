@@ -81,6 +81,14 @@ open class AnionItem(
 	open fun onPlayerSwapHand(event: PlayerSwapHandItemsEvent) { swapHandler?.invoke(event) }
 	open fun onEntityShootBow(event: EntityShootBowEvent) {}
 
+	/**
+	 * Called once a second for every player holding this item in their main hand, main thread.
+	 *
+	 * For readouts a tool wants to keep current without an interaction — what the crosshair is on,
+	 * what state the thing under it is in.
+	 */
+	open fun slowTick(player: Player) {}
+
 	/** [player] no longer holds this item in their main hand. */
 	open fun onRemove(player: Player) { removeHandler?.invoke(player) }
 
@@ -94,6 +102,19 @@ object AnionItemDispatcher : Listener {
 
 	/** the anion item each player currently holds in their main hand. */
 	private val equippedItems = ConcurrentHashMap<UUID, AnionItem>()
+
+	/** Drives [AnionItem.slowTick] for whoever is holding one. Scheduled from Anion.onEnable. */
+	fun slowTickEquipped() {
+
+		for ((uuid, item) in equippedItems) {
+
+			val player = Anion.instance.getPlayer(uuid) ?: continue
+
+			item.slowTick(player)
+
+		}
+
+	}
 
 	@EventHandler
 	fun onPlayerInteract(event: PlayerInteractEvent) {

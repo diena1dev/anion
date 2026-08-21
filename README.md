@@ -61,7 +61,16 @@ POWER
 Idle power draw is just a recipe with no item result, per the "if another subsystem already does this, use it" rule.
 Nothing supplies energy yet. Until the energy and transport subsystems land, a machine should hand the adapter a supply function that reports unlimited AnionEnergy — TODO in MachineRecipeAdapter.
 
-**which port feeds which buffer is the player's to say.** one buffer can be auto-bound at assembly and never thought about — the cargo container does exactly that. more than one cannot, so a port block is cycled by right-clicking it bare-handed: unbound, then each buffer in turn, then back round. `/machine debug` reads the bindings back and `/machine clear <buffer>` empties one onto the floor, which is the way out of loading fuel into the smelting buffer. a machine keeps its buffers through a clear; only disassembly forgets them.
+**two tools, and everything a machine needs in world.**
+
+- **wrench** — right-click assembles the machine the clicked block completes, sneak-click tears one down. held, it reports what the crosshair is on once a second: the machine there, or the type that block *would* complete if it were assembled.
+- **screwdriver** — right-click cycles which buffer a port feeds: unbound, each buffer in turn, then back round. sneak-click empties that buffer out of the face you clicked, so it lands in front of the port rather than inside the machine. held, it reports the port under the crosshair and what it is bound to.
+
+readouts go to the action bar, so a tool never spams chat and never needs an interaction to stay current. `AnionItem.slowTick(player)` is the hook — once a second for whoever holds it in their main hand.
+
+**which port feeds which buffer is the player's to say.** one buffer can be auto-bound at assembly and never thought about — the cargo container does exactly that. more than one cannot, which is what the screwdriver is for. `/machine debug` reads the bindings back and `/machine clear <buffer>` does the same dump from a command. a machine keeps its buffers through a clear; only disassembly forgets them.
+
+`MachineBuffer.spillable` is the opt-out: false on `BulkItemBuffer`, because emptying a container is the opposite of the point and a full one is thousands of items on the floor. disassembly ignores it — the machine is going away either way.
 
 capacity comes from the ports bound to a buffer, so a machine with three buffers wants at least three bus ports. with fewer, whichever buffer got none has no room and the machine stalls against it — the framework working as designed, and visible in `/machine debug` as `0/0 ports=0`.
 

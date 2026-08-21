@@ -8,11 +8,9 @@ import dev.astralchroma.processor.annotations.Subcommand
 import dev.diena.anion.Keys
 import dev.diena.anion.extensions.vec3i
 import dev.diena.anion.features.machine.Machine
-import dev.diena.anion.features.machine.MachineIndex
 import dev.diena.anion.features.machine.component.BulkItemBuffer
 import dev.diena.anion.features.machine.examples.BlinkerMachine
 import dev.diena.anion.features.machine.machine_types.PortedMachine
-import dev.diena.anion.features.starship.Starship
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.TextColor
 import org.bukkit.Color
@@ -20,8 +18,8 @@ import org.bukkit.craftbukkit.CraftWorld
 import org.bukkit.entity.Player
 
 // TODO: add permission nodes
-// TODO: this whole command is a stand-in for wrench assembly. the wrench does the same two calls:
-//       Machine.candidatesAt() on the clicked block, then assemble() on the single candidate.
+// the wrench and screwdriver do all of this in world now. these stay as the admin path: they reach
+// further, they name the machine type, and they work without the tools in hand.
 @Command
 @Name("machine")
 @Permission("${Keys.COMMAND_PERMISSION_TREE}.machine")
@@ -111,6 +109,11 @@ object MachineCommand {
 				continue
 			}
 
+			if (!store.spillable) {
+				sender.info("'$buffer' will not be dumped — disassemble the machine to empty it.")
+				continue
+			}
+
 			val held = store.used()
 			machine.spill(store)
 
@@ -177,16 +180,14 @@ object MachineCommand {
 		val level = (sender.world as CraftWorld).handle
 		val cell = target.vec3i
 
-		// grounded machines live in the cell index; carried ones are tracked by their ship instead
-		val machines = MachineIndex.machinesAt(level, cell) +
-			Starship.starshipAt(level, cell)?.machines?.machinesHolding(cell).orEmpty()
+		val machines = Machine.machinesAt(level, cell)
 
 		if (machines.isEmpty()) {
 			sender.info("No machine at $cell.")
 			return null
 		}
 
-		return machines.distinct()
+		return machines
 
 	}
 

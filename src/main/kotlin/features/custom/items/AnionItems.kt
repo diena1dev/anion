@@ -36,6 +36,10 @@ object AnionItems {
 		AnionToolGunItem()
 	)
 
+	// machine tools
+	val WRENCH = registerItem(AnionWrenchItem())
+	val SCREWDRIVER = registerItem(AnionScrewdriverItem())
+
 	val RAW_URANIUM_ORE = registerItem(
 		AnionItem(
 			displayName = "Raw Uranium Ore",

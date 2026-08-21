@@ -132,6 +132,12 @@ abstract class Machine(
 		/** fraction of mismatched cells past which a broken machine tears itself down instead of waiting for repair */
 		const val DISASSEMBLY_THRESHOLD = 0.5
 
+		/** Every machine holding [cell]. Machines may share cells, so this is a list. */
+		// grounded machines live in the cell index; carried ones are tracked by their ship instead
+		fun machinesAt(level: ServerLevel, cell: Vec3i): List<Machine> =
+			(MachineIndex.machinesAt(level, cell) +
+				Starship.starshipAt(level, cell)?.machines?.machinesHolding(cell).orEmpty()).distinct()
+
 		/**
 		 * Picks the declared variant that actually fills every cell of [blockSet] at [origin]+[rotation].
 		 * Returns null if any cell is unmatched.
@@ -645,15 +651,14 @@ abstract class Machine(
 	}
 
 	/**
-	 * Empties [buffer], dropping whatever it held at the core block. Gas, fluid and energy have
-	 * nowhere to be put down, so they are voided by design.
+	 * Empties [buffer], dropping whatever it held at [dropLocation], the core block by default. Gas,
+	 * fluid and energy have nowhere to be put down, so they are voided by design.
 	 *
 	 * The machine keeps the buffer itself — this is the way out of loading the wrong resource into
-	 * the wrong one, not a teardown.
+	 * the wrong one, not a teardown. Callers acting on a player's behalf should check
+	 * [MachineBuffer.spillable] first; this does not, so disassembly can empty everything.
 	 */
-	fun spill(buffer: MachineBuffer) {
-
-		val dropLocation = Location(level.world, origin.x + 0.5, origin.y + 0.5, origin.z + 0.5)
+	fun spill(buffer: MachineBuffer, dropLocation: Location = coreLocation()) {
 
 		for ((held, units) in buffer.contents()) {
 
@@ -680,6 +685,9 @@ abstract class Machine(
 		markDirty()
 
 	}
+
+	/** Centre of the core block, where anything with nowhere better to go ends up. */
+	fun coreLocation(): Location = Location(level.world, origin.x + 0.5, origin.y + 0.5, origin.z + 0.5)
 
 	private fun portCellsOf(
 
