@@ -7,6 +7,7 @@ import dev.diena.anion.extensions.faces
 import dev.diena.anion.extensions.itemKeys
 import dev.diena.anion.extensions.plus
 import dev.diena.anion.extensions.vec3i
+import dev.diena.anion.features.custom.AnionResource
 import dev.diena.anion.features.custom.ItemKey
 import dev.diena.anion.features.custom.blocks.AnionBlock
 import dev.diena.anion.features.custom.blocks.AnionBlocks
@@ -17,7 +18,9 @@ import org.bukkit.Instrument
 import org.bukkit.Material
 import org.bukkit.block.Block
 import org.bukkit.block.BlockFace
+import org.bukkit.block.Container
 import org.bukkit.block.data.BlockData
+import org.bukkit.block.data.type.Hopper
 import org.bukkit.block.data.type.NoteBlock
 
 /**
@@ -185,6 +188,68 @@ object VanillaContainerImporter : AnionTransportComponent {
 
 }
 
+/**
+ * The item filter, bound to the vanilla hopper. Carries out of the face it points, refusing anything
+ * its filter list says it should.
+ *
+ * The list is the hopper's own inventory, which is the whole reason the filter is a hopper: an
+ * AnionBlock is one instance shared by every placed copy and cannot hold a per-cell configuration,
+ * while a hopper's contents are per-cell state vanilla already stores and persists.
+ *
+ * Redstone picks the mode, and vanilla stores that too — a powered hopper is `enabled=false`:
+ * - **unpowered** — whitelist, carries only what is listed
+ * - **powered** — blacklist, carries everything except what is listed
+ *
+ * An empty hopper is an unconfigured one and carries everything, in either mode. A hopper dropped into
+ * a run mid-build should not silently kill the network.
+ *
+ * Items match the way they match everywhere else, by [ItemKey], so an enchanted tool is a different
+ * thing from a plain one and has to be listed separately.
+ */
+object HopperFilter : AnionTransportComponent {
+
+	override fun exitsFor(block: Block, entryFace: BlockFace): List<BlockFace>? {
+
+		val facing = (block.blockData as? Hopper)?.facing ?: return null
+		if (entryFace == facing) return null // that side is the output, nothing comes in through it
+
+		return listOf(facing)
+
+	}
+
+	override fun accepts(block: Block, resource: AnionResource): Boolean {
+
+		val key = resource as? ItemKey ?: return false
+
+		val listed = filterList(block)
+		if (listed.isEmpty()) return true // unconfigured
+
+		return if (blacklisting(block)) key !in listed else key in listed
+
+	}
+
+	override fun describe(block: Block): String {
+
+		val facing = (block.blockData as? Hopper)?.facing ?: return "(not a placed hopper)"
+
+		val listed = filterList(block)
+		val mode = if (blacklisting(block)) "BLACKLIST (powered)" else "WHITELIST"
+
+		if (listed.isEmpty()) return "FILTER out $facing, $mode, empty so everything passes"
+
+		return "FILTER out $facing, $mode ${listed.joinToString(",") { it.namespacedKey.key }}"
+
+	}
+
+	/** every distinct variant the hopper holds, which is what it filters on */
+	private fun filterList(block: Block): List<ItemKey> =
+		(block.state as? Container)?.inventory?.itemKeys().orEmpty()
+
+	/** a powered hopper is disabled, and that is the signal the mode is read from */
+	private fun blacklisting(block: Block): Boolean = (block.blockData as? Hopper)?.isEnabled == false
+
+}
+
 /////////////////
 ///// LOOKUP
 /////////////////
@@ -195,6 +260,7 @@ object AnionTransportComponents {
 	// vanilla blocks cannot implement the interface, so they are adapted here instead
 	private val byMaterial: Map<Material, AnionTransportComponent> = mapOf(
 		Material.CRAFTING_TABLE to VanillaContainerImporter,
+		Material.HOPPER to HopperFilter,
 	)
 
 	/** The component [block] is, or null when it is not one. */

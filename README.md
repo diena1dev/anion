@@ -83,6 +83,10 @@ carriers are the pipe and the junction. a pipe is a length of tube: it carries a
 
 **an uncapped pipe spills.** a pipe end with nothing in front of it drops its contents into the world, which is what makes capping a run matter — any block at all is a cap, a junction included. spilling is the last resort and never a race: the whole network is searched for somewhere that will actually take the items first, so an open end on one branch of a junction never beats a chest on the other, and a chest that has merely filled up makes items wait rather than hit the floor. that lives on `AnionItemPipeBlock.spillAt` rather than in the router, so gas venting or a conduit shorting out is the same hook and none of them inherit each other's rules.
 
+**the filter is a hopper.** it carries out of the face it points and refuses anything its filter list says it should. the list is the hopper's own inventory, which is the entire reason it is a hopper: an AnionBlock is one instance shared by every placed copy and cannot hold a per-cell configuration, while a hopper's contents are per-cell state vanilla already stores and persists. redstone picks the mode, and vanilla stores that too — a powered hopper is `enabled=false`, so unpowered is a whitelist and powered is a blacklist. an empty hopper is an unconfigured one and passes everything in either mode; a hopper dropped into a run mid-build should not silently kill the network. matching is by `ItemKey` like everywhere else, so an enchanted tool is a different thing from a plain one and has to be listed separately.
+
+that needed one addition to the component interface: `accepts(block, resource)`, the policy half of `exitsFor`'s geometry. it is also what a gas pipe rated for one gas will use. and it means **a hopper is no longer a container to transport** — its inventory is configuration, not cargo, so a crafting table beside one will not import the filter list and a run will not deliver into it. use a chest for storage.
+
 drop-offs are a bus port or any vanilla container on an open side. so both of these work, and neither needs a machine anywhere on the run:
 
 ```

@@ -4,6 +4,7 @@ import dev.diena.anion.extensions.drawItem
 import dev.diena.anion.extensions.plus
 import dev.diena.anion.extensions.pushItem
 import dev.diena.anion.extensions.vec3i
+import dev.diena.anion.features.custom.AnionResource
 import dev.diena.anion.features.custom.ItemKey
 import dev.diena.anion.features.machine.component.MachineBuffer
 import dev.diena.anion.features.machine.component.MachinePort
@@ -28,6 +29,12 @@ interface AnionTransportComponent {
 
 	/** Where something entering [block] through [entryFace] can go next, or null if it will not carry. */
 	fun exitsFor(block: Block, entryFace: BlockFace): List<BlockFace>?
+
+	/**
+	 * Whether this component will carry [resource] at all. Geometry is [exitsFor]'s job; this is the
+	 * policy half, so a filter can refuse an item a pipe would happily have taken.
+	 */
+	fun accepts(block: Block, resource: AnionResource): Boolean = true
 
 	/** Moves whatever this component is responsible for moving. Carriers do nothing. */
 	fun drive(pass: TransportPass) {}

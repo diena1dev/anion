@@ -133,6 +133,7 @@ object AnionTransport {
 
 		val block = world.getBlockAt(cell.x, cell.y, cell.z)
 		val component = AnionTransportComponents.at(block) ?: return null
+		if (!component.accepts(block, key)) return null // a filter that refuses this is a dead end for it
 		val exits = component.exitsFor(block, entryFace) ?: return null
 
 		for (exit in exits) {
@@ -347,7 +348,16 @@ object AnionTransport {
 	}
 
 	/** The live inventory of a vanilla container at [cell]. Crafting tables have none, so they fall out. */
-	internal fun containerAt(world: World, cell: Vec3i): Inventory? =
-		(world.getBlockAt(cell.x, cell.y, cell.z).state as? Container)?.inventory
+	// a component's inventory is never cargo, whichever end of a move is asking. the hopper filter has
+	// one only because that is where its filter list lives — importing from it would eat the filter,
+	// and delivering into it would stall the run and rewrite the filter.
+	internal fun containerAt(world: World, cell: Vec3i): Inventory? {
+
+		val block = world.getBlockAt(cell.x, cell.y, cell.z)
+		if (AnionTransportComponents.at(block) != null) return null
+
+		return (block.state as? Container)?.inventory
+
+	}
 
 }
