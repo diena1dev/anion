@@ -52,6 +52,22 @@ open class MachineBuffer(
 	/** ports bound to this buffer. capacity scales with the count, up to [hardCap]. */
 	val boundPorts: MutableSet<MachinePort> = mutableSetOf()
 
+	/**
+	 * The machine that declared this buffer. Claimed by [Machine] once the type has declared its
+	 * buffers, so anything that changes what is held marks that machine for saving.
+	 *
+	 * Null until then, and deliberately null while [restore] runs — writing back what is already on
+	 * disk is not a change.
+	 */
+	internal var owner: Machine? = null
+
+	/** Marks the owning machine for saving. Every path that changes what is held goes through this. */
+	// a machine is only written when it is dirty, so a buffer that fills without saying so is items
+	// that exist until the next restart and then do not
+	protected fun markChanged() {
+		owner?.dirty = true
+	}
+
 	/** What this buffer holds. Never more than one entry in the base — a subclass may hold more. */
 	open fun contents(): Map<AnionResource, Long> {
 
@@ -108,6 +124,7 @@ open class MachineBuffer(
 
 		this.resource = resource
 		this.amount += accepted
+		markChanged()
 
 		return accepted
 
@@ -124,6 +141,7 @@ open class MachineBuffer(
 		val drawn = minOf(units, amount)
 		amount -= drawn
 		if (amount == 0L) this.resource = null
+		if (drawn > 0L) markChanged()
 
 		return drawn
 
@@ -134,6 +152,8 @@ open class MachineBuffer(
 
 	/** Drops the whole contents. Called when the machine is disassembled. */
 	open fun clear() {
+
+		if (resource != null || amount != 0L) markChanged()
 
 		resource = null
 		amount = 0L
@@ -214,6 +234,7 @@ open class BulkItemBuffer(
 		if (accepted <= 0L) return 0L
 
 		stored[resource] = (stored[resource] ?: 0L) + accepted
+		markChanged()
 
 		return accepted
 
@@ -228,12 +249,19 @@ open class BulkItemBuffer(
 
 		// drop the entry outright at zero, otherwise it would hold a type slot hostage
 		if (drawn == held) stored.remove(resource) else stored[resource] = held - drawn
+		if (drawn > 0L) markChanged()
 
 		return drawn
 
 	}
 
-	override fun clear() = stored.clear()
+	override fun clear() {
+
+		if (stored.isNotEmpty()) markChanged()
+
+		stored.clear()
+
+	}
 
 	override fun restore(contents: Map<AnionResource, Long>) {
 

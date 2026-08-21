@@ -552,6 +552,10 @@ abstract class Machine(
 
 		applyRestoredBuffers()
 
+		// claimed after the restore, so reading a machine back off disk does not mark it dirty. from
+		// here on any change to a buffer marks the machine, which is the only reason it ever gets saved
+		for (buffer in buffers.values) buffer.owner = this
+
 	}
 
 	/** Pushes saved buffer contents into the buffers the type declared in [onAssemble]. */
