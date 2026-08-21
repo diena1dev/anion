@@ -41,7 +41,7 @@ open class AnionPillarBlock(
 
 	placeHandler: ((block: Block, player: Player?) -> Unit)? = null,
 	breakHandler: ((block: Block, player: Player?) -> Unit)? = null,
-	interactHandler: ((event: PlayerInteractEvent) -> Unit)? = null,
+	interactHandler: ((event: PlayerInteractEvent) -> Boolean)? = null,
 	neighborChangeHandler: ((block: Block) -> Unit)? = null,
 
 ) : AnionBlock(

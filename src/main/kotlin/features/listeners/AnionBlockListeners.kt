@@ -79,9 +79,6 @@ object AnionBlockListeners : Listener {
 	}
 
 	private fun simulateItemUse(event: PlayerInteractEvent) {
-		// the block already did something with this click, so the held item is not being placed
-		if (event.isCancelled) return
-
 		val hand = event.hand ?: return
 		val nmsHand = if (hand == EquipmentSlot.HAND) InteractionHand.MAIN_HAND else InteractionHand.OFF_HAND
 		val nmsPlayer = (event.player as CraftPlayer).handle
@@ -236,8 +233,8 @@ object AnionBlockListeners : Listener {
 				// item usage defined by NMS, cancel paper events here
 				event.setUseInteractedBlock(Event.Result.DENY)
 				event.setUseItemInHand(Event.Result.DENY)
-				anionBlock.onInteract(event)
-				simulateItemUse(event)
+				// only place if the block did not spend the click on something of its own
+				if (!anionBlock.onInteract(event)) simulateItemUse(event)
 			}
 			return
 		}

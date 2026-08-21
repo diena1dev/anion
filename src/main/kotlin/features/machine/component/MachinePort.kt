@@ -14,7 +14,6 @@ import net.minecraft.core.Vec3i
 import net.minecraft.server.level.ServerLevel
 import org.bukkit.GameMode
 import org.bukkit.craftbukkit.CraftWorld
-import org.bukkit.event.Event
 import org.bukkit.event.block.Action
 import org.bukkit.event.player.PlayerInteractEvent
 import org.bukkit.inventory.EquipmentSlot
@@ -99,47 +98,44 @@ class MachinePort(
 		 * The hand-loading path, so a machine can be fed without building a transport network to it.
 		 * What actually fits is decided by the buffer, not here: the wrong resource for it, or no room,
 		 * takes nothing and says so.
+		 *
+		 * Returns whether the click was spent. Only a load that actually moved something spends it —
+		 * anything else leaves the click to the placement path, so a port stays a block you can build
+		 * against.
 		 */
-		fun insertHeld(event: PlayerInteractEvent) {
+		fun insertHeld(event: PlayerInteractEvent): Boolean {
 
-			if (event.action != Action.RIGHT_CLICK_BLOCK) return
-			if (event.hand != EquipmentSlot.HAND) return
+			if (event.action != Action.RIGHT_CLICK_BLOCK) return false
+			if (event.hand != EquipmentSlot.HAND) return false
 
 			val player = event.player
 			val held = player.inventory.itemInMainHand
-			if (held.isEmpty) return
+			if (held.isEmpty) return false
 
 			// a tool clicked on a port is being used on it, not fed into it
-			if (held.toAnionItem()?.handlesBlockInteraction == true) return
+			if (held.toAnionItem()?.handlesBlockInteraction == true) return false
 
-			val block = event.clickedBlock ?: return
-			val port = at((block.world as CraftWorld).handle, block.vec3i) ?: return
-
-			event.setUseInteractedBlock(Event.Result.DENY)
-			event.setUseItemInHand(Event.Result.DENY)
+			val block = event.clickedBlock ?: return false
+			val port = at((block.world as CraftWorld).handle, block.vec3i) ?: return false
 
 			val buffer = port.buffer() ?: run {
 				player.sendActionBar(Component.text("${port.kind} port is not bound to a buffer.").color(NamedTextColor.RED))
-				return
+				return false
 			}
 
 			val key = ItemKey.of(held)
 
 			if (!buffer.accepts(key)) {
 				player.sendActionBar(Component.text("${buffer.key} will not take that.").color(NamedTextColor.RED))
-				return
+				return false
 			}
 
 			val inserted = buffer.insert(key, held.amount.toLong()).toInt()
 
 			if (inserted <= 0) {
 				player.sendActionBar(Component.text("${buffer.key} is full.").color(NamedTextColor.RED))
-				return
+				return false
 			}
-
-			// the click has been spent. without this a held block item would also get placed against
-			// the port by the listener's own placement path, on top of going into the buffer.
-			event.isCancelled = true
 
 			// creative hands are bottomless everywhere else, so they are here too
 			if (player.gameMode != GameMode.CREATIVE) {
@@ -151,6 +147,8 @@ class MachinePort(
 				Component.text("+$inserted -> ${buffer.key} ${buffer.used()}/${buffer.capacity}")
 					.color(NamedTextColor.GREEN)
 			)
+
+			return true
 
 		}
 

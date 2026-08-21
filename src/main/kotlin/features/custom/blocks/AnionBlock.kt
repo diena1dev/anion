@@ -30,7 +30,7 @@ open class AnionBlock(
 
 	private val placeHandler: ((block: Block, player: Player?) -> Unit)? = null,
 	private val breakHandler: ((block: Block, player: Player?) -> Unit)? = null,
-	private val interactHandler: ((event: PlayerInteractEvent) -> Unit)? = null,
+	private val interactHandler: ((event: PlayerInteractEvent) -> Boolean)? = null,
 	private val neighborChangeHandler: ((block: Block) -> Unit)? = null,
 
 ) : AnionResource {
@@ -61,7 +61,13 @@ open class AnionBlock(
 
 	open fun onPlace(block: Block, player: Player?) { placeHandler?.invoke(block, player) }
 	open fun onBreak(block: Block, player: Player?) { breakHandler?.invoke(block, player) }
-	open fun onInteract(event: PlayerInteractEvent) { interactHandler?.invoke(event) }
+	/**
+	 * Handles a right click on this block. Returns whether the click was spent.
+	 *
+	 * False leaves the click to the placement path, so a block that does nothing with it is still
+	 * something you can build against.
+	 */
+	open fun onInteract(event: PlayerInteractEvent): Boolean = interactHandler?.invoke(event) ?: false
 	open fun onNeighborChange(block: Block) { neighborChangeHandler?.invoke(block) }
 	open fun onAdd() {}
 	open fun onRemove() {}
