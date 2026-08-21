@@ -69,6 +69,10 @@ first pass, items only.
 
 **components drive, ports do not.** a MachinePort exists only to bridge to an internal buffer, so transport never iterates ports — it iterates its own blocks and looks a port up when one happens to be on the other side. the adapters are the intermediary blocks that attach on the outside of a port: a chute on a bus, and later a pump on a valve and a connector on a conduit.
 
+**the block is the behaviour.** `AnionTransportComponent` is an interface a block implements — `exitsFor`, `drive`, `describe` — so `AnionTransport.tick()` resolves the component and calls the hook without ever naming a block, the way AnionItemDispatcher does for items. a driver gets a `TransportPass` rather than the world, so the per-buffer rationing cannot be skipped. a new component is a new class plus one line in `AnionBlocks`; editing AnionTransport to add one means it is in the wrong place. vanilla blocks cannot implement an interface, so the crafting table is adapted through `AnionTransportComponents.byMaterial`.
+
+nothing in that interface says "item". what it does not yet cover is a component that *holds* its contents instead of passing them straight through — a gas pipe that fills up and flows on. an AnionBlock is a singleton shared by every placed copy, so per-cell contents need an instance layer like `Machine.activeMachines`, keyed by cell or by network. that is the same graph the cached-routing TODO wants, and it should land with gas rather than before it.
+
 drivers:
 - **chute** — exports the buffer of any bus port touching it, out of any of its other sides. no facing: the name suggests one, but making it directional only ever created a way to build it backwards. with no port beside it, it carries like a junction.
 - **crafting table** — the vanilla-inventory import adapter. pulls from any container touching it and pushes into whatever the network offers. asymmetric on purpose: a chest feeds the network through a table rather than being drained by any pipe that happens to run past.

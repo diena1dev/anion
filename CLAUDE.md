@@ -41,6 +41,15 @@ Rules:
 - Helpers are `object` when stateless (`StarshipMovement`, `StarshipCollision`, `StarshipSplit`) and a per-ship class with a `private constructor()` + `companion object { fun new(starship: Starship) }` when they hold state (`StarshipVelocity`, `StarshipSimulator`, `StarshipHitbox`).
 - A helper takes the carrier ship as a parameter or a back-reference field, and mutates it through the ship's own public functions where one exists.
 
+### Transport: the block is the behaviour
+
+`AnionTransportComponent` is an interface, not a base class — a pipe is already an `AnionPillarBlock` and Kotlin gives you one superclass. A block that transport can use implements it and answers three questions: `exitsFor` (where something entering here can go), `drive` (what work this component does, nothing for a plain carrier), `describe` (its line in `/transport debug`).
+
+- `AnionTransport.tick()` is **dispatch only** — resolve the component through `AnionTransportComponents.at(block)`, hand it a `TransportPass`, call `drive`. No block is ever named there, the same way `AnionItemDispatcher` never names an item.
+- A driver gets a `TransportPass`, never the world, so the per-buffer rationing in `route()` cannot be skipped.
+- Vanilla blocks cannot implement the interface, so they are adapted in `AnionTransportComponents.byMaterial` — one entry, not a branch in the pass.
+- New component (gas pipe, pump, connector) = a new class implementing the interface + one line in `AnionBlocks`. If you are editing `AnionTransport` to add one, it is in the wrong place.
+
 ### Registries
 
 `AnionRegistry<V>` + `AnionRegistryKey` + the `AnionRegistries` object. Registration throws on duplicate keys. Feature `object`s (`AnionItems`, `AnionBlocks`, `AnionRecipes`) are touched in `Anion.onEnable()` purely to force their static init to run the registrations.

@@ -4,6 +4,9 @@ import dev.diena.anion.data.registry.AnionRegistryKey
 import dev.diena.anion.data.registry.registries.AnionRegistries
 import dev.diena.anion.extensions.gradient
 import dev.diena.anion.features.custom.items.AnionItems
+import dev.diena.anion.features.transport.AnionItemChuteBlock
+import dev.diena.anion.features.transport.AnionItemPipeBlock
+import dev.diena.anion.features.transport.AnionItemPipeJunctionBlock
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.TextColor
 import org.bukkit.Axis
@@ -115,11 +118,10 @@ object AnionBlocks {
 		)
 	)
 
-	// transport pipe. a pipe is a length of tube, so it carries both ways along whichever axis it was
-	// laid on and only takes items in through one of its two ends — turning a corner is what the
-	// junction is for. notes 13-15 are free, left over from when this was six one-way facings.
+	// transport components. what each one does lives on its own class — see AnionTransportComponent.
+	// notes 13-15 are free, left over from when the pipe was six one-way facings.
 	val ITEM_PIPE = registerPillarBlock(
-		AnionPillarBlock(
+		AnionItemPipeBlock(
 			"Item Pipe",
 			Instrument.ZOMBIE,
 			mapOf(
@@ -130,19 +132,16 @@ object AnionBlocks {
 		)
 	)
 
-	// takes items in on any face and passes them out of every other one
 	val ITEM_PIPE_JUNCTION = registerBlock(
-		AnionBlock(
+		AnionItemPipeJunctionBlock(
 			"Item Pipe Junction",
 			Instrument.ZOMBIE,
 			16,
 		)
 	)
 
-	// item adapter. sits against a machine's bus port and drives what the port only provides access to.
-	// no facing: it takes the port on whichever side has one and passes items out of any other.
 	val ITEM_CHUTE = registerBlock(
-		AnionBlock(
+		AnionItemChuteBlock(
 			"Item Chute",
 			Instrument.ZOMBIE,
 			17,

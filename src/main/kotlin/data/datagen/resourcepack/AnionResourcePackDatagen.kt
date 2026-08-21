@@ -4,8 +4,8 @@ import com.google.gson.GsonBuilder
 import com.google.gson.JsonObject
 import dev.diena.anion.data.registry.registries.AnionRegistries
 import dev.diena.anion.features.custom.blocks.AnionBlock
-import dev.diena.anion.features.custom.blocks.AnionBlocks
 import dev.diena.anion.features.custom.blocks.AnionPillarBlock
+import dev.diena.anion.features.transport.AnionTransportComponent
 import net.minecraft.world.level.block.state.properties.NoteBlockInstrument
 import org.bukkit.craftbukkit.block.data.CraftBlockData
 import java.io.File
@@ -99,7 +99,7 @@ class AnionResourcePackDatagen(private val outputDir: File) {
 	private fun placeholderModelParent(block: AnionBlock): String? = when {
 
 		block is AnionPillarBlock -> "minecraft:block/purpur_pillar"
-		block === AnionBlocks.ITEM_PIPE_JUNCTION || block === AnionBlocks.ITEM_CHUTE -> "minecraft:block/purpur_block"
+		block is AnionTransportComponent -> "minecraft:block/purpur_block"
 
 		else -> null
 

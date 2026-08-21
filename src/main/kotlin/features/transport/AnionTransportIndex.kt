@@ -1,11 +1,8 @@
 package dev.diena.anion.features.transport
 
 import dev.diena.anion.data.database.AnionPersistence
-import dev.diena.anion.extensions.anionBlock
 import dev.diena.anion.extensions.vec3i
-import dev.diena.anion.features.custom.blocks.AnionBlocks
 import net.minecraft.core.Vec3i
-import org.bukkit.Material
 import org.bukkit.World
 import org.bukkit.block.Block
 import java.util.UUID
@@ -33,23 +30,8 @@ object AnionTransportIndex {
 	/** Every indexed component cell in [world]. */
 	fun cellsIn(world: World): Set<Vec3i> = cells[world.uid] ?: emptySet()
 
-	/** Whether transport drives items from [block], or carries them through it. */
-	fun isComponent(block: Block): Boolean {
-
-		// a crafting table is the vanilla-inventory import adapter, so it counts as a component
-		if (block.type == Material.CRAFTING_TABLE) return true
-
-		return when (block.anionBlock) {
-
-			AnionBlocks.ITEM_PIPE,
-			AnionBlocks.ITEM_PIPE_JUNCTION,
-			AnionBlocks.ITEM_CHUTE -> true
-
-			else -> false
-
-		}
-
-	}
+	/** Whether transport drives anything from [block], or carries anything through it. */
+	fun isComponent(block: Block): Boolean = AnionTransportComponents.at(block) != null
 
 	/** Records [block] as a component, in memory and on disk. No-op if it is not one. */
 	fun register(block: Block) {
