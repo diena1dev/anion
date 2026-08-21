@@ -279,6 +279,10 @@ object AnionBlockListeners : Listener {
 			}
 		}
 
+		// a piston learns about redstone through its own physics event, so cancelling that one stops it
+		// ever firing. an anion block beside it is already covered by its own branch above.
+		if (block.type == Material.PISTON || block.type == Material.STICKY_PISTON) return
+
 		if (anionBlockAt(block.getRelative(BlockFace.UP)) != null ||
 			anionBlockAt(block.getRelative(BlockFace.DOWN)) != null) {
 			event.isCancelled = true
@@ -297,22 +301,53 @@ object AnionBlockListeners : Listener {
 	@EventHandler
 	fun onPistonRetract(event: BlockPistonRetractEvent) = trackPistonMove(event, event.blocks)
 
+	/** The note block data at [block] when it encodes a registered AnionBlock, else null. */
+	private fun anionNoteData(block: Block): NoteBlock? {
+		val data = block.blockData as? NoteBlock ?: return null
+		if (AnionBlocks.fromState(data.instrument, data.note.id.toInt()) == null) return null
+
+		return data
+	}
+
+	/** Records the anion data a piston move is about to lose, keyed by the cell it belongs in after. */
 	private fun trackPistonMove(event: BlockPistonEvent, blocks: List<Block>) {
+
+		// every cell the move empties. on a vertical move these are also the up/down neighbours swept
+		// below, and stamping one is what duplicated the block: the piston head lands in a vacated cell
+		// on extend, and on retract it is left as plain air with a second copy of an already-moved block.
+		val vacated = blocks.toHashSet()
+
+		val destinations = mutableMapOf<Block, BlockData>()
 		for (block in blocks) {
+			val data = anionNoteData(block) ?: continue
+			destinations[block.getRelative(event.direction)] = data
+		}
+
+		// a note block reads its instrument off the block below it, so a cell that changes can mangle
+		// the anion block above or below it. those are not moving, so they get repaired where they are.
+		for (block in blocks) {
+
 			val destination = block.getRelative(event.direction)
 
-			fun markIfAnion(target: Block, dataSource: Block = target) {
-				val data = dataSource.blockData as? NoteBlock ?: return
-				if (AnionBlocks.fromState(data.instrument, data.note.id.toInt()) == null) return
-				blocksToFix[target] = data
+			val neighbours = listOf(
+				block.getRelative(BlockFace.UP),
+				block.getRelative(BlockFace.DOWN),
+				destination.getRelative(BlockFace.UP),
+				destination.getRelative(BlockFace.DOWN),
+			)
+
+			for (neighbour in neighbours) {
+				if (neighbour in vacated || neighbour in destinations) continue
+
+				val data = anionNoteData(neighbour) ?: continue
+				blocksToFix[neighbour] = data
 			}
 
-			markIfAnion(destination, block)               // the moving block itself
-			markIfAnion(block.getRelative(BlockFace.UP))         // block above source
-			markIfAnion(block.getRelative(BlockFace.DOWN))       // block below source
-			markIfAnion(destination.getRelative(BlockFace.UP))   // block above destination
-			markIfAnion(destination.getRelative(BlockFace.DOWN)) // block below destination
 		}
+
+		// last, so a moving block's destination outranks any repair another block claimed for that cell
+		blocksToFix += destinations
+
 	}
 
 	@EventHandler
@@ -321,8 +356,17 @@ object AnionBlockListeners : Listener {
 		blocksToFix = mutableMapOf()
 		for ((block, data) in toFix) {
 			block.setBlockData(data, false)
+
+			// the block lives somewhere else now. the cell it left is a stale hint and drops out on the
+			// next read, but nothing would ever have discovered the one it landed in.
+			AnionTransportIndex.register(block)
+			markMachineCell(block)
+
+			// everyone who can see the cell, not only whoever is standing in its chunk — the rest were
+			// left holding whatever the piston told them was there
+			val viewRadius = block.world.viewDistance * 16.0
 			block.world.players
-				.filter { it.location.chunk == block.chunk }
+				.filter { it.location.distanceSquared(block.location) <= viewRadius * viewRadius }
 				.forEach { it.sendBlockChange(block.location, data) }
 		}
 	}
