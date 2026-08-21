@@ -132,6 +132,9 @@ abstract class Machine(
 		/** fraction of mismatched cells past which a broken machine tears itself down instead of waiting for repair */
 		const val DISASSEMBLY_THRESHOLD = 0.5
 
+		/** what a machine will move per transport pass when its type does not say otherwise */
+		const val DEFAULT_TRANSFER_CEILING = 512L
+
 		/** Every machine holding [cell]. Machines may share cells, so this is a list. */
 		// grounded machines live in the cell index; carried ones are tracked by their ship instead
 		fun machinesAt(level: ServerLevel, cell: Vec3i): List<Machine> =
@@ -248,6 +251,16 @@ abstract class Machine(
 
 	/** resource stores, keyed by name. kept while the structure is broken, spilled on disassembly. */
 	val buffers: MutableMap<String, MachineBuffer> = mutableMapOf()
+
+	/**
+	 * Ceiling on units moved in or out of this machine across one transport pass, summed over every
+	 * buffer.
+	 *
+	 * A port raises the rate of the buffer it is bound to; this is the only thing that stops that
+	 * scaling forever. Machine-wide rather than per-buffer on purpose — a per-buffer cap would just be
+	 * dodged by spreading the same wall of ports over three buffers instead of one.
+	 */
+	open val transferCeiling: Long = DEFAULT_TRANSFER_CEILING
 
 	var rotation: Rotation = Rotation.NONE; protected set
 	var intact: Boolean = false; protected set

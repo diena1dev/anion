@@ -72,7 +72,9 @@ readouts go to the action bar, so a tool never spams chat and never needs an int
 
 `MachineBuffer.spillable` is the opt-out: false on `BulkItemBuffer`, because emptying a container is the opposite of the point and a full one is thousands of items on the floor. disassembly ignores it — the machine is going away either way.
 
-capacity comes from the ports bound to a buffer, so a machine with three buffers wants at least three bus ports. with fewer, whichever buffer got none has no room and the machine stalls against it — the framework working as designed, and visible in `/machine debug` as `0/0 ports=0`.
+**capacity is fixed and ports do not touch it.** a buffer holds what its machine says it holds, bound to nothing or bound to ten. ports move resources in and out; they do not make room for them, so bolting more onto a casing makes a machine faster and never bigger. a machine with no ports at all still works — you just have to hand-load it.
+
+what a port *does* buy is rate, at two levels. `transferLimit()` is `transferPerPort` for each port bound to that buffer, and `Machine.transferCeiling` is the total across every buffer on the machine. machine-wide rather than per-buffer on purpose: a per-buffer cap is dodged by spreading the same wall of ports over three buffers instead of one.
 
 **a run is scoped to the machine, not the recipe.** a registered `AnionRecipe` is one object shared by everything that smelts it, and both the adapter's op counter and each `AnionIngredient`'s fed-in progress are mutable — two machines running off the shared instance would advance each other. `AnionRecipe.newRun()` hands out a copy with its own counters and handlers that still delegate to the original.
 
@@ -92,7 +94,7 @@ drivers:
 - **chute** — exports the buffer of any bus port touching it, out of any of its other sides. no facing: the name suggests one, but making it directional only ever created a way to build it backwards. with no port beside it, it carries like a junction.
 - **crafting table** — the vanilla-inventory import adapter. pulls from any container touching it and pushes into whatever the network offers. asymmetric on purpose: a chest feeds the network through a table rather than being drained by any pipe that happens to run past.
 
-**throughput** is rationed per buffer per pass, not per driver. `transferLimit()` is `softTransfer` per bound port clamped by `hardTransfer`, so more ports genuinely is more throughput — the point of ports — but a wall of importers cannot stuff or drain a buffer in one tick. both ends of a handoff are charged, so neither a busy source nor a popular destination gets worked harder than its own ports allow. a vanilla container has no rate of its own and stays limited by its slots.
+**throughput** is rationed per pass, not per driver, at two levels: what a buffer has left (`transferPerPort` per bound port) and what its whole machine has left (`Machine.transferCeiling`, shared across every buffer). so more ports genuinely is more throughput — the point of ports — but a wall of importers cannot stuff or drain a machine in one tick, and cannot dodge the ceiling by spreading itself over several of its buffers. both ends of a handoff are charged, so neither a busy source nor a popular destination gets worked harder than its own ports allow. a vanilla container has no rate of its own and stays limited by its slots.
 
 carriers are the pipe and the junction. a pipe is a length of tube: it carries along the axis it was laid on, in at one end and out at the other, either way round. direction comes from where the items entered rather than from the block, so a run reads straight off the world with nothing to configure and no way to build one backwards. turning a corner is what the junction is for.
 

@@ -74,10 +74,9 @@ val DEBUG_FURNACE_STRUCTURE =
  * got loaded with the wrong thing. That is the whole point of the machine: a single buffer can be
  * auto-bound at assembly and never thought about, three cannot.
  *
- * A buffer's capacity is granted by the ports bound to it, so this wants **at least three bus ports**
- * in the casing — with fewer, whichever buffer got none has no room and the furnace stalls against it.
- * That is the framework working as designed rather than a bug, and `/machine debug` shows it as
- * `0/0 ports=0`.
+ * Capacity is fixed, so it runs with no ports at all if you hand-load it. Ports are what let transport
+ * feed it, and how fast: each one raises the rate of the buffer it is bound to, up to the machine's
+ * own [transferCeiling].
  */
 class DebugFurnaceMachine : PortedMachine("Debug Furnace", DEBUG_FURNACE_STRUCTURE) {
 
@@ -90,9 +89,8 @@ class DebugFurnaceMachine : PortedMachine("Debug Furnace", DEBUG_FURNACE_STRUCTU
 		/** one course above the roof */
 		private val SMOKE_OFFSET = Vec3i(0, 3, 0)
 
-		/** per bound port, and the ceiling however many are bound */
-		private const val BUFFER_SOFT_CAP = 64L
-		private const val BUFFER_HARD_CAP = 512L
+		/** fixed, whatever is bound to it — ports move resources, they do not make room for them */
+		private const val BUFFER_CAPACITY = 512L
 
 	}
 
@@ -130,9 +128,9 @@ class DebugFurnaceMachine : PortedMachine("Debug Furnace", DEBUG_FURNACE_STRUCTU
 
 		// declared before super, which resolves the ports and replays their saved bindings — those
 		// bindings resolve against this map, so it has to be populated first
-		buffers[FUEL_BUFFER] = MachineBuffer(FUEL_BUFFER, ItemKey::class, BUFFER_SOFT_CAP, BUFFER_HARD_CAP)
-		buffers[INPUT_BUFFER] = MachineBuffer(INPUT_BUFFER, ItemKey::class, BUFFER_SOFT_CAP, BUFFER_HARD_CAP)
-		buffers[OUTPUT_BUFFER] = MachineBuffer(OUTPUT_BUFFER, ItemKey::class, BUFFER_SOFT_CAP, BUFFER_HARD_CAP)
+		buffers[FUEL_BUFFER] = MachineBuffer(FUEL_BUFFER, ItemKey::class, BUFFER_CAPACITY)
+		buffers[INPUT_BUFFER] = MachineBuffer(INPUT_BUFFER, ItemKey::class, BUFFER_CAPACITY)
+		buffers[OUTPUT_BUFFER] = MachineBuffer(OUTPUT_BUFFER, ItemKey::class, BUFFER_CAPACITY)
 
 		super.onAssemble()
 

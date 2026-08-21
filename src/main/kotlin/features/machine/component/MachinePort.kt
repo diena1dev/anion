@@ -148,7 +148,7 @@ class MachinePort(
 			}
 
 			player.sendActionBar(
-				Component.text("+$inserted -> ${buffer.key} ${buffer.used()}/${buffer.capacity()}")
+				Component.text("+$inserted -> ${buffer.key} ${buffer.used()}/${buffer.capacity}")
 					.color(NamedTextColor.GREEN)
 			)
 

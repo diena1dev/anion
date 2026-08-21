@@ -13,21 +13,20 @@ import kotlin.reflect.KClass
  * instance gate (is it *this* gas). Subclasses that hold several resources at once, like a bulk
  * container, override [accepts] and the storage trio and leave the family gate alone.
  *
- * @param key           name this buffer is addressed by within its machine
- * @param resourceType  resource family this buffer accepts (AnionItem, AnionGas, ...)
- * @param softCap       capacity granted per bound port
- * @param hardCap       ceiling across every bound port, no matter how many are attached
+ * Capacity is fixed. Ports move resources in and out; they do not make room for them, so bolting more
+ * onto the casing makes a machine faster and never bigger.
+ *
+ * @param key             name this buffer is addressed by within its machine
+ * @param resourceType    resource family this buffer accepts (AnionItem, AnionGas, ...)
+ * @param capacity        how much it holds, whatever is bound to it
+ * @param transferPerPort units moved per transport pass, for each port bound to this buffer
  */
 open class MachineBuffer(
 
 	val key: String,
 	val resourceType: KClass<out AnionResource>,
-	val softCap: Long,
-	val hardCap: Long,
-	/** units moved per transport pass, per bound port */
-	val softTransfer: Long = DEFAULT_TRANSFER_PER_PORT,
-	/** ceiling on units moved per pass, however many ports are bound */
-	val hardTransfer: Long = softTransfer * 8,
+	val capacity: Long,
+	val transferPerPort: Long = DEFAULT_TRANSFER_PER_PORT,
 	/**
 	 * Whether a player may dump this buffer with a screwdriver.
 	 *
@@ -50,7 +49,7 @@ open class MachineBuffer(
 	protected var resource: AnionResource? = null
 	protected var amount: Long = 0L
 
-	/** ports bound to this buffer. capacity scales with the count, up to [hardCap]. */
+	/** ports bound to this buffer. throughput scales with the count, capacity does not. */
 	val boundPorts: MutableSet<MachinePort> = mutableSetOf()
 
 	/**
@@ -98,21 +97,17 @@ open class MachineBuffer(
 	 * pushing at it.
 	 *
 	 * Scales with bound ports because that is the whole point of ports — a machine fed through seven
-	 * of them should genuinely run seven times harder — and [hardTransfer] is what stops it scaling
-	 * forever, so a wall of ports cannot drain a buffer in a single tick.
+	 * of them should genuinely run seven times harder. What stops it scaling forever is the machine's
+	 * own [Machine.transferCeiling], not anything here: the ceiling is shared across every buffer, so
+	 * a wall of ports cannot be spread over several of them to dodge it.
 	 */
-	open fun transferLimit(): Long = minOf(softTransfer * boundPorts.size, hardTransfer).coerceAtLeast(0L)
-
-	/** Current capacity: [softCap] per bound port, clamped to [hardCap]. */
-	// throughput scales with ports because that is what a machine input is. storage that scales with
-	// volume instead should override this outright.
-	open fun capacity(): Long = minOf(softCap * boundPorts.size, hardCap)
+	open fun transferLimit(): Long = (transferPerPort * boundPorts.size).coerceAtLeast(0L)
 
 	/** Total units held across every resource. */
 	open fun used(): Long = contents().values.sum()
 
 	/** Room left before [capacity] is hit. */
-	open fun free(): Long = (capacity() - used()).coerceAtLeast(0L)
+	open fun free(): Long = (capacity - used()).coerceAtLeast(0L)
 
 	/** Inserts up to [units] of [resource]. Returns how much was accepted. */
 	open fun insert(resource: AnionResource, units: Long): Long {
@@ -149,7 +144,7 @@ open class MachineBuffer(
 	}
 
 	/** One line for a debug readout. */
-	open fun describe(): String = "$key ${used()}/${capacity()} ports=${boundPorts.size}"
+	open fun describe(): String = "$key ${used()}/$capacity ports=${boundPorts.size}"
 
 	/** Drops the whole contents. Called when the machine is disassembled. */
 	open fun clear() {
@@ -161,7 +156,7 @@ open class MachineBuffer(
 
 	}
 
-	/** Restores a saved buffer. Bypasses [capacity] — ports are bound after state is read back. */
+	/** Restores a saved buffer. Bypasses [capacity] so lowering one never voids what was already in it. */
 	internal open fun restore(contents: Map<AnionResource, Long>) {
 
 		val (held, units) = contents.entries.firstOrNull() ?: run {
@@ -177,7 +172,7 @@ open class MachineBuffer(
 }
 
 /**
- * Item store that holds several variants at once: up to [typeLimit] distinct ones, and [totalCapacity]
+ * Item store that holds several variants at once: up to [typeLimit] distinct ones, and [capacity]
  * items summed across all of them. Two caps, and they bite independently — a container with room by
  * count still refuses a variant it has no type slot for.
  *
@@ -187,18 +182,15 @@ open class BulkItemBuffer(
 
 	key: String,
 	val typeLimit: Int,
-	val totalCapacity: Long,
-	softTransfer: Long = DEFAULT_TRANSFER_PER_PORT,
-	hardTransfer: Long = softTransfer * 8,
+	capacity: Long,
+	transferPerPort: Long = DEFAULT_TRANSFER_PER_PORT,
 
 ) : MachineBuffer(
 
 	key,
 	ItemKey::class,
-	totalCapacity,
-	totalCapacity,
-	softTransfer,
-	hardTransfer,
+	capacity,
+	transferPerPort,
 	// dumping a container is the opposite of what one is for, and a full one is 24000 items on the floor
 	spillable = false,
 
@@ -213,10 +205,7 @@ open class BulkItemBuffer(
 	fun typesUsed(): Int = stored.size
 
 	override fun describe(): String =
-		"$key ${used()}/${capacity()} ${typesUsed()}/$typeLimit types ports=${boundPorts.size}"
-
-	// storage capacity is a property of the structure, not of how many ports were bolted onto it
-	override fun capacity(): Long = totalCapacity
+		"$key ${used()}/$capacity ${typesUsed()}/$typeLimit types ports=${boundPorts.size}"
 
 	override fun accepts(resource: AnionResource): Boolean {
 

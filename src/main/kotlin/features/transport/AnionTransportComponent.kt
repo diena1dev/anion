@@ -6,6 +6,7 @@ import dev.diena.anion.extensions.pushItem
 import dev.diena.anion.extensions.vec3i
 import dev.diena.anion.features.custom.AnionResource
 import dev.diena.anion.features.custom.ItemKey
+import dev.diena.anion.features.machine.Machine
 import dev.diena.anion.features.machine.component.MachineBuffer
 import dev.diena.anion.features.machine.component.MachinePort
 import net.minecraft.core.Vec3i
@@ -166,23 +167,41 @@ class Sink(
 }
 
 /**
- * What each machine buffer has left to move this pass.
+ * What is left to move this pass, at both levels that ration it.
  *
  * Without this every driver got its own throughput, so seven crafting tables feeding one machine simply
  * moved seven times as much. Ports are supposed to raise throughput, but the ceiling has to come from
- * the buffer being fed rather than from how many things happen to be pushing at it.
+ * the thing being fed rather than from how many happen to be pushing at it.
+ *
+ * Two levels because the port count decides a buffer's rate and nothing else may: the machine's own
+ * ceiling is shared across all of its buffers, so a wall of ports spread over three of them runs into
+ * exactly the same wall as a wall of ports on one.
  */
 class Budget internal constructor() {
 
-	private val remaining = HashMap<MachineBuffer, Long>()
+	private val perBuffer = HashMap<MachineBuffer, Long>()
+	private val perMachine = HashMap<Machine, Long>()
 
-	fun left(buffer: MachineBuffer?): Long =
-		if (buffer == null) Long.MAX_VALUE // a vanilla container is limited by its own slots
-		else remaining.getOrPut(buffer) { buffer.transferLimit() }
+	fun left(buffer: MachineBuffer?): Long {
+
+		if (buffer == null) return Long.MAX_VALUE // a vanilla container is limited by its own slots
+
+		val bufferLeft = perBuffer.getOrPut(buffer) { buffer.transferLimit() }
+		val machine = buffer.owner ?: return bufferLeft
+
+		return minOf(bufferLeft, perMachine.getOrPut(machine) { machine.transferCeiling })
+
+	}
 
 	fun spend(buffer: MachineBuffer?, units: Long) {
+
 		if (buffer == null || units <= 0L) return
-		remaining[buffer] = (left(buffer) - units).coerceAtLeast(0L)
+
+		perBuffer[buffer] = (perBuffer.getOrPut(buffer) { buffer.transferLimit() } - units).coerceAtLeast(0L)
+
+		val machine = buffer.owner ?: return
+		perMachine[machine] = (perMachine.getOrPut(machine) { machine.transferCeiling } - units).coerceAtLeast(0L)
+
 	}
 
 }

@@ -249,7 +249,7 @@ object AnionTransport {
 			val buffer = port.buffer()
 				?: return "$name BUS PORT -> ${port.bufferKey ?: "unbound"} (no buffer: machine broken or unbound)"
 
-			return "$name BUS PORT -> ${port.bufferKey} ${buffer.used()}/${buffer.capacity()}"
+			return "$name BUS PORT -> ${port.bufferKey} ${buffer.used()}/${buffer.capacity}"
 		}
 
 		containerAt(world, cell)?.let { container ->

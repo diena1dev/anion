@@ -113,7 +113,7 @@ class AnionScrewdriverItem : AnionItem(
 		val message = when {
 			port.bufferKey == null -> "${port.kind} -> unbound"
 			buffer == null -> "${port.kind} -> ${port.bufferKey} (machine broken)"
-			else -> "${port.kind} -> ${buffer.key} ${buffer.used()}/${buffer.capacity()}"
+			else -> "${port.kind} -> ${buffer.key} ${buffer.used()}/${buffer.capacity}"
 		}
 
 		player.sendActionBar(Component.text(message).color(NamedTextColor.AQUA))

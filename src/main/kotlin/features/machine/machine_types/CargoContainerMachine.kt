@@ -83,7 +83,7 @@ class CargoContainerMachine(
 
 		// declared before super, which resolves the ports and replays their saved bindings — those
 		// bindings resolve against this map, so it has to be populated first
-		buffers[CARGO_BUFFER] = BulkItemBuffer(CARGO_BUFFER, typeLimit, totalCapacity)
+		buffers[CARGO_BUFFER] = BulkItemBuffer(CARGO_BUFFER, typeLimit, capacity = totalCapacity)
 
 		super.onAssemble()
 
