@@ -90,7 +90,7 @@ class DebugFurnaceMachine : PortedMachine("Debug Furnace", DEBUG_FURNACE_STRUCTU
 		private val SMOKE_OFFSET = Vec3i(0, 3, 0)
 
 		/** fixed, whatever is bound to it — ports move resources, they do not make room for them */
-		private const val BUFFER_CAPACITY = 512L
+		private const val BUFFER_CAPACITY = 16L
 
 	}
 
