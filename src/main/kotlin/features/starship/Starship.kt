@@ -61,6 +61,7 @@ class Starship {
 	lateinit var hitbox: StarshipHitbox       // ship hitbox
 	lateinit var simulator: StarshipSimulator // starship world interaction
 	lateinit var machines: StarshipMachines   // machines carried by this ship
+	lateinit var transport: StarshipTransport // transport component cells carried by this ship
 
 	lateinit var velocity: StarshipVelocity
 	var yaw: Double = 0.0
@@ -132,10 +133,12 @@ class Starship {
 		this.hitbox = StarshipHitbox.new(this)
 		this.velocity = StarshipVelocity.new(this)
 		this.machines = StarshipMachines.new(this)
+		this.transport = StarshipTransport.new(this)
 		this.yaw = 1.0
 		this.size = blockPosSet.size
 
 		this.machines.rebuild() // claim any machine already assembled inside the detected blocks
+		this.transport.rebuild() // and any pipe, junction or chute among the detected blocks
 
 		this.simulator.calculateTotalStarshipMass() // calculate initial starship mass
 
@@ -168,10 +171,14 @@ class Starship {
 		this.velocity = StarshipVelocity.new(this) // FIXME: SAVE VELOCITY ON SHIP UNLOAD
 		this.simulator = StarshipSimulator.new(this) // FIXME: Save Simulator on unload.
 		this.machines = StarshipMachines.new(this)
+		this.transport = StarshipTransport.new(this)
 
 		// machines load on their own chunk, which may come up before or after this ship — rebuild()
 		// catches the ones already in memory, and any that load later claim this ship themselves.
 		this.machines.rebuild()
+
+		// components have no such ordering problem: they are cells, and this ship's blocks are all here
+		this.transport.rebuild()
 
 		return this
 
@@ -201,6 +208,7 @@ class Starship {
 		this.origin += vectorToMoveIn                  // translate origin
 		this.blockHashMap = writingToWorld { StarshipMovement.move(vectorToMoveIn, this) }
 		this.machines.translate(vectorToMoveIn) // carry machines along, after the world is rewritten
+		this.transport.translate(vectorToMoveIn) // and the component cells, which are pure positions
 		this.hitbox.moveHitbox(vectorToMoveIn) // translate hitbox
 		this.dirty = true
 		this.moving = false
@@ -249,6 +257,7 @@ class Starship {
 		// origin is unchanged
 		this.blockHashMap = writingToWorld { StarshipMovement.rotate(steps, this) }
 		this.machines.rotate(rotationOf(steps)) // same steps as the blocks, so machines land with them
+		this.transport.rotate(rotationOf(steps))
 		this.hitbox.rebuildHitbox() // recompute hitbox
 		this.dirty = true
 		this.moving = false
@@ -303,6 +312,7 @@ class Starship {
 		}
 
 		this.blockHashMap.remove(block.vec3i)
+		this.transport.remove(block.vec3i)
 
 		// TODO: move this out of removeBlock
 		this.checkForSplit(block.vec3i)
@@ -365,6 +375,8 @@ class Starship {
 			this.hitbox.rebuildHitbox()
 			this.dirty = true
 
+			this.transport.add(block) // no-op unless it is a pipe, chute or crafting table
+
 			this.simulator.addStarshipMass(block)
 
 			return true
@@ -397,6 +409,10 @@ class Starship {
 		// position is unchanged, so the hitbox does not need rebuilding
 		this.blockHashMap[block.vec3i] = (block as CraftBlock).blockState
 		this.dirty = true
+
+		// the cell may have become a component, or stopped being one
+		this.transport.remove(block.vec3i)
+		this.transport.add(block)
 
 		return true
 
@@ -455,6 +471,7 @@ class Starship {
 		this.simulator.calculateTotalStarshipMass()
 		this.hitbox.rebuildHitbox()
 		this.machines.rebuild() // the island took some of these blocks with it
+		this.transport.rebuild()
 		this.dirty = true
 
 		// build the new ship from the detached block set (world states re-read here on the main thread).

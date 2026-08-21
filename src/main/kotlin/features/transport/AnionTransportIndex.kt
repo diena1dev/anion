@@ -2,6 +2,7 @@ package dev.diena.anion.features.transport
 
 import dev.diena.anion.data.database.AnionPersistence
 import dev.diena.anion.extensions.vec3i
+import dev.diena.anion.features.starship.Starship
 import net.minecraft.core.Vec3i
 import org.bukkit.World
 import org.bukkit.block.Block
@@ -27,8 +28,25 @@ object AnionTransportIndex {
 	/** component cells per world uuid */
 	private val cells: MutableMap<UUID, MutableSet<Vec3i>> = ConcurrentHashMap()
 
-	/** Every indexed component cell in [world]. */
-	fun cellsIn(world: World): Set<Vec3i> = cells[world.uid] ?: emptySet()
+	/**
+	 * Every component cell in [world]: the grounded ones recorded here, plus the ones riding a ship.
+	 *
+	 * A carried cell moves every tick, so it is never persisted and never lives in this index — its ship
+	 * holds it instead, exactly as a carried machine is held by its ship rather than by MachineIndex.
+	 */
+	fun cellsIn(world: World): Set<Vec3i> {
+
+		val grounded = cells[world.uid] ?: emptySet()
+
+		val carried = Starship.loadedStarships.values
+			.filter { it.level.world == world }
+			.flatMap { it.transport.cells }
+
+		if (carried.isEmpty()) return grounded
+
+		return grounded + carried
+
+	}
 
 	/** Whether transport drives anything from [block], or carries anything through it. */
 	fun isComponent(block: Block): Boolean = AnionTransportComponents.at(block) != null

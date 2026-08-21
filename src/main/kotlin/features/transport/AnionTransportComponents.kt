@@ -2,7 +2,6 @@ package dev.diena.anion.features.transport
 
 import dev.diena.anion.extensions.CARTESIAN_FACES
 import dev.diena.anion.extensions.anionAxis
-import dev.diena.anion.extensions.anionBlock
 import dev.diena.anion.extensions.axis
 import dev.diena.anion.extensions.faces
 import dev.diena.anion.extensions.itemKeys
@@ -10,6 +9,7 @@ import dev.diena.anion.extensions.plus
 import dev.diena.anion.extensions.vec3i
 import dev.diena.anion.features.custom.ItemKey
 import dev.diena.anion.features.custom.blocks.AnionBlock
+import dev.diena.anion.features.custom.blocks.AnionBlocks
 import dev.diena.anion.features.custom.blocks.AnionPillarBlock
 import net.kyori.adventure.text.Component
 import org.bukkit.Axis
@@ -17,6 +17,8 @@ import org.bukkit.Instrument
 import org.bukkit.Material
 import org.bukkit.block.Block
 import org.bukkit.block.BlockFace
+import org.bukkit.block.data.BlockData
+import org.bukkit.block.data.type.NoteBlock
 
 /**
  * A length of tube. Carries along the axis it was laid on, in at one end and out at the other, either
@@ -196,7 +198,18 @@ object AnionTransportComponents {
 	)
 
 	/** The component [block] is, or null when it is not one. */
-	fun at(block: Block): AnionTransportComponent? =
-		block.anionBlock as? AnionTransportComponent ?: byMaterial[block.type]
+	fun at(block: Block): AnionTransportComponent? = of(block.blockData)
+
+	/** The component [data] encodes, or null when it is not one. */
+	// off the blockdata rather than a world block, so a ship can classify the states it has stored
+	// without reading — and therefore loading — the chunks they sit in
+	fun of(data: BlockData): AnionTransportComponent? {
+
+		val noteBlock = data as? NoteBlock
+			?: return byMaterial[data.material]
+
+		return AnionBlocks.fromState(noteBlock.instrument, noteBlock.note.id.toInt()) as? AnionTransportComponent
+
+	}
 
 }

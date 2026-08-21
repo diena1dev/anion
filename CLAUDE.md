@@ -33,6 +33,8 @@ Everything else is a **helper class** that takes the calling `Starship` as an ar
 | `StarshipHitbox` | bounding volume |
 | `StarshipSplit` | flood-fill for disconnected sections |
 | `StarshipPackets` | client-side packet work |
+| `StarshipMachines` | machines carried by the ship, and the transforms that keep them attached |
+| `StarshipTransport` | transport component cells carried by the ship |
 
 Rules:
 
