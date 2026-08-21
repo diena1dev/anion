@@ -296,6 +296,9 @@ abstract class Machine(
 
 	}
 
+	/** Extra lines for `/machine debug` — whatever this type wants a look at that the base cannot know. */
+	open fun debugLines(): List<String> = emptyList()
+
 	/** Called on Machine Disassembly */
 	// recommended use: flush recipes, call shutdown() to any attached entities or display components.
 	// buffers are spilled by the base right after this runs.
@@ -632,40 +635,49 @@ abstract class Machine(
 			.keys
 			.mapTo(mutableSetOf()) { localToWorld(it) }
 
-	/** Drops item buffers at the core block and voids everything else. */
+	/** Empties every buffer and forgets them. Disassembly only — the machine is going away. */
 	private fun spillBuffers() {
+
+		for (buffer in buffers.values) spill(buffer)
+
+		buffers.clear()
+
+	}
+
+	/**
+	 * Empties [buffer], dropping whatever it held at the core block. Gas, fluid and energy have
+	 * nowhere to be put down, so they are voided by design.
+	 *
+	 * The machine keeps the buffer itself — this is the way out of loading the wrong resource into
+	 * the wrong one, not a teardown.
+	 */
+	fun spill(buffer: MachineBuffer) {
 
 		val dropLocation = Location(level.world, origin.x + 0.5, origin.y + 0.5, origin.z + 0.5)
 
-		for (buffer in buffers.values) {
+		for ((held, units) in buffer.contents()) {
 
-			for ((held, units) in buffer.contents()) {
+			val stack = when (held) {
+				is ItemKey -> held.stack
+				is AnionItem -> held.asItemStack()
+				else -> continue
+			}
 
-				// gas, fluid and energy have nowhere to be put down, so they are voided by design
-				val stack = when (held) {
-					is ItemKey -> held.stack
-					is AnionItem -> held.asItemStack()
-					else -> continue
-				}
+			val stackSize = stack.maxStackSize.coerceAtLeast(1).toLong()
+			var remaining = units
 
-				val stackSize = stack.maxStackSize.coerceAtLeast(1).toLong()
-				var remaining = units
+			while (remaining > 0L) {
 
-				while (remaining > 0L) {
-
-					val quantity = minOf(remaining, stackSize).toInt()
-					level.world.dropItem(dropLocation, stack.asQuantity(quantity))
-					remaining -= quantity
-
-				}
+				val quantity = minOf(remaining, stackSize).toInt()
+				level.world.dropItem(dropLocation, stack.asQuantity(quantity))
+				remaining -= quantity
 
 			}
 
-			buffer.clear()
-
 		}
 
-		buffers.clear()
+		buffer.clear()
+		markDirty()
 
 	}
 

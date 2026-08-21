@@ -61,6 +61,12 @@ POWER
 Idle power draw is just a recipe with no item result, per the "if another subsystem already does this, use it" rule.
 Nothing supplies energy yet. Until the energy and transport subsystems land, a machine should hand the adapter a supply function that reports unlimited AnionEnergy — TODO in MachineRecipeAdapter.
 
+**which port feeds which buffer is the player's to say.** one buffer can be auto-bound at assembly and never thought about — the cargo container does exactly that. more than one cannot, so a port block is cycled by right-clicking it bare-handed: unbound, then each buffer in turn, then back round. `/machine debug` reads the bindings back and `/machine clear <buffer>` empties one onto the floor, which is the way out of loading fuel into the smelting buffer. a machine keeps its buffers through a clear; only disassembly forgets them.
+
+capacity comes from the ports bound to a buffer, so a machine with three buffers wants at least three bus ports. with fewer, whichever buffer got none has no room and the machine stalls against it — the framework working as designed, and visible in `/machine debug` as `0/0 ports=0`.
+
+**a run is scoped to the machine, not the recipe.** a registered `AnionRecipe` is one object shared by everything that smelts it, and both the adapter's op counter and each `AnionIngredient`'s fed-in progress are mutable — two machines running off the shared instance would advance each other. `AnionRecipe.newRun()` hands out a copy with its own counters and handlers that still delegate to the original.
+
 
 ---
 TRANSPORT

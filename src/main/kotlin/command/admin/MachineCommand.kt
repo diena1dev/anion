@@ -89,6 +89,37 @@ object MachineCommand {
 
 	}
 
+	/** Empties a buffer onto the floor. The way out of loading the wrong resource into the wrong one. */
+	@Subcommand
+	@Permission("${Keys.COMMAND_PERMISSION_TREE}.clear")
+	fun clear(
+
+		@Sender sender: Player,
+		buffer: String,
+
+	) {
+
+		val machines = machinesAt(sender) ?: return
+
+		for (machine in machines) {
+
+			val store = machine.buffers[buffer]
+
+			if (store == null) {
+				val known = machine.buffers.keys.joinToString(", ").ifEmpty { "none" }
+				sender.info("${machine.namespacedKey.key} has no buffer '$buffer'. it has: $known")
+				continue
+			}
+
+			val held = store.used()
+			machine.spill(store)
+
+			sender.info("Cleared ${machine.namespacedKey.key} buffer '$buffer', dropped $held.")
+
+		}
+
+	}
+
 	/** Dumps structure, port and buffer state for the machine(s) at the targeted block. */
 	@Subcommand
 	@Permission("${Keys.COMMAND_PERMISSION_TREE}.debug")
@@ -128,6 +159,8 @@ object MachineCommand {
 				}
 
 			}
+
+			for (line in machine.debugLines()) sender.info("  $line")
 
 		}
 

@@ -7,6 +7,7 @@ import dev.diena.anion.features.custom.ItemKey
 import dev.diena.anion.features.custom.items.AnionItems
 import dev.diena.anion.features.recipes.adapters.FurnaceFuelAdapter
 import dev.diena.anion.features.recipes.adapters.FurnaceSmeltAdapter
+import dev.diena.anion.features.recipes.adapters.MachineRecipeAdapter
 import dev.diena.anion.features.recipes.adapters.RecipeAdapter
 import dev.diena.anion.features.recipes.adapters.ShapedCraftingTableAdapter
 import dev.diena.anion.features.recipes.adapters.ShapelessCraftingTableAdapter
@@ -272,6 +273,33 @@ object AnionRecipes {
 			fuel = AnionItems.TEST_FUEL,
 			burnTicks = 20,
 			cookTimeModifier = 0.5, // half normal processing time of whatever furnace recipe is being smelted
+		)
+	)
+
+	// MACHINE RECIPES
+
+	// the debug furnace's only recipe: one test item and one test fuel, five seconds, one test block.
+	// both ingredients are drawn in full on the first tick that has them, and the remaining ticks are
+	// pure processing time — a starved run never starts, and a run that started always finishes.
+	val DEBUG_FURNACE_SMELT = registerRecipe(
+		MachineRecipeAdapter(
+			recipe = AnionRecipe(
+				displayName = "Debug Furnace Smelt",
+				ingredients = listOf(
+					AnionIngredient(
+						resource = ItemKey.of(AnionItems.TEST_ITEM),
+						totalRequired = 1L,
+						ratePerTick = 1L,
+					),
+					AnionIngredient(
+						resource = ItemKey.of(AnionItems.TEST_FUEL),
+						totalRequired = 1L,
+						ratePerTick = 1L,
+					),
+				),
+				processingTicks = 100, // five seconds
+				result = AnionResult.Item(AnionItems.TEST_BLOCK, quantity = 1),
+			),
 		)
 	)
 

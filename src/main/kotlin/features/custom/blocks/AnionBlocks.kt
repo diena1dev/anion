@@ -4,6 +4,7 @@ import dev.diena.anion.data.registry.AnionRegistryKey
 import dev.diena.anion.data.registry.registries.AnionRegistries
 import dev.diena.anion.extensions.gradient
 import dev.diena.anion.features.custom.items.AnionItems
+import dev.diena.anion.features.machine.component.MachinePort
 import dev.diena.anion.features.transport.AnionItemChuteBlock
 import dev.diena.anion.features.transport.AnionItemPipeBlock
 import dev.diena.anion.features.transport.AnionItemPipeJunctionBlock
@@ -72,7 +73,8 @@ object AnionBlocks {
 			5,
 			styledDisplayName = Component.text("Copper Machine ")
 				.gradient(COPPER_TEXT_START, COPPER_TEXT_END)
-				.append(Component.text("Display").color(TextColor.color(Color.LIME.asARGB())))
+				.append(Component.text("Display").color(TextColor.color(Color.LIME.asARGB()))),
+			interactHandler = { event -> MachinePort.cycleBinding(event) }
 		)
 	)
 
@@ -82,7 +84,8 @@ object AnionBlocks {
 			Instrument.ZOMBIE,
 			6,
 			styledDisplayName = Component.text("Copper Machine Valve")
-				.gradient(COPPER_TEXT_START, COPPER_TEXT_END)
+				.gradient(COPPER_TEXT_START, COPPER_TEXT_END),
+			interactHandler = { event -> MachinePort.cycleBinding(event) }
 		)
 	)
 
@@ -92,7 +95,8 @@ object AnionBlocks {
 			Instrument.ZOMBIE,
 			7,
 			styledDisplayName = Component.text("Copper Machine Bus")
-				.gradient(COPPER_TEXT_START, COPPER_TEXT_END)
+				.gradient(COPPER_TEXT_START, COPPER_TEXT_END),
+			interactHandler = { event -> MachinePort.cycleBinding(event) }
 		)
 	)
 
@@ -102,7 +106,8 @@ object AnionBlocks {
 			Instrument.ZOMBIE,
 			8,
 			styledDisplayName = Component.text("Copper Machine DataPort")
-				.gradient(COPPER_TEXT_START, COPPER_TEXT_END)
+				.gradient(COPPER_TEXT_START, COPPER_TEXT_END),
+			interactHandler = { event -> MachinePort.cycleBinding(event) }
 		)
 	)
 
@@ -114,7 +119,8 @@ object AnionBlocks {
 			Instrument.ZOMBIE,
 			9,
 			styledDisplayName = Component.text("Copper Machine Conduit")
-				.gradient(COPPER_TEXT_START, COPPER_TEXT_END)
+				.gradient(COPPER_TEXT_START, COPPER_TEXT_END),
+			interactHandler = { event -> MachinePort.cycleBinding(event) }
 		)
 	)
 

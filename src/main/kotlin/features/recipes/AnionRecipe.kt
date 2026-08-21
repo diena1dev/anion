@@ -38,6 +38,34 @@ open class AnionRecipe(
 
 ) {
 
+	/**
+	 * A run-scoped copy: same definition, its own [AnionIngredient] progress counters.
+	 *
+	 * A registered recipe is one object shared by every machine that smelts it, and an ingredient
+	 * tracks how much of itself has been fed in. Two machines running the same recipe off the shared
+	 * instance would advance each other's progress, so each run takes one of these.
+	 */
+	// handlers stay on the source, so a copy still fires whatever the original was given
+	open fun newRun(): AnionRecipe {
+
+		val source = this
+
+		return object : AnionRecipe(
+			displayName,
+			ingredients.map { AnionIngredient(it.resource, it.totalRequired, it.ratePerTick) },
+			processingTicks,
+			result,
+			namespacedKey,
+		) {
+
+			override fun onStart() = source.onStart()
+			override fun onTick(progressFraction: Double) = source.onTick(progressFraction)
+			override fun onComplete() = source.onComplete()
+
+		}
+
+	}
+
 	open fun onStart() { startHandler?.invoke() }
 	open fun onTick(progressFraction: Double) { tickHandler?.invoke(progressFraction) }
 	open fun onComplete() { completeHandler?.invoke() }
