@@ -11,6 +11,7 @@ import org.rocksdb.ColumnFamilyHandle
 import org.rocksdb.WriteBatch
 import java.nio.ByteBuffer
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 object AnionPersistence {
 
@@ -76,22 +77,64 @@ object AnionPersistence {
 
 	// Machine
 
-	fun saveMachine(uuid: UUID, machine: Machine) {
-		val batch = WriteBatch()
-		val key = uuidToBytes(uuid)
-		val worldUid = machine.level.world.uid
+	/** A machine already turned into bytes. Holds nothing live, so the writer thread may touch it. */
+	private class PendingWrite(val worldUid: UUID, val origin: Vec3i, val bytes: ByteArray)
 
-		// drop the stale chunk row first — a carried machine's origin chunk changes as its ship moves
-		val previousOrigin = AnionDatabase.get(AnionDatabase.machines, key)?.let { MachineSerializer.readOrigin(it) }
-		if (previousOrigin != null) {
-			batch.delete(AnionDatabase.machineChunks, chunkIndexKey(worldUid, previousOrigin, uuid))
+	/**
+	 * Snapshots waiting to be written, keyed by machine.
+	 *
+	 * Keyed rather than queued on purpose: a newer snapshot replaces an older one, so a four-thread
+	 * pool can never put a stale record down after a fresh one.
+	 */
+	private val pendingMachines = ConcurrentHashMap<UUID, PendingWrite>()
+
+	/**
+	 * Snapshots [machine] for the writer. **Main thread only.**
+	 *
+	 * Serialising walks live buffer contents and the structure map, both plain collections the main
+	 * thread mutates — doing it off-thread raced them, and a ConcurrentModificationException here means
+	 * the save throws, `dirty` never clears, and the machine is silently never written again.
+	 */
+	fun saveMachine(uuid: UUID, machine: Machine) {
+
+		pendingMachines[uuid] = PendingWrite(
+			machine.level.world.uid,
+			machine.origin,
+			MachineSerializer.serialize(machine),
+		)
+
+		machine.dirty = false
+
+	}
+
+	/** Writes every queued snapshot. Off-thread — it reads nothing but the bytes it was handed. */
+	fun flushMachineWrites() {
+
+		if (pendingMachines.isEmpty()) return
+
+		val queued = pendingMachines.entries.iterator()
+
+		while (queued.hasNext()) {
+
+			val (uuid, pending) = queued.next()
+			queued.remove()
+
+			val batch = WriteBatch()
+			val key = uuidToBytes(uuid)
+
+			// drop the stale chunk row first — a carried machine's origin chunk changes as its ship moves
+			val previousOrigin = AnionDatabase.get(AnionDatabase.machines, key)?.let { MachineSerializer.readOrigin(it) }
+			if (previousOrigin != null) {
+				batch.delete(AnionDatabase.machineChunks, chunkIndexKey(pending.worldUid, previousOrigin, uuid))
+			}
+
+			batch.put(AnionDatabase.machines, key, pending.bytes)
+			batch.put(AnionDatabase.machineChunks, chunkIndexKey(pending.worldUid, pending.origin, uuid), NO_VALUE)
+
+			AnionDatabase.write(batch)
+
 		}
 
-		batch.put(AnionDatabase.machines, key, MachineSerializer.serialize(machine))
-		batch.put(AnionDatabase.machineChunks, chunkIndexKey(worldUid, machine.origin, uuid), NO_VALUE)
-
-		AnionDatabase.write(batch)
-		machine.dirty = false
 	}
 
 	fun loadMachine(uuid: UUID, world: ServerLevel): Machine? {
@@ -112,12 +155,19 @@ object AnionPersistence {
 
 		MachineIndex.unregister(machine)
 		Machine.activeMachines.remove(uuid)
+
+		// written before returning, not queued: the chunk can come back up inside the writer's next
+		// interval, and loadMachinesForChunk reads the database rather than the pending snapshots
 		saveMachine(uuid, machine)
+		flushMachineWrites()
 	}
 
 	/** Erases [uuid]'s machine. [level] is the world it was assembled in, needed to find its index row. */
 	fun deleteMachine(uuid: UUID, level: ServerLevel) {
 		val key = uuidToBytes(uuid)
+
+		// a snapshot taken before the teardown would otherwise be written back afterwards
+		pendingMachines.remove(uuid)
 
 		val storedOrigin = AnionDatabase.get(AnionDatabase.machines, key)?.let { MachineSerializer.readOrigin(it) }
 		if (storedOrigin != null) {
@@ -147,6 +197,9 @@ object AnionPersistence {
 		for ((uuid, machine) in Machine.activeMachines) {
 			if (machine.dirty) saveMachine(uuid, machine)
 		}
+
+		// there is no later to write in — the task executor is about to be shut down
+		flushMachineWrites()
 	}
 
 	// Transport components

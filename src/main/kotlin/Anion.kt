@@ -89,11 +89,16 @@ class Anion : JavaPlugin() {
 			AnionTransport.tick()
 		})
 
-		// machine saving. off-thread, since RocksDB writes have no business on the main thread
-		Tasks.scheduleAsync(1, 1, TimeUnit.SECONDS, Runnable {
+		// machine snapshots. sync: serialising a machine walks live buffers and its structure map
+		Tasks.scheduleSync(20, 20, Runnable {
 			for ((uuid, machine) in Machine.activeMachines) {
 				if (machine.dirty) AnionPersistence.saveMachine(uuid, machine)
 			}
+		})
+
+		// and the writes off-thread, since RocksDB has no business on the main thread
+		Tasks.scheduleAsync(1, 1, TimeUnit.SECONDS, Runnable {
+			AnionPersistence.flushMachineWrites()
 		})
 
 	}
