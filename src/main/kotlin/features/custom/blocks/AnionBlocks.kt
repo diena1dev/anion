@@ -5,12 +5,10 @@ import dev.diena.anion.data.registry.registries.AnionRegistries
 import dev.diena.anion.extensions.gradient
 import dev.diena.anion.features.custom.items.AnionItems
 import net.kyori.adventure.text.Component
-import net.kyori.adventure.text.format.Style
 import net.kyori.adventure.text.format.TextColor
-import net.kyori.adventure.util.RGBLike
+import org.bukkit.Axis
 import org.bukkit.Color
 import org.bukkit.Instrument
-import org.bukkit.block.BlockFace
 
 object AnionBlocks {
 
@@ -63,7 +61,7 @@ object AnionBlocks {
 		)
 	)
 
-	// TODO: AnionDirectionalBlock
+	// TODO: AnionPillarBlock
 	val COPPER_MACHINE_DISPLAY = registerBlock(
 		AnionBlock(
 			"Copper Machine Display",
@@ -117,56 +115,37 @@ object AnionBlocks {
 		)
 	)
 
-	// transport conduits. flow follows the block's facing, so a straight run only takes items in
-	// through its back face — turning a corner is what the junction is for.
-	val COPPER_PIPE = registerDirectionalBlock(
-		AnionDirectionalBlock(
-			"Copper Pipe",
+	// transport pipe. a pipe is a length of tube, so it carries both ways along whichever axis it was
+	// laid on and only takes items in through one of its two ends — turning a corner is what the
+	// junction is for. notes 13-15 are free, left over from when this was six one-way facings.
+	val ITEM_PIPE = registerPillarBlock(
+		AnionPillarBlock(
+			"Item Pipe",
 			Instrument.ZOMBIE,
 			mapOf(
-				BlockFace.NORTH to 10,
-				BlockFace.EAST  to 11,
-				BlockFace.SOUTH to 12,
-				BlockFace.WEST  to 13,
+				Axis.X to 10,
+				Axis.Y to 11,
+				Axis.Z to 12,
 			),
-			styledDisplayName = Component.text("Copper Pipe")
-				.gradient(COPPER_TEXT_START, COPPER_TEXT_END)
-		)
-	)
-
-	val COPPER_PIPE_VERTICAL = registerDirectionalBlock(
-		AnionDirectionalBlock(
-			"Copper Pipe Vertical",
-			Instrument.ZOMBIE,
-			mapOf(
-				BlockFace.UP   to 14,
-				BlockFace.DOWN to 15,
-			),
-			styledDisplayName = Component.text("Copper Pipe Vertical")
-				.gradient(COPPER_TEXT_START, COPPER_TEXT_END)
 		)
 	)
 
 	// takes items in on any face and passes them out of every other one
-	val COPPER_PIPE_JUNCTION = registerBlock(
+	val ITEM_PIPE_JUNCTION = registerBlock(
 		AnionBlock(
-			"Copper Pipe Junction",
+			"Item Pipe Junction",
 			Instrument.ZOMBIE,
 			16,
-			styledDisplayName = Component.text("Copper Pipe Junction")
-				.gradient(COPPER_TEXT_START, COPPER_TEXT_END)
 		)
 	)
 
 	// item adapter. sits against a machine's bus port and drives what the port only provides access to.
 	// no facing: it takes the port on whichever side has one and passes items out of any other.
-	val COPPER_CHUTE = registerBlock(
+	val ITEM_CHUTE = registerBlock(
 		AnionBlock(
-			"Copper Chute",
+			"Item Chute",
 			Instrument.ZOMBIE,
 			17,
-			styledDisplayName = Component.text("Copper Chute")
-				.gradient(COPPER_TEXT_START, COPPER_TEXT_END)
 		)
 	)
 
@@ -184,9 +163,9 @@ object AnionBlocks {
 		return block
 	}
 
-	/** every facing's note resolves back to the same block, so structure checks ignore rotation */
-	private fun registerDirectionalBlock(block: AnionDirectionalBlock): AnionDirectionalBlock {
-		for (note in block.notesByFacing.values) byState[block.instrument to note] = block
+	/** every axis's note resolves back to the same block, so structure checks ignore orientation */
+	private fun registerPillarBlock(block: AnionPillarBlock): AnionPillarBlock {
+		for (note in block.notesByAxis.values) byState[block.instrument to note] = block
 
 		AnionRegistries.BLOCK_REGISTRY.register(
 			AnionRegistryKey(block.namespacedKey.key),

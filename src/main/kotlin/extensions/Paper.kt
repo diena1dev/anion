@@ -7,7 +7,7 @@ import dev.diena.anion.data.registry.registries.AnionRegistries
 import dev.diena.anion.features.custom.ItemKey
 import dev.diena.anion.features.custom.blocks.AnionBlock
 import dev.diena.anion.features.custom.blocks.AnionBlocks
-import dev.diena.anion.features.custom.blocks.AnionDirectionalBlock
+import dev.diena.anion.features.custom.blocks.AnionPillarBlock
 import dev.diena.anion.features.custom.items.AnionItem
 import io.papermc.paper.datacomponent.DataComponentType
 import io.papermc.paper.datacomponent.DataComponentTypes
@@ -21,6 +21,7 @@ import net.minecraft.core.SectionPos
 import net.minecraft.core.Vec3i
 import net.minecraft.world.level.block.Rotation
 import net.minecraft.world.phys.Vec3
+import org.bukkit.Axis
 import org.bukkit.Location
 import org.bukkit.Material
 import org.bukkit.RegionAccessor
@@ -384,6 +385,28 @@ val CARTESIAN_FACES = listOf(
 
 inline val BlockFace.vec3i get() = Vec3i(modX, modY, modZ)
 
+/** The axis this face lies on, or null for a non-cartesian one. */
+val BlockFace.axis: Axis?
+	get() = when (this) {
+
+		BlockFace.NORTH, BlockFace.SOUTH -> Axis.Z
+		BlockFace.EAST,  BlockFace.WEST  -> Axis.X
+		BlockFace.UP,    BlockFace.DOWN  -> Axis.Y
+
+		else -> null
+
+	}
+
+/** The two faces at the ends of this axis. */
+val Axis.faces: List<BlockFace>
+	get() = when (this) {
+
+		Axis.X -> listOf(BlockFace.EAST, BlockFace.WEST)
+		Axis.Y -> listOf(BlockFace.UP, BlockFace.DOWN)
+		Axis.Z -> listOf(BlockFace.SOUTH, BlockFace.NORTH)
+
+	}
+
 /** The registered AnionBlock this world block encodes, or null if it is not one. */
 val Block.anionBlock: AnionBlock?
 	get() {
@@ -393,11 +416,11 @@ val Block.anionBlock: AnionBlock?
 		return AnionBlocks.fromState(noteBlock.instrument, noteBlock.note.id.toInt())
 	}
 
-/** Which way this block points, or null when it is not a placed [AnionDirectionalBlock]. */
-val Block.anionFacing: BlockFace?
+/** Which way this block runs, or null when it is not a placed [AnionPillarBlock]. */
+val Block.anionAxis: Axis?
 	get() {
-		val directional = anionBlock as? AnionDirectionalBlock ?: return null
+		val pillar = anionBlock as? AnionPillarBlock ?: return null
 		val noteBlock = blockData as? NoteBlock ?: return null
 
-		return directional.facingOf(noteBlock.note.id.toInt())
+		return pillar.axisOf(noteBlock.note.id.toInt())
 	}

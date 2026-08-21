@@ -75,7 +75,7 @@ drivers:
 
 **throughput** is rationed per buffer per pass, not per driver. `transferLimit()` is `softTransfer` per bound port clamped by `hardTransfer`, so more ports genuinely is more throughput — the point of ports — but a wall of importers cannot stuff or drain a buffer in one tick. both ends of a handoff are charged, so neither a busy source nor a popular destination gets worked harder than its own ports allow. a vanilla container has no rate of its own and stays limited by its slots.
 
-carriers are the pipes and the junction. flow is a pipe's own facing, so a run only takes items in through its back face and only passes them out of its front, which makes the network a directed graph read straight off the world with nothing to configure. turning a corner is what the junction is for.
+carriers are the pipe and the junction. a pipe is a length of tube: it carries along the axis it was laid on, in at one end and out at the other, either way round. direction comes from where the items entered rather than from the block, so a run reads straight off the world with nothing to configure and no way to build one backwards. turning a corner is what the junction is for.
 
 drop-offs are a bus port or any vanilla container on an open side. so both of these work, and neither needs a machine anywhere on the run:
 
@@ -88,11 +88,13 @@ chest -> crafting table -> chute -> bus port -> buffer
 
 how far async can go, when the graph lands: loading the index and resolving routes is pure memory and can move off-thread. vanilla Inventory access and world block reads cannot. so the graph work goes async and the actual item handoff stays sync, the same snapshot-then-revalidate discipline the starship slowTick uses.
 
-blocks: `COPPER_PIPE` (four horizontal facings), `COPPER_PIPE_VERTICAL` (up/down), `COPPER_PIPE_JUNCTION`, `COPPER_CHUTE`. a directional block claims one note per facing and every one of them resolves back to the same AnionBlock, so a BlockSet accepting a pipe accepts it in any rotation. the resource pack reuses a single north-facing model and spins it in the blockstate, so a facing costs a note and nothing else.
+blocks: `ITEM_PIPE` (three axes), `ITEM_PIPE_JUNCTION`, `ITEM_CHUTE`. an `AnionPillarBlock` claims one note per **axis**, not per facing, and every one of them resolves back to the same AnionBlock, so a BlockSet accepting a pipe accepts it in any orientation. the resource pack reuses a single Y-standing model and spins it in the blockstate, so an axis costs a note and nothing else.
 
-placement: a directional block placed off the *output end* of a pipe carries on the same way, so clicking along a run extends it. anything else — a machine face, the ground — falls through to aim, because those say nothing about which way you want to point. steep aim (>=45 degrees) means vertical, shallow means heading.
+axis rather than facing because a pillar has two ends and no front. six one-way facings could only ever say the same thing twice, and the two halves of each pair were indistinguishable in world — a north pipe and a south pipe rendered identically, so a correct debug report looked like a lie. bidirectional flow also folded the separate vertical pipe block into the Y axis.
 
--# note budget: the ZOMBIE instrument is at 18 of 25. dropping the chute's five extra facings gave 18-24 back.
+placement: the axis runs out of the face you clicked, exactly as vanilla logs do. clicking the end of a run extends it and clicking its side branches off it, which is one rule instead of the old pile of aim heuristics.
+
+-# note budget: the ZOMBIE instrument is at 18 of 25, with 13-15 free inside that range. dropping the chute's five extra facings gave 18-24 back; collapsing the pipes to axes gave 13-15.
 
 ---
 RECIPE RAMBLING

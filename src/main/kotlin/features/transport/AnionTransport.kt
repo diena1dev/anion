@@ -1,8 +1,10 @@
 package dev.diena.anion.features.transport
 
 import dev.diena.anion.extensions.CARTESIAN_FACES
+import dev.diena.anion.extensions.anionAxis
 import dev.diena.anion.extensions.anionBlock
-import dev.diena.anion.extensions.anionFacing
+import dev.diena.anion.extensions.axis
+import dev.diena.anion.extensions.faces
 import dev.diena.anion.extensions.drawItem
 import dev.diena.anion.extensions.hasRoomFor
 import dev.diena.anion.extensions.itemKeys
@@ -36,9 +38,10 @@ import org.bukkit.inventory.Inventory
  * - **chute** — exports the buffer of the bus port behind it into whatever is in front
  * - **crafting table** — imports from any vanilla container touching it
  *
- * Carriers: pipes and the junction. Flow is a pipe's own facing, so a run only takes items in through
- * its back face and only passes them out of its front — turning a corner is what the junction is for.
- * That makes the network a directed graph read straight off the world, with nothing to configure.
+ * Carriers: the pipe and the junction. A pipe carries along the axis it was laid on, in at one end and
+ * out at the other, either way round — turning a corner is what the junction is for. Direction comes
+ * from where the items entered rather than from the block, so a run reads straight off the world with
+ * nothing to configure and nothing to build backwards.
  *
  * Drop-offs: a bus port, or any vanilla container on an open side.
  *
@@ -114,7 +117,7 @@ object AnionTransport {
 				// pipes and the junction only carry, so there is nothing to drive for them
 				when {
 					block.type == Material.CRAFTING_TABLE -> driveTable(world, cell, ports, budget)
-					block.anionBlock === AnionBlocks.COPPER_CHUTE -> driveChute(world, cell, ports, budget)
+					block.anionBlock === AnionBlocks.ITEM_CHUTE -> driveChute(world, cell, ports, budget)
 				}
 
 			}
@@ -275,16 +278,16 @@ object AnionTransport {
 		return when (block.anionBlock) {
 
 			// both take items in on any face and pass them out of every other one
-			AnionBlocks.COPPER_PIPE_JUNCTION,
-			AnionBlocks.COPPER_CHUTE -> CARTESIAN_FACES.filter { it != entryFace }
+			AnionBlocks.ITEM_PIPE_JUNCTION,
+			AnionBlocks.ITEM_CHUTE -> CARTESIAN_FACES.filter { it != entryFace }
 
-			AnionBlocks.COPPER_PIPE,
-			AnionBlocks.COPPER_PIPE_VERTICAL -> {
+			// a length of tube: in one end, out the other, either way round
+			AnionBlocks.ITEM_PIPE -> {
 
-				val facing = block.anionFacing ?: return null
-				if (entryFace != facing.oppositeFace) return null // entered against the flow
+				val axis = block.anionAxis ?: return null
+				if (entryFace.axis != axis) return null // entered through a side rather than an end
 
-				listOf(facing)
+				listOf(entryFace.oppositeFace)
 
 			}
 
@@ -332,10 +335,10 @@ object AnionTransport {
 		val block = world.getBlockAt(cell.x, cell.y, cell.z)
 		val ports = portsIn(world)
 
-		val facing = block.anionFacing
+		val axis = block.anionAxis
 		val indexed = cell in AnionTransportIndex.cellsIn(world)
 
-		lines += "$cell ${nameOf(block)}${facing?.let { " facing=$it" } ?: ""} indexed=$indexed driver=${AnionTransportIndex.isComponent(block)}"
+		lines += "$cell ${nameOf(block)}${axis?.let { " axis=$it" } ?: ""} indexed=$indexed driver=${AnionTransportIndex.isComponent(block)}"
 		ports[cell]?.let { lines += "  this cell is a bus port -> ${it.bufferKey ?: "unbound"}" }
 
 		// every side, so a missing one is visible rather than silently skipped
@@ -382,10 +385,10 @@ object AnionTransport {
 			return "$name CONTAINER $filled/${container.size} slots${if (full) " [FULL — nothing more fits in an empty slot]" else ""}"
 		}
 
-		val blockFacing = block.anionFacing
-		if (blockFacing != null) return "$name facing=$blockFacing (takes items in through ${blockFacing.oppositeFace})"
+		val blockAxis = block.anionAxis
+		if (blockAxis != null) return "$name axis=$blockAxis (takes items in through ${blockAxis.faces.joinToString(" or ")})"
 
-		if (block.anionBlock === AnionBlocks.COPPER_PIPE_JUNCTION) return "$name (any side in, any other out)"
+		if (block.anionBlock === AnionBlocks.ITEM_PIPE_JUNCTION) return "$name (any side in, any other out)"
 
 		return name
 

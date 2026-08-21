@@ -5,11 +5,11 @@ import dev.astralchroma.processor.annotations.Register
 import dev.diena.anion.data.registry.AnionRegistryKey
 import dev.diena.anion.data.registry.registries.AnionRegistries
 import dev.diena.anion.extensions.toAnionItem
-import dev.diena.anion.extensions.anionFacing
+import dev.diena.anion.extensions.axis
 import dev.diena.anion.extensions.vec3i
 import dev.diena.anion.features.custom.blocks.AnionBlock
 import dev.diena.anion.features.custom.blocks.AnionBlocks
-import dev.diena.anion.features.custom.blocks.AnionDirectionalBlock
+import dev.diena.anion.features.custom.blocks.AnionPillarBlock
 import dev.diena.anion.features.custom.items.AnionBlockItem
 import dev.diena.anion.features.machine.MachineIndex
 import dev.diena.anion.features.starship.Starship
@@ -22,6 +22,7 @@ import net.minecraft.world.InteractionHand
 import net.minecraft.world.item.context.UseOnContext
 import net.minecraft.world.phys.BlockHitResult
 import net.minecraft.world.phys.Vec3
+import org.bukkit.Axis
 import org.bukkit.GameMode
 import org.bukkit.Material
 import org.bukkit.Note
@@ -49,6 +50,7 @@ import org.bukkit.event.player.PlayerInteractEvent
 import org.bukkit.event.world.ChunkLoadEvent
 import org.bukkit.event.world.ChunkUnloadEvent
 import org.bukkit.inventory.EquipmentSlot
+import java.util.WeakHashMap
 
 // FIXME: cleanup and explain more of the listeners.
 @Register
@@ -129,10 +131,10 @@ object AnionBlockListeners : Listener {
 
 	}
 
-	/** Turns a freshly placed directional block to point the way the placement implies. */
-	private fun faceOnPlacement(block: Block, directional: AnionDirectionalBlock, event: BlockPlaceEvent) {
+	/** Lays a freshly placed pillar block along the axis the placement implies. */
+	private fun layOnPlacement(block: Block, pillar: AnionPillarBlock, event: BlockPlaceEvent) {
 
-		val note = directional.noteFor(placementFacing(directional, event)) ?: return
+		val note = pillar.noteFor(placementAxis(pillar, event)) ?: return
 		val data = noteData(block) ?: return
 
 		data.note = Note(note)
@@ -140,37 +142,21 @@ object AnionBlockListeners : Listener {
 
 	}
 
-	private fun placementFacing(directional: AnionDirectionalBlock, event: BlockPlaceEvent): BlockFace {
+	/** The face each player last clicked, since [BlockPlaceEvent] does not carry one. */
+	// weak keys so a player who logs out drops out on their own, without a quit handler to remember
+	private val lastClickedFace = WeakHashMap<Player, BlockFace>()
 
-		val against = event.blockAgainst
+	/** The axis a pillar lands on: the one running out of the face that was clicked. */
+	// this also extends a run for free. clicking the end of a pipe gives the same axis, clicking its
+	// side gives the perpendicular one, so branching and continuing are the same gesture.
+	private fun placementAxis(pillar: AnionPillarBlock, event: BlockPlaceEvent): Axis {
 
-		// placed off the output end of a pipe, it carries on the same way. only the output end: placing
-		// against a machine or the ground says nothing about which way you want to point, so those fall
-		// through to aim rather than guessing an orientation you did not ask for.
-		val runFacing = against.anionFacing
-		if (runFacing != null && runFacing in directional.facings && against.getFace(event.blockPlaced) == runFacing) {
-			return runFacing
-		}
+		// the delta only agrees with the clicked face when the placement landed in a cell of its own.
+		// a placement that replaces grass or water lands *in* the block it was placed against, making
+		// the delta SELF, so the remembered face is what carries those.
+		val clickedFace = lastClickedFace[event.player] ?: event.blockAgainst.getFace(event.blockPlaced)
 
-		val pitch = event.player.location.pitch
-
-		// steep aim asks for a vertical placement. a shallow one must NOT, or a block that can point
-		// both ways round could never be placed horizontally at all.
-		val vertical = when {
-			pitch <= -45f -> BlockFace.UP
-			pitch >= 45f -> BlockFace.DOWN
-			else -> null
-		}
-		if (vertical != null && vertical in directional.facings) return vertical
-
-		val heading = event.player.facing
-		if (heading in directional.facings) return heading
-
-		// a block that can only point up or down still has to resolve from a shallow aim
-		val shallow = if (pitch <= 0f) BlockFace.UP else BlockFace.DOWN
-		if (shallow in directional.facings) return shallow
-
-		return directional.defaultFacing
+		return pillar.axisFor(clickedFace)
 
 	}
 
@@ -204,7 +190,7 @@ object AnionBlockListeners : Listener {
 
 		val anionBlock = anionBlockAt(block) ?: return
 
-		if (anionBlock is AnionDirectionalBlock) faceOnPlacement(block, anionBlock, event)
+		if (anionBlock is AnionPillarBlock) layOnPlacement(block, anionBlock, event)
 
 		anionBlock.onPlace(block, event.player)
 	}
@@ -232,6 +218,10 @@ object AnionBlockListeners : Listener {
 
 	@EventHandler
 	fun onPlayerInteract(event: PlayerInteractEvent) {
+		// before any of the note block filtering below: a pillar placed against plain dirt needs this
+		// face just as much as one placed against an anion block, and BlockPlaceEvent will not have it
+		if (event.action == Action.RIGHT_CLICK_BLOCK) lastClickedFace[event.player] = event.blockFace
+
 		val block = event.clickedBlock ?: return
 		if (block.type != Material.NOTE_BLOCK) return
 		val data = noteData(block) ?: return

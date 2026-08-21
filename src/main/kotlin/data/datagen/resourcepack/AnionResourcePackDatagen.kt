@@ -5,9 +5,8 @@ import com.google.gson.JsonObject
 import dev.diena.anion.data.registry.registries.AnionRegistries
 import dev.diena.anion.features.custom.blocks.AnionBlock
 import dev.diena.anion.features.custom.blocks.AnionBlocks
-import dev.diena.anion.features.custom.blocks.AnionDirectionalBlock
+import dev.diena.anion.features.custom.blocks.AnionPillarBlock
 import net.minecraft.world.level.block.state.properties.NoteBlockInstrument
-import org.bukkit.block.BlockFace
 import org.bukkit.craftbukkit.block.data.CraftBlockData
 import java.io.File
 import java.util.Base64
@@ -93,35 +92,16 @@ class AnionResourcePackDatagen(private val outputDir: File) {
 	 * Vanilla model to stand in for a block whose own model has not been drawn yet, or null to emit the
 	 * usual cube_all pointing at an anion texture.
 	 *
-	 * Purpur reads as obviously-not-final in world, and the pillar makes a directional block's facing
-	 * visible, so a wrong rotation is spottable before any art exists. Drop an entry once its real
-	 * model is authored.
+	 * Purpur reads as obviously-not-final in world, and purpur_pillar stands on Y like every vanilla
+	 * pillar, so [AnionPillarBlock.modelRotation] spins it correctly and an orientation is legible
+	 * before any art exists. Drop an entry once its real model is authored.
 	 */
 	private fun placeholderModelParent(block: AnionBlock): String? = when {
 
-		block is AnionDirectionalBlock -> "minecraft:block/purpur_pillar"
-		block === AnionBlocks.COPPER_PIPE_JUNCTION || block === AnionBlocks.COPPER_CHUTE -> "minecraft:block/purpur_block"
+		block is AnionPillarBlock -> "minecraft:block/purpur_pillar"
+		block === AnionBlocks.ITEM_PIPE_JUNCTION || block === AnionBlocks.ITEM_CHUTE -> "minecraft:block/purpur_block"
 
 		else -> null
-
-	}
-
-	/**
-	 * Spin for a placeholder-modelled facing, replacing [AnionDirectionalBlock.modelRotation].
-	 *
-	 * That one assumes a model authored pointing north, which a real model will be. purpur_pillar's
-	 * column runs along Y instead, and a Y-axis column is invariant under a y spin — left alone, all
-	 * four horizontal facings would render as the same upright pillar. Tipping it first at least makes
-	 * the axis visible, which is the point of having a placeholder at all.
-	 */
-	// a pillar has no front, so north/south and east/west each share an orientation. that is a limit of
-	// the stand-in, not of the block.
-	private fun placeholderRotation(facing: BlockFace): Pair<Int, Int> = when (facing) {
-
-		BlockFace.NORTH, BlockFace.SOUTH -> 90 to 0
-		BlockFace.EAST, BlockFace.WEST   -> 90 to 90
-
-		else -> 0 to 0 // up and down leave it standing, which is already the right read
 
 	}
 
@@ -166,8 +146,8 @@ class AnionResourcePackDatagen(private val outputDir: File) {
 		blockstatesDir.mkdirs()
 
 		// (serialized instrument name, note 0-24) -> model identifier, plus the x/y spin to apply.
-		// a directional block claims one note per facing and reuses the single north-facing model,
-		// so a facing costs a note and nothing else — no extra model, no extra texture.
+		// a pillar block claims one note per axis and reuses the single Y-standing model, so an axis
+		// costs a note and nothing else — no extra model, no extra texture.
 		val anionStateModels = HashMap<Pair<String, Int>, Pair<String, Pair<Int, Int>>>()
 
 		for (block in AnionRegistries.BLOCK_REGISTRY.all.values) {
@@ -175,13 +155,10 @@ class AnionResourcePackDatagen(private val outputDir: File) {
 			val nmsInstrument = CraftBlockData.toVanilla(block.instrument, NoteBlockInstrument::class.java)
 			val model = "anion:block/${block.namespacedKey.key}"
 
-			if (block is AnionDirectionalBlock) {
+			if (block is AnionPillarBlock) {
 
-				val standingIn = placeholderModelParent(block) != null
-
-				for ((facing, note) in block.notesByFacing) {
-					val rotation = if (standingIn) placeholderRotation(facing) else block.modelRotation(facing)
-					anionStateModels[nmsInstrument.serializedName to note] = model to rotation
+				for ((axis, note) in block.notesByAxis) {
+					anionStateModels[nmsInstrument.serializedName to note] = model to block.modelRotation(axis)
 				}
 
 			} else {

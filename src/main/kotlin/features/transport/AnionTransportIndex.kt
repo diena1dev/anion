@@ -41,10 +41,9 @@ object AnionTransportIndex {
 
 		return when (block.anionBlock) {
 
-			AnionBlocks.COPPER_PIPE,
-			AnionBlocks.COPPER_PIPE_VERTICAL,
-			AnionBlocks.COPPER_PIPE_JUNCTION,
-			AnionBlocks.COPPER_CHUTE -> true
+			AnionBlocks.ITEM_PIPE,
+			AnionBlocks.ITEM_PIPE_JUNCTION,
+			AnionBlocks.ITEM_CHUTE -> true
 
 			else -> false
 
