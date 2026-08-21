@@ -266,6 +266,16 @@ object AnionBlockListeners : Listener {
 
 	private val blocksToFix = mutableMapOf<Block, PendingFix>()
 
+	/**
+	 * Cells a piston is rewriting this tick: the piston, everything it is moving, and where each of
+	 * those lands. Cleared at the end of the tick.
+	 *
+	 * The neighbour rule below must not touch these. A vertical piston sits directly under the anion
+	 * block it is pushing, so the rule fires on the piston itself and suppresses the shape propagation
+	 * the move is carried by — which is why pushing sideways always worked and pushing up never did.
+	 */
+	private val movingCells = mutableSetOf<Block>()
+
 	/** ticks a fix waits for a piston to finish sliding before it is applied regardless */
 	private const val SETTLE_TICKS = 4
 
@@ -310,6 +320,11 @@ object AnionBlockListeners : Listener {
 
 		}
 
+		// a cell a piston is rewriting right now is the one exception: the move is carried by the shape
+		// propagation the rule below suppresses. the anion blocks involved are repaired at tick end by
+		// trackPistonMove instead, which is a better guarantee than the rule was giving them anyway.
+		if (block in movingCells) return
+
 		// this block just changed, and NoteBlock.updateShape recomputes the instrument from whatever is
 		// on its Y axis. an anion instrument is one vanilla only ever produces from a mob head above, so
 		// a single shape update resets it and deregisters the block.
@@ -317,8 +332,8 @@ object AnionBlockListeners : Listener {
 		// cancelling here is what stops that: Level.notifyAndUpdatePhysics only skips
 		// updateNeighbourShapes and updateIndirectNeighbourShapes when the event is cancelled, and it
 		// has already run updateNeighborsAt by that point. so this suppresses shape propagation out of
-		// this cell and costs its own behaviour nothing — a piston, a repeater or a hopper beside a
-		// machine still gets every neighbourChanged it needs. do not exempt block types from this.
+		// this cell and costs its own behaviour nothing — a repeater or a hopper beside a machine still
+		// gets every neighbourChanged it needs. do not exempt block *types* from this.
 		if (anionBlockAt(block.getRelative(BlockFace.UP)) != null ||
 			anionBlockAt(block.getRelative(BlockFace.DOWN)) != null) {
 			event.isCancelled = true
@@ -339,6 +354,11 @@ object AnionBlockListeners : Listener {
 		// below, and stamping one is what duplicated the block: the piston head lands in a vacated cell
 		// on extend, and on retract it is left as plain air with a second copy of an already-moved block.
 		val vacated = blocks.toHashSet()
+
+		// the whole footprint of the move, anion or not, so onBlockPhysics leaves all of it alone
+		movingCells += event.block
+		movingCells += blocks
+		for (block in blocks) movingCells += block.getRelative(event.direction)
 
 		val destinations = mutableMapOf<Block, BlockData>()
 		for (block in blocks) {
@@ -375,6 +395,9 @@ object AnionBlockListeners : Listener {
 
 	@EventHandler
 	fun onServerTickEnd(event: ServerTickEndEvent) {
+
+		// the window a move needs the exemption for is the tick its event fired in
+		movingCells.clear()
 
 		if (blocksToFix.isEmpty()) return
 
