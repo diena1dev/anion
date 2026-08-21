@@ -79,6 +79,9 @@ object AnionBlockListeners : Listener {
 	}
 
 	private fun simulateItemUse(event: PlayerInteractEvent) {
+		// the block already did something with this click, so the held item is not being placed
+		if (event.isCancelled) return
+
 		val hand = event.hand ?: return
 		val nmsHand = if (hand == EquipmentSlot.HAND) InteractionHand.MAIN_HAND else InteractionHand.OFF_HAND
 		val nmsPlayer = (event.player as CraftPlayer).handle

@@ -1,12 +1,24 @@
 package dev.diena.anion.features.machine.component
 
+import dev.diena.anion.extensions.toAnionItem
+import dev.diena.anion.extensions.vec3i
+import dev.diena.anion.features.custom.ItemKey
 import dev.diena.anion.features.custom.blocks.AnionBlock
 import dev.diena.anion.features.custom.blocks.AnionBlocks
 import dev.diena.anion.features.machine.BlockMatcher
 import dev.diena.anion.features.machine.Machine
 import dev.diena.anion.features.machine.machine_types.PortedMachine
+import net.kyori.adventure.text.Component
+import net.kyori.adventure.text.format.NamedTextColor
 import net.minecraft.core.Vec3i
 import net.minecraft.server.level.ServerLevel
+import org.bukkit.GameMode
+import org.bukkit.craftbukkit.CraftWorld
+import org.bukkit.event.Event
+import org.bukkit.event.block.Action
+import org.bukkit.event.player.PlayerInteractEvent
+import org.bukkit.inventory.EquipmentSlot
+import org.bukkit.inventory.ItemStack
 
 /**
  * An access point punched into a machine's casing. A port only exposes the buffer behind it — it
@@ -80,6 +92,67 @@ class MachinePort(
 	enum class Kind { BUS, VALVE, CONDUIT, DATA, DISPLAY }
 
 	companion object {
+
+		/**
+		 * Puts what the player is holding into the buffer behind the port they clicked.
+		 *
+		 * The hand-loading path, so a machine can be fed without building a transport network to it.
+		 * What actually fits is decided by the buffer, not here: the wrong resource for it, or no room,
+		 * takes nothing and says so.
+		 */
+		fun insertHeld(event: PlayerInteractEvent) {
+
+			if (event.action != Action.RIGHT_CLICK_BLOCK) return
+			if (event.hand != EquipmentSlot.HAND) return
+
+			val player = event.player
+			val held = player.inventory.itemInMainHand
+			if (held.isEmpty) return
+
+			// a tool clicked on a port is being used on it, not fed into it
+			if (held.toAnionItem()?.handlesBlockInteraction == true) return
+
+			val block = event.clickedBlock ?: return
+			val port = at((block.world as CraftWorld).handle, block.vec3i) ?: return
+
+			event.setUseInteractedBlock(Event.Result.DENY)
+			event.setUseItemInHand(Event.Result.DENY)
+
+			val buffer = port.buffer() ?: run {
+				player.sendActionBar(Component.text("${port.kind} port is not bound to a buffer.").color(NamedTextColor.RED))
+				return
+			}
+
+			val key = ItemKey.of(held)
+
+			if (!buffer.accepts(key)) {
+				player.sendActionBar(Component.text("${buffer.key} will not take that.").color(NamedTextColor.RED))
+				return
+			}
+
+			val inserted = buffer.insert(key, held.amount.toLong()).toInt()
+
+			if (inserted <= 0) {
+				player.sendActionBar(Component.text("${buffer.key} is full.").color(NamedTextColor.RED))
+				return
+			}
+
+			// the click has been spent. without this a held block item would also get placed against
+			// the port by the listener's own placement path, on top of going into the buffer.
+			event.isCancelled = true
+
+			// creative hands are bottomless everywhere else, so they are here too
+			if (player.gameMode != GameMode.CREATIVE) {
+				val remaining = held.amount - inserted
+				player.inventory.setItemInMainHand(if (remaining > 0) held.asQuantity(remaining) else ItemStack.empty())
+			}
+
+			player.sendActionBar(
+				Component.text("+$inserted -> ${buffer.key} ${buffer.used()}/${buffer.capacity()}")
+					.color(NamedTextColor.GREEN)
+			)
+
+		}
 
 		/** The port occupying [cell], on whichever machine owns it, or null if that cell is not one. */
 		fun at(level: ServerLevel, cell: Vec3i): MachinePort? {

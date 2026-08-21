@@ -2,6 +2,7 @@ package dev.diena.anion.features.machine.component
 
 import dev.diena.anion.features.custom.AnionResource
 import dev.diena.anion.features.custom.ItemKey
+import dev.diena.anion.features.machine.Machine
 import kotlin.reflect.KClass
 
 /**

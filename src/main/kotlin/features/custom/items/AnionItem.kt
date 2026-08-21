@@ -82,6 +82,14 @@ open class AnionItem(
 	open fun onEntityShootBow(event: EntityShootBowEvent) {}
 
 	/**
+	 * Whether this item does its own thing with a right-clicked block, so the block should leave that
+	 * interaction alone.
+	 *
+	 * A tool clicked on a machine port is being used on it, not fed into it.
+	 */
+	open val handlesBlockInteraction: Boolean get() = false
+
+	/**
 	 * Called once a second for every player holding this item in their main hand, main thread.
 	 *
 	 * For readouts a tool wants to keep current without an interaction — what the crosshair is on,

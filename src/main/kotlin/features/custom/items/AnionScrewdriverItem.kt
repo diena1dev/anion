@@ -33,6 +33,8 @@ class AnionScrewdriverItem : AnionItem(
 
 	}
 
+	override val handlesBlockInteraction: Boolean get() = true
+
 	override fun onPlayerInteract(event: PlayerInteractEvent) {
 
 		if (event.hand != EquipmentSlot.HAND) return

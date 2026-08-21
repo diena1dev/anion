@@ -12,8 +12,10 @@ import dev.diena.anion.features.recipes.AnionRecipes
 import dev.diena.anion.features.recipes.AnionResult
 import dev.diena.anion.features.recipes.adapters.MachineRecipeAdapter
 import net.minecraft.core.Vec3i
+import net.minecraft.world.level.block.SoundType
 import org.bukkit.Location
 import org.bukkit.Particle
+import org.bukkit.Sound
 import org.bukkit.block.BlockType
 
 /**
@@ -169,7 +171,7 @@ class DebugFurnaceMachine : PortedMachine("Debug Furnace", DEBUG_FURNACE_STRUCTU
 		)
 
 		working = result.progressGained > 0.0
-		if (working) emitSmoke()
+		if (working) { emitSmoke(); emitSound()}
 
 		if (!result.completed) return
 
@@ -234,6 +236,18 @@ class DebugFurnaceMachine : PortedMachine("Debug Furnace", DEBUG_FURNACE_STRUCTU
 			.count(0)
 			.extra(0.1)
 			.spawn()
+
+	}
+
+	private fun emitSound() {
+
+		val point = this.coreLocation()
+
+		point.world.playSound(
+			point,
+			Sound.BLOCK_BLASTFURNACE_FIRE_CRACKLE,
+			1f, 1f
+		)
 
 	}
 
