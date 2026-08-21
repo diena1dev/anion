@@ -144,7 +144,7 @@ open class MachineBuffer(
 	}
 
 	/** One line for a debug readout. */
-	open fun describe(): String = "$key ${used()}/$capacity ports=${boundPorts.size}"
+	open fun describe(): String = "$key ${used()}/$capacity ports=${boundPorts.size} rate=${transferLimit()}/pass"
 
 	/** Drops the whole contents. Called when the machine is disassembled. */
 	open fun clear() {
@@ -205,7 +205,7 @@ open class BulkItemBuffer(
 	fun typesUsed(): Int = stored.size
 
 	override fun describe(): String =
-		"$key ${used()}/$capacity ${typesUsed()}/$typeLimit types ports=${boundPorts.size}"
+		"$key ${used()}/$capacity ${typesUsed()}/$typeLimit types ports=${boundPorts.size} rate=${transferLimit()}/pass"
 
 	override fun accepts(resource: AnionResource): Boolean {
 

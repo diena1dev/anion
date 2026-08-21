@@ -332,6 +332,9 @@ abstract class Machine(
 		lines += "${namespacedKey.key} @ $origin rot=$rotation intact=$intact ship=$carrier"
 		lines += "  cells=${resolvedStructure.size} dirty=$dirty"
 
+		// the per-buffer rates below are what ports bought; this is what the machine will actually allow
+		lines += "  transfer ceiling=$transferCeiling/pass across all buffers"
+
 		lines += portLines()
 
 		if (buffers.isEmpty()) lines += "  buffers: none"
