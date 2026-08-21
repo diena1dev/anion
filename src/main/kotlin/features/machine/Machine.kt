@@ -302,8 +302,39 @@ abstract class Machine(
 
 	}
 
-	/** Extra lines for `/machine debug` — whatever this type wants a look at that the base cannot know. */
+	/** Extra lines for [debugReport] — whatever this type wants a look at that the base cannot know. */
 	open fun debugLines(): List<String> = emptyList()
+
+	/** The port section of [debugReport]. Empty unless the type has ports. */
+	protected open fun portLines(): List<String> = emptyList()
+
+	/** Everything worth knowing about this machine, one line at a time. */
+	// shared by /machine debug and the wrench, so the two can never drift apart
+	fun debugReport(): List<String> {
+
+		val lines = mutableListOf<String>()
+
+		val carrier = starship?.uuid?.toString()?.take(8) ?: "none"
+
+		lines += "${namespacedKey.key} @ $origin rot=$rotation intact=$intact ship=$carrier"
+		lines += "  cells=${resolvedStructure.size} dirty=$dirty"
+
+		lines += portLines()
+
+		if (buffers.isEmpty()) lines += "  buffers: none"
+		else for (buffer in buffers.values) {
+
+			lines += "  buffer ${buffer.describe()}"
+
+			for ((resource, amount) in buffer.contents()) lines += "   - ${resource.namespacedKey} x$amount"
+
+		}
+
+		for (line in debugLines()) lines += "  $line"
+
+		return lines
+
+	}
 
 	/** Called on Machine Disassembly */
 	// recommended use: flush recipes, call shutdown() to any attached entities or display components.

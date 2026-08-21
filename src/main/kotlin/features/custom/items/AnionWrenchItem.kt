@@ -13,7 +13,8 @@ import org.bukkit.inventory.EquipmentSlot
 import org.bukkit.inventory.ItemType
 
 /**
- * Assembles the machine the clicked block belongs to, or tears one down while sneaking.
+ * Assembles the machine the clicked block would complete, dumps a full readout when there is already
+ * one there, and tears one down while sneaking.
  *
  * Held, it reports what the crosshair is on once a second: the machine there, or the one that block
  * would complete if it were assembled.
@@ -64,6 +65,19 @@ class AnionWrenchItem : AnionItem(
 				Component.text("Disassembled ${machines.joinToString(", ") { it.namespacedKey.key }}")
 					.color(NamedTextColor.YELLOW)
 			)
+
+			return
+
+		}
+
+		// already a machine here, so there is nothing to assemble and the interesting thing is its state
+		val existing = Machine.machinesAt(level, cell)
+
+		if (existing.isNotEmpty()) {
+
+			for (machine in existing) {
+				for (line in machine.debugReport()) player.sendMessage(Component.text(line).color(NamedTextColor.GRAY))
+			}
 
 			return
 

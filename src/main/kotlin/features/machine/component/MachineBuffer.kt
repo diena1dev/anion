@@ -129,6 +129,9 @@ open class MachineBuffer(
 
 	}
 
+	/** One line for a debug readout. */
+	open fun describe(): String = "$key ${used()}/${capacity()} ports=${boundPorts.size}"
+
 	/** Drops the whole contents. Called when the machine is disassembled. */
 	open fun clear() {
 
@@ -187,6 +190,9 @@ open class BulkItemBuffer(
 
 	/** Distinct variants held, against [typeLimit]. */
 	fun typesUsed(): Int = stored.size
+
+	override fun describe(): String =
+		"$key ${used()}/${capacity()} ${typesUsed()}/$typeLimit types ports=${boundPorts.size}"
 
 	// storage capacity is a property of the structure, not of how many ports were bolted onto it
 	override fun capacity(): Long = totalCapacity

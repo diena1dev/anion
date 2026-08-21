@@ -46,6 +46,23 @@ abstract class PortedMachine(
 
 	}
 
+	override fun portLines(): List<String> {
+
+		if (ports.isEmpty()) return listOf("  ports: none")
+
+		val lines = mutableListOf<String>()
+
+		val byKind = ports.values.groupingBy { it.kind }.eachCount().entries.joinToString(" ") { "${it.key}x${it.value}" }
+		lines += "  ports=${ports.size} [$byKind]"
+
+		for (port in ports.values.sortedBy { it.kind }) {
+			lines += "   ${port.offset} ${port.kind} -> ${port.bufferKey ?: "unbound"}"
+		}
+
+		return lines
+
+	}
+
 	/** Which buffer each port feeds. Player-cycled, so it cannot be re-derived from the structure. */
 	override fun saveState(tag: CompoundTag) {
 

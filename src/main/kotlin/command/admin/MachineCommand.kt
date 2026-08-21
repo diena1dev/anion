@@ -8,9 +8,7 @@ import dev.astralchroma.processor.annotations.Subcommand
 import dev.diena.anion.Keys
 import dev.diena.anion.extensions.vec3i
 import dev.diena.anion.features.machine.Machine
-import dev.diena.anion.features.machine.component.BulkItemBuffer
 import dev.diena.anion.features.machine.examples.BlinkerMachine
-import dev.diena.anion.features.machine.machine_types.PortedMachine
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.TextColor
 import org.bukkit.Color
@@ -135,36 +133,7 @@ object MachineCommand {
 		val machines = machinesAt(sender) ?: return
 
 		for (machine in machines) {
-
-			val carrier = machine.starship?.uuid?.toString()?.take(8) ?: "none"
-			sender.info("${machine.namespacedKey.key} @ ${machine.origin} rot=${machine.rotation} intact=${machine.intact} ship=$carrier")
-			sender.info("  cells=${machine.resolvedStructure.size} dirty=${machine.dirty}")
-
-			val ports = (machine as? PortedMachine)?.ports?.values.orEmpty()
-			if (ports.isEmpty()) sender.info("  ports: none")
-			else {
-				val byKind = ports.groupingBy { it.kind }.eachCount().entries.joinToString(" ") { "${it.key}x${it.value}" }
-				sender.info("  ports=${ports.size} [$byKind]")
-
-				for (port in ports.sortedBy { it.kind }) {
-					sender.info("   ${port.offset} ${port.kind} -> ${port.bufferKey ?: "unbound"}")
-				}
-			}
-
-			if (machine.buffers.isEmpty()) sender.info("  buffers: none")
-			else for (buffer in machine.buffers.values) {
-
-				val types = if (buffer is BulkItemBuffer) " ${buffer.typesUsed()}/${buffer.typeLimit} types" else ""
-				sender.info("  buffer ${buffer.key} ${buffer.used()}/${buffer.capacity()}$types ports=${buffer.boundPorts.size}")
-
-				for ((resource, amount) in buffer.contents()) {
-					sender.info("   - ${resource.namespacedKey} x$amount")
-				}
-
-			}
-
-			for (line in machine.debugLines()) sender.info("  $line")
-
+			for (line in machine.debugReport()) sender.info(line)
 		}
 
 	}
