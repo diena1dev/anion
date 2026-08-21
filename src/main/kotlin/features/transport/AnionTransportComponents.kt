@@ -222,7 +222,7 @@ object HopperFilter : AnionTransportComponent {
 		val key = resource as? ItemKey ?: return false
 
 		val listed = filterList(block)
-		if (listed.isEmpty()) return true // unconfigured
+		if (listed.isEmpty()) return false // if unconfigured, pass NOTHING
 
 		return if (blacklisting(block)) key !in listed else key in listed
 
