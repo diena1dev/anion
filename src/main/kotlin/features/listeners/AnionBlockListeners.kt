@@ -310,14 +310,15 @@ object AnionBlockListeners : Listener {
 
 		}
 
-		// a piston learns about redstone through its own physics event, so cancelling that one stops it
-		// ever firing. the anion blocks around a piston move are repaired by trackPistonMove instead.
-		if (block.type == Material.PISTON || block.type == Material.STICKY_PISTON) return
-
-		// NoteBlock.updateShape recomputes the instrument from whatever is on its Y axis and writes
-		// itself back, which shape-updates the block under it in turn. so a note block that is allowed
-		// to recalculate cascades down a stack, and cancelling the anion block's own event is too late
-		// to stop it — the cascade has to be frozen a block early, here.
+		// this block just changed, and NoteBlock.updateShape recomputes the instrument from whatever is
+		// on its Y axis. an anion instrument is one vanilla only ever produces from a mob head above, so
+		// a single shape update resets it and deregisters the block.
+		//
+		// cancelling here is what stops that: Level.notifyAndUpdatePhysics only skips
+		// updateNeighbourShapes and updateIndirectNeighbourShapes when the event is cancelled, and it
+		// has already run updateNeighborsAt by that point. so this suppresses shape propagation out of
+		// this cell and costs its own behaviour nothing — a piston, a repeater or a hopper beside a
+		// machine still gets every neighbourChanged it needs. do not exempt block types from this.
 		if (anionBlockAt(block.getRelative(BlockFace.UP)) != null ||
 			anionBlockAt(block.getRelative(BlockFace.DOWN)) != null) {
 			event.isCancelled = true
