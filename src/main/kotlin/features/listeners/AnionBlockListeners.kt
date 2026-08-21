@@ -267,14 +267,17 @@ object AnionBlockListeners : Listener {
 	private val blocksToFix = mutableMapOf<Block, PendingFix>()
 
 	/**
-	 * Cells a piston is rewriting this tick: the piston, everything it is moving, and where each of
-	 * those lands. Cleared at the end of the tick.
+	 * Cells a piston is rewriting, and how many ticks they stay exempt for.
 	 *
 	 * The neighbour rule below must not touch these. A vertical piston sits directly under the anion
-	 * block it is pushing, so the rule fires on the piston itself and suppresses the shape propagation
-	 * the move is carried by — which is why pushing sideways always worked and pushing up never did.
+	 * block it is moving, so the rule fires on the piston itself and suppresses the shape propagation
+	 * the move is carried by — which is why moving one sideways always worked and vertically never did.
+	 *
+	 * It has to outlive the tick the move started in. The head only lands when the slide finishes two
+	 * ticks later, into the cell right under the block that was just pushed off it, and the rule fires
+	 * on that too — which is why extending broke after retracting was fixed.
 	 */
-	private val movingCells = mutableSetOf<Block>()
+	private val movingCells = mutableMapOf<Block, Int>()
 
 	/** ticks a fix waits for a piston to finish sliding before it is applied regardless */
 	private const val SETTLE_TICKS = 4
@@ -290,6 +293,11 @@ object AnionBlockListeners : Listener {
 	/** Queues [data] to be stamped back into [block] once the tick has settled. */
 	private fun repair(block: Block, data: BlockData, moved: Boolean = false) {
 		blocksToFix[block] = PendingFix(data, moved)
+	}
+
+	/** Leaves [block] out of the neighbour rule until the piston move touching it has finished. */
+	private fun exempt(block: Block) {
+		movingCells[block] = SETTLE_TICKS
 	}
 
 	@EventHandler
@@ -355,10 +363,16 @@ object AnionBlockListeners : Listener {
 		// on extend, and on retract it is left as plain air with a second copy of an already-moved block.
 		val vacated = blocks.toHashSet()
 
-		// the whole footprint of the move, anion or not, so onBlockPhysics leaves all of it alone
-		movingCells += event.block
-		movingCells += blocks
-		for (block in blocks) movingCells += block.getRelative(event.direction)
+		// the whole footprint of the move, anion or not, so onBlockPhysics leaves all of it alone.
+		// both sides of the piston, since the head lands in front on an extend and vacates it on a retract
+		exempt(event.block)
+		exempt(event.block.getRelative(event.direction))
+		exempt(event.block.getRelative(event.direction.oppositeFace))
+
+		for (block in blocks) {
+			exempt(block)
+			exempt(block.getRelative(event.direction))
+		}
 
 		val destinations = mutableMapOf<Block, BlockData>()
 		for (block in blocks) {
@@ -396,8 +410,14 @@ object AnionBlockListeners : Listener {
 	@EventHandler
 	fun onServerTickEnd(event: ServerTickEndEvent) {
 
-		// the window a move needs the exemption for is the tick its event fired in
-		movingCells.clear()
+		// exemptions age out on their own, so a move that never lands cannot leave one behind
+		if (movingCells.isNotEmpty()) {
+			val expiring = movingCells.entries.iterator()
+			while (expiring.hasNext()) {
+				val entry = expiring.next()
+				if (entry.value <= 1) expiring.remove() else entry.setValue(entry.value - 1)
+			}
+		}
 
 		if (blocksToFix.isEmpty()) return
 
