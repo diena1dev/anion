@@ -3,6 +3,7 @@ package dev.diena.anion.features.starship
 import dev.diena.anion.extensions.blockPos
 import dev.diena.anion.extensions.minus
 import dev.diena.anion.extensions.plus
+import dev.diena.anion.extensions.rotateWithAnion
 import net.minecraft.core.Vec3i
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.world.entity.PositionMoveRotation
@@ -240,7 +241,7 @@ object StarshipMovement {
 		for ((vec, state) in starship.blockHashMap) {
 
 			val newVec = starship.origin + rotateVec(vec - starship.origin, rotationSteps)
-			newBlockMap[newVec] = state.rotate(nmsRotation)
+			newBlockMap[newVec] = state.rotateWithAnion(nmsRotation)
 
 		}
 

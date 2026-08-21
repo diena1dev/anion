@@ -2,7 +2,9 @@ package dev.diena.anion.features.custom.blocks
 
 import dev.diena.anion.Anion
 import dev.diena.anion.extensions.axis
+import dev.diena.anion.extensions.rotated
 import net.kyori.adventure.text.Component
+import net.minecraft.world.level.block.Rotation
 import org.bukkit.Axis
 import org.bukkit.Instrument
 import org.bukkit.NamespacedKey
@@ -89,6 +91,15 @@ open class AnionPillarBlock(
 	 */
 	open fun axisFor(clickedFace: BlockFace?): Axis =
 		clickedFace?.axis?.takeIf { it in axes } ?: defaultAxis
+
+	/** Turns the axis the note encodes, so a pillar lies the right way after a starship rotation. */
+	override fun noteAfterRotation(note: Int, rotation: Rotation): Int {
+
+		val axis = axisOf(note) ?: return note
+
+		return noteFor(axis.rotated(rotation)) ?: note
+
+	}
 
 	/**
 	 * Blockstate model rotation for [axis], as `x` to `y` degrees. Assumes the model stands on Y,

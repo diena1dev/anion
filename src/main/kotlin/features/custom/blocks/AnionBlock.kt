@@ -3,6 +3,7 @@ package dev.diena.anion.features.custom.blocks
 import dev.diena.anion.Anion
 import dev.diena.anion.features.custom.AnionResource
 import net.kyori.adventure.text.Component
+import net.minecraft.world.level.block.Rotation
 import org.bukkit.Instrument
 import org.bukkit.NamespacedKey
 import org.bukkit.SoundGroup
@@ -49,6 +50,14 @@ open class AnionBlock(
 	init {
 		if (note !in 0..24) throw IllegalStateException("note must be 0–24, got $note for ${this.namespacedKey}")
 	}
+
+	/**
+	 * The note this block should carry after [rotation]. Defaults to unchanged.
+	 *
+	 * A note block has no rotatable vanilla property, so anything an anion block encodes in its note
+	 * has to be turned here or it survives a starship rotation pointing the way it started.
+	 */
+	open fun noteAfterRotation(note: Int, rotation: Rotation): Int = note
 
 	open fun onPlace(block: Block, player: Player?) { placeHandler?.invoke(block, player) }
 	open fun onBreak(block: Block, player: Player?) { breakHandler?.invoke(block, player) }

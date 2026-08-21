@@ -20,7 +20,9 @@ import net.minecraft.core.BlockPos.MutableBlockPos
 import net.minecraft.core.SectionPos
 import net.minecraft.core.Vec3i
 import net.minecraft.world.level.block.Rotation
+import net.minecraft.world.level.block.state.BlockState
 import net.minecraft.world.phys.Vec3
+import net.minecraft.world.level.block.NoteBlock as NmsNoteBlock
 import org.bukkit.Axis
 import org.bukkit.Location
 import org.bukkit.Material
@@ -28,6 +30,7 @@ import org.bukkit.RegionAccessor
 import org.bukkit.block.Block
 import org.bukkit.block.BlockFace
 import org.bukkit.block.data.type.NoteBlock
+import org.bukkit.craftbukkit.block.data.CraftBlockData
 import org.bukkit.entity.Entity
 import org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason
 import org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason.CUSTOM
@@ -406,6 +409,44 @@ val Axis.faces: List<BlockFace>
 		Axis.Z -> listOf(BlockFace.SOUTH, BlockFace.NORTH)
 
 	}
+
+/** This axis after [rotation]. A quarter turn swaps the horizontal pair; Y never moves. */
+// an axis has no direction, so a half turn leaves every one of them where it was
+fun Axis.rotated(rotation: Rotation): Axis = when (rotation) {
+
+	Rotation.CLOCKWISE_90, Rotation.COUNTERCLOCKWISE_90 -> when (this) {
+
+		Axis.X -> Axis.Z
+		Axis.Z -> Axis.X
+		Axis.Y -> Axis.Y
+
+	}
+
+	else -> this
+
+}
+
+/**
+ * Rotates this block state, including the part vanilla cannot do for us.
+ *
+ * A note block has no rotatable property, and an [AnionPillarBlock] keeps its axis in the note, so
+ * plain [BlockState.rotate] leaves a pipe lying the way it was before the ship turned.
+ */
+fun BlockState.rotateWithAnion(rotation: Rotation): BlockState {
+
+	val rotated = this.rotate(rotation)
+
+	val noteBlock = CraftBlockData.createData(rotated) as? NoteBlock ?: return rotated
+	val note = noteBlock.note.id.toInt()
+
+	val anionBlock = AnionBlocks.fromState(noteBlock.instrument, note) ?: return rotated
+	val turned = anionBlock.noteAfterRotation(note, rotation)
+
+	if (turned == note) return rotated
+
+	return rotated.setValue(NmsNoteBlock.NOTE, turned)
+
+}
 
 /** The registered AnionBlock this world block encodes, or null if it is not one. */
 val Block.anionBlock: AnionBlock?
