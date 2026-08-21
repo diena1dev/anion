@@ -22,7 +22,11 @@ import org.bukkit.block.BlockType
  */
 val DEBUG_FURNACE_STRUCTURE =
 	BlockSet.new("debug_furnace")
-		.core('C', AnionBlocks.TEST_BLOCK)
+		.core('C', BlockType.IRON_BLOCK)
+
+		.assign('b', BlockType.POLISHED_BLACKSTONE_WALL)
+		.assign('i', BlockType.IRON_BLOCK)
+		.assign('s', BlockType.SMOOTH_SANDSTONE_STAIRS)
 
 		.assign('I', AnionBlocks.COPPER_MACHINE_CASING)
 		.assign('I', AnionBlocks.COPPER_MACHINE_BUS)
@@ -34,20 +38,28 @@ val DEBUG_FURNACE_STRUCTURE =
 		.assign('M', BlockType.MAGMA_BLOCK)
 
 		.slice(
-			"III",
-			"ICI",
-			"III",
+			"iC",
+			"ss",
+			"II",
+			"II",
+			"II"
 		)
 		.slice(
-			"III",
-			"IMI",
-			"III",
+			"ii",
+			"ss",
+			"II",
+			"II",
+			"II"
 		)
 		.slice(
-			"III",
-			"III",
-			"III",
+			" b",
+			"  ",
+			"  ",
+			"  ",
+			"  "
 		)
+
+
 
 		.build()
 
@@ -55,10 +67,10 @@ val DEBUG_FURNACE_STRUCTURE =
  * The first machine that actually runs a recipe. Debug: one hardcoded recipe, no fuel value maths,
  * no byproducts, no power.
  *
- * Three buffers, and which port feeds which is the player's to decide — right-click a port block
- * bare-handed to cycle it, `/machine debug` to read the bindings back, `/machine clear <buffer>` to
- * dump one that got loaded with the wrong thing. That is the whole point of the machine: a single
- * buffer can be auto-bound at assembly and never thought about, three cannot.
+ * Three buffers, and which port feeds which is the player's to decide — a screwdriver cycles a port,
+ * `/machine debug` reads the bindings back, and a sneak-click with the screwdriver dumps a buffer that
+ * got loaded with the wrong thing. That is the whole point of the machine: a single buffer can be
+ * auto-bound at assembly and never thought about, three cannot.
  *
  * A buffer's capacity is granted by the ports bound to it, so this wants **at least three bus ports**
  * in the casing — with fewer, whichever buffer got none has no room and the furnace stalls against it.
