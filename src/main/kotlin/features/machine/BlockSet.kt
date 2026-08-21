@@ -151,6 +151,21 @@ open class BlockSet private constructor(
 
 		}
 
+		fun core(char: Char, block: BlockType): Builder {
+
+			if (coreChar != null) throw IllegalStateException("duplicate core registration in machine structure")
+
+			// the same block may already be an accepted variant for this char, and listing it twice
+			// would only make resolveStructure walk a dead entry
+			val matchers = charMatchers.getOrPut(char) { mutableListOf() }
+			val matcher = BlockMatcher.Vanilla(block)
+			if (matcher !in matchers) matchers.add(matcher)
+
+			coreChar = char
+			return this
+
+		}
+
 		/** Assign AnionBlock. Call multiple times on the same char to accept any of several block variants there. */
 		fun assign(char: Char, block: AnionBlock): Builder {
 
