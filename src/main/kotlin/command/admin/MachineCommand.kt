@@ -2,8 +2,10 @@ package dev.diena.anion.command.admin
 
 import dev.astralchroma.processor.annotations.Command
 import dev.astralchroma.processor.annotations.Name
+import dev.astralchroma.processor.annotations.Permission
 import dev.astralchroma.processor.annotations.Sender
 import dev.astralchroma.processor.annotations.Subcommand
+import dev.diena.anion.Keys
 import dev.diena.anion.extensions.vec3i
 import dev.diena.anion.features.machine.Machine
 import dev.diena.anion.features.machine.MachineIndex
@@ -22,35 +24,12 @@ import org.bukkit.entity.Player
 //       Machine.candidatesAt() on the clicked block, then assemble() on the single candidate.
 @Command
 @Name("machine")
+@Permission("${Keys.COMMAND_PERMISSION_TREE}.machine")
 object MachineCommand {
-
-	/** debug: assembles a [BlinkerMachine] with its core at the block the sender is looking at */
-	@Subcommand
-	fun assembleBlinkerMachine(
-
-		@Sender sender: Player
-
-	) {
-
-		val target = sender.getTargetBlockExact(16) ?: run {
-			sender.info("No block in range (max 16 blocks).")
-			return
-		}
-
-		val level = (sender.world as CraftWorld).handle
-		val origin = target.vec3i
-
-		val machine = BlinkerMachine().assemble(level, origin) ?: run {
-			sender.info("No blinker structure at $origin.")
-			return
-		}
-
-		sender.info("Assembled ${machine::class.simpleName} at $origin. Intact: ${machine.intact}")
-
-	}
 
 	/** Assembles whatever machine the clicked block belongs to, at any offset and rotation. */
 	@Subcommand
+	@Permission("${Keys.COMMAND_PERMISSION_TREE}.machine.assemble")
 	fun assemble(
 
 		@Sender sender: Player
@@ -92,6 +71,7 @@ object MachineCommand {
 
 	/** Tears down every machine occupying the targeted block. */
 	@Subcommand
+	@Permission("${Keys.COMMAND_PERMISSION_TREE}.disassemble")
 	fun disassemble(
 
 		@Sender sender: Player
@@ -111,6 +91,7 @@ object MachineCommand {
 
 	/** Dumps structure, port and buffer state for the machine(s) at the targeted block. */
 	@Subcommand
+	@Permission("${Keys.COMMAND_PERMISSION_TREE}.debug")
 	fun debug(
 
 		@Sender sender: Player

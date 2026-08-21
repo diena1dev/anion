@@ -2,8 +2,10 @@ package dev.diena.anion.command.admin
 
 import dev.astralchroma.processor.annotations.Command
 import dev.astralchroma.processor.annotations.Name
+import dev.astralchroma.processor.annotations.Permission
 import dev.astralchroma.processor.annotations.Sender
 import dev.astralchroma.processor.annotations.Subcommand
+import dev.diena.anion.Keys
 import dev.diena.anion.extensions.vec3i
 import dev.diena.anion.features.transport.AnionTransport
 import dev.diena.anion.features.transport.AnionTransportIndex
@@ -15,10 +17,12 @@ import org.bukkit.entity.Player
 // TODO: add permission nodes
 @Command
 @Name("transport")
+@Permission("${Keys.COMMAND_PERMISSION_TREE}.transport")
 object TransportCommand {
 
 	/** Dumps what transport sees at the targeted block, and where a run leaving it stops. */
 	@Subcommand
+	@Permission("${Keys.COMMAND_PERMISSION_TREE}.transport.debug")
 	fun debug(
 
 		@Sender sender: Player

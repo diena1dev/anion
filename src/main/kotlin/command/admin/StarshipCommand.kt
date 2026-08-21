@@ -3,10 +3,12 @@ package dev.diena.anion.command.admin
 import com.destroystokyo.paper.event.server.ServerTickEndEvent
 import dev.astralchroma.processor.annotations.Command
 import dev.astralchroma.processor.annotations.Name
+import dev.astralchroma.processor.annotations.Permission
 import dev.astralchroma.processor.annotations.Register
 import dev.astralchroma.processor.annotations.Sender
 import dev.astralchroma.processor.annotations.Subcommand
 import dev.diena.anion.Anion
+import dev.diena.anion.Keys
 import dev.diena.anion.data.database.AnionPersistence
 import dev.diena.anion.extensions.blockPos
 import dev.diena.anion.features.starship.Starship
@@ -31,6 +33,7 @@ import kotlin.collections.toSet
 // TODO: add better cache per-player (PLAYER DATA)
 @Command
 @Name("starship")
+@Permission("${Keys.COMMAND_PERMISSION_TREE}.starship")
 object StarshipCommand {
 
 	@Register
@@ -64,6 +67,7 @@ object StarshipCommand {
 	////////////////////////////////////////////////
 
 	@Subcommand
+	@Permission("${Keys.COMMAND_PERMISSION_TREE}.starship.create")
 	fun create(
 
 		@Sender sender: Player
@@ -117,6 +121,7 @@ object StarshipCommand {
 
 	/** remove starship from all starship related things (very helpful note i know :3) */
 	@Subcommand
+	@Permission("${Keys.COMMAND_PERMISSION_TREE}.starship.destroy")
 	fun destroy(
 
 		@Sender sender: Player,
@@ -145,6 +150,7 @@ object StarshipCommand {
 	}
 
 	@Subcommand
+	@Permission("${Keys.COMMAND_PERMISSION_TREE}.starship.select")
 	fun select(
 
 		@Sender sender: Player
@@ -158,6 +164,7 @@ object StarshipCommand {
 	}
 
 	@Subcommand
+	@Permission("${Keys.COMMAND_PERMISSION_TREE}.starship.unselect")
 	fun unselect(
 
 		@Sender sender: Player
@@ -171,6 +178,7 @@ object StarshipCommand {
 	}
 
 	@Subcommand
+	@Permission("${Keys.COMMAND_PERMISSION_TREE}.starship.info")
 	fun info(
 
 		@Sender sender: Player
@@ -197,6 +205,7 @@ object StarshipCommand {
 
 	/** move ship in given direction */
 	@Subcommand
+	@Permission("${Keys.COMMAND_PERMISSION_TREE}.starship.move")
 	fun move(
 
 		@Sender sender: Player,
@@ -216,6 +225,7 @@ object StarshipCommand {
 	}
 
 	@Subcommand
+	@Permission("${Keys.COMMAND_PERMISSION_TREE}.starship.rotate")
 	fun rotate(
 
 		@Sender sender: Player,
@@ -231,6 +241,7 @@ object StarshipCommand {
 	}
 
 	@Subcommand
+	@Permission("${Keys.COMMAND_PERMISSION_TREE}.starship.teleport")
 	fun teleport(
 
 		@Sender sender: Player,
@@ -253,9 +264,11 @@ object StarshipCommand {
 
 	/** modify starship velocity */
 	@Subcommand
+	@Permission("${Keys.COMMAND_PERMISSION_TREE}.starship.velocity")
 	object Velocity {
 
 		@Subcommand
+		@Permission("${Keys.COMMAND_PERMISSION_TREE}.starship.velocity.add")
 		fun add(
 
 			@Sender sender: Player,
@@ -273,6 +286,7 @@ object StarshipCommand {
 		}
 
 		@Subcommand
+		@Permission("${Keys.COMMAND_PERMISSION_TREE}.starship.velocity.reset")
 		fun reset(
 
 			@Sender sender: Player
@@ -288,6 +302,7 @@ object StarshipCommand {
 
 		/** set a constant velocity re-applied every tick, for debugging movement without thrusters */
 		@Subcommand
+		@Permission("${Keys.COMMAND_PERMISSION_TREE}.starship.velocity.set_constant")
 		fun setConstant(
 
 			@Sender sender: Player,
@@ -306,6 +321,7 @@ object StarshipCommand {
 
 		/** stop re-applying the debug constant velocity (does not reset current velocity, see [reset]) */
 		@Subcommand
+		@Permission("${Keys.COMMAND_PERMISSION_TREE}.starship.velocity.reset_constant")
 		fun resetConstant(
 
 			@Sender sender: Player

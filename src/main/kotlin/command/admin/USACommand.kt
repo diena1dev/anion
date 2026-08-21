@@ -17,7 +17,7 @@ import org.bukkit.inventory.meta.FireworkMeta
 /** Horizon's End uses the `/usa` command as an alias to `/unsetall`, which is lame. >:3 */
 @Command
 @Name("usa")
-@Permission("${Keys.COMMAND_PERMISSION_TREE}.admin.usa")
+@Permission("${Keys.COMMAND_PERMISSION_TREE}.usa")
 object USACommand {
 
 	@Inferred

@@ -13,7 +13,7 @@ import org.bukkit.command.CommandSender
 
 @Command
 @Name("resourcepackdatagen")
-@Permission("${Keys.COMMAND_PERMISSION_TREE}.admin.resourcepackdatagen")
+@Permission("${Keys.COMMAND_PERMISSION_TREE}.resourcepackdatagen")
 object ResourcePackDatagenCommand {
 
 	@Inferred
