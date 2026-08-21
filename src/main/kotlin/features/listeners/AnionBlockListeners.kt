@@ -257,49 +257,17 @@ object AnionBlockListeners : Listener {
 
 	// end interaction
 
-	// physics protection
+	// block state protection
 
-	@EventHandler
-	fun onBlockPhysics(event: BlockPhysicsEvent) {
-		val block = event.block
+	/** blockdata that belongs in a cell once the tick's block churn has settled */
+	// moved says the block arrived in this cell rather than never leaving it, which is what decides
+	// whether the indexes need telling even when the data turns out not to have been mangled at all
+	private class PendingFix(val data: BlockData, val moved: Boolean, var ticksWaited: Int = 0)
 
-		if (block.type == Material.NOTE_BLOCK) {
-			val data = noteData(block) ?: return
-			val anionBlock = AnionBlocks.fromState(data.instrument, data.note.id.toInt())
-			if (anionBlock != null) {
-				event.isCancelled = true
-				anionBlock.onNeighborChange(block)
-				return
-			}
+	private val blocksToFix = mutableMapOf<Block, PendingFix>()
 
-			val nextNote = (data.note.id.toInt() + 1) % 25
-			if (AnionBlocks.fromState(data.instrument, nextNote) != null) {
-				event.isCancelled = true
-				return
-			}
-		}
-
-		// a piston learns about redstone through its own physics event, so cancelling that one stops it
-		// ever firing. an anion block beside it is already covered by its own branch above.
-		if (block.type == Material.PISTON || block.type == Material.STICKY_PISTON) return
-
-		if (anionBlockAt(block.getRelative(BlockFace.UP)) != null ||
-			anionBlockAt(block.getRelative(BlockFace.DOWN)) != null) {
-			event.isCancelled = true
-		}
-	}
-
-	// physics protection end
-
-	// piston protection
-
-	private var blocksToFix = mutableMapOf<Block, BlockData>()
-
-	@EventHandler
-	fun onPistonExtend(event: BlockPistonExtendEvent) = trackPistonMove(event, event.blocks)
-
-	@EventHandler
-	fun onPistonRetract(event: BlockPistonRetractEvent) = trackPistonMove(event, event.blocks)
+	/** ticks a fix waits for a piston to finish sliding before it is applied regardless */
+	private const val SETTLE_TICKS = 4
 
 	/** The note block data at [block] when it encodes a registered AnionBlock, else null. */
 	private fun anionNoteData(block: Block): NoteBlock? {
@@ -308,6 +276,60 @@ object AnionBlockListeners : Listener {
 
 		return data
 	}
+
+	/** Queues [data] to be stamped back into [block] once the tick has settled. */
+	private fun repair(block: Block, data: BlockData, moved: Boolean = false) {
+		blocksToFix[block] = PendingFix(data, moved)
+	}
+
+	@EventHandler
+	fun onBlockPhysics(event: BlockPhysicsEvent) {
+
+		val block = event.block
+
+		if (block.type == Material.NOTE_BLOCK) {
+
+			// an anion block is inert: no repowering, no note cycling, no instrument recalculation
+			val data = noteData(block) ?: return
+			val anionBlock = AnionBlocks.fromState(data.instrument, data.note.id.toInt())
+			if (anionBlock != null) {
+				event.isCancelled = true
+				anionBlock.onNeighborChange(block)
+				return
+			}
+
+			// a vanilla note block one note short of a registered state must not be cycled into it
+			val nextNote = (data.note.id.toInt() + 1) % 25
+			if (AnionBlocks.fromState(data.instrument, nextNote) != null) {
+				event.isCancelled = true
+				return
+			}
+
+			// deliberately falls through. a vanilla note block beside an anion block is the case the
+			// rule below exists for, and returning here is what let it cascade.
+
+		}
+
+		// a piston learns about redstone through its own physics event, so cancelling that one stops it
+		// ever firing. the anion blocks around a piston move are repaired by trackPistonMove instead.
+		if (block.type == Material.PISTON || block.type == Material.STICKY_PISTON) return
+
+		// NoteBlock.updateShape recomputes the instrument from whatever is on its Y axis and writes
+		// itself back, which shape-updates the block under it in turn. so a note block that is allowed
+		// to recalculate cascades down a stack, and cancelling the anion block's own event is too late
+		// to stop it — the cascade has to be frozen a block early, here.
+		if (anionBlockAt(block.getRelative(BlockFace.UP)) != null ||
+			anionBlockAt(block.getRelative(BlockFace.DOWN)) != null) {
+			event.isCancelled = true
+		}
+
+	}
+
+	@EventHandler
+	fun onPistonExtend(event: BlockPistonExtendEvent) = trackPistonMove(event, event.blocks)
+
+	@EventHandler
+	fun onPistonRetract(event: BlockPistonRetractEvent) = trackPistonMove(event, event.blocks)
 
 	/** Records the anion data a piston move is about to lose, keyed by the cell it belongs in after. */
 	private fun trackPistonMove(event: BlockPistonEvent, blocks: List<Block>) {
@@ -340,25 +362,45 @@ object AnionBlockListeners : Listener {
 				if (neighbour in vacated || neighbour in destinations) continue
 
 				val data = anionNoteData(neighbour) ?: continue
-				blocksToFix[neighbour] = data
+				repair(neighbour, data)
 			}
 
 		}
 
 		// last, so a moving block's destination outranks any repair another block claimed for that cell
-		blocksToFix += destinations
+		for ((destination, data) in destinations) repair(destination, data, moved = true)
 
 	}
 
 	@EventHandler
 	fun onServerTickEnd(event: ServerTickEndEvent) {
-		val toFix = blocksToFix
-		blocksToFix = mutableMapOf()
-		for ((block, data) in toFix) {
-			block.setBlockData(data, false)
 
-			// the block lives somewhere else now. the cell it left is a stale hint and drops out on the
-			// next read, but nothing would ever have discovered the one it landed in.
+		if (blocksToFix.isEmpty()) return
+
+		val pending = blocksToFix.entries.iterator()
+
+		while (pending.hasNext()) {
+
+			val (block, fix) = pending.next()
+
+			// the piston is still sliding this cell. stamping now replaces the moving-piston block entity
+			// mid-slide, and that block entity is what shoves entities along in front of the block.
+			if (block.type == Material.MOVING_PISTON && fix.ticksWaited < SETTLE_TICKS) {
+				fix.ticksWaited++
+				continue
+			}
+
+			pending.remove()
+
+			// by far the common case: a physics repair queued beside a machine that nothing went on to
+			// mangle. every redstone tick next to one of these queues a fix, so a no-op must stay a no-op
+			// rather than rewriting the block and telling everyone in view distance about it.
+			if (!fix.moved && block.blockData == fix.data) continue
+
+			block.setBlockData(fix.data, false)
+
+			// a pushed block lives somewhere else now. the cell it left is a stale hint and drops out on
+			// the next read, but nothing would ever have discovered the one it landed in.
 			AnionTransportIndex.register(block)
 			markMachineCell(block)
 
@@ -367,11 +409,13 @@ object AnionBlockListeners : Listener {
 			val viewRadius = block.world.viewDistance * 16.0
 			block.world.players
 				.filter { it.location.distanceSquared(block.location) <= viewRadius * viewRadius }
-				.forEach { it.sendBlockChange(block.location, data) }
+				.forEach { it.sendBlockChange(block.location, fix.data) }
+
 		}
+
 	}
 
-	// piston protection end
+	// block state protection end
 
 	// pick block
 
