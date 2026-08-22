@@ -31,6 +31,16 @@ object StarshipCollision {
 
 	}
 
+	/** true if [pos] is somewhere a block can exist, both inside build height and inside the border. */
+	// off the primitives rather than a BlockPos- this runs once per ship block per march step
+	private fun inBounds(pos: Vec3i, starship: Starship): Boolean {
+
+		if (starship.level.isOutsideBuildHeight(pos.y)) return false
+
+		return starship.level.worldBorder.isWithinBounds(pos.x.toDouble(), pos.z.toDouble())
+
+	}
+
 	/** true if none of the starship's blocks would land in a non-air, non-starship block after moving by [vectorToMoveIn]. */
 	private fun isClean(vectorToMoveIn: Vec3i, starship: Starship): Boolean {
 
@@ -41,6 +51,8 @@ object StarshipCollision {
 		for (vec in starship.blockHashMap.keys) {
 
 			val vecToMoveTo = vec+vectorToMoveIn
+
+			if (!inBounds(vecToMoveTo, starship)) return false // a cell the ship owns is still one it may not enter
 
 			// if block to move to does already exist in ship, skip recheck check
 			if (starship.blockHashMap[vecToMoveTo] == null) {
@@ -121,6 +133,8 @@ object StarshipCollision {
 
 			// rotate about the ship origin
 			val vecToMoveTo = starship.origin + rotateVec(vec - starship.origin, steps)
+
+			if (!inBounds(vecToMoveTo, starship)) return false
 
 			// if block to move to does already exist in ship, skip recheck check
 			if (starship.blockHashMap[vecToMoveTo] == null) {
