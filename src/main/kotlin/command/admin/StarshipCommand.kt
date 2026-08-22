@@ -53,7 +53,11 @@ object StarshipCommand {
 				val ship = getSelectedStarship(player, false) ?: continue
 
 				player.sendActionBar(
-					Component.text("Pos: ${ship.origin} | Vel: ${ship.velocity.velocity} | CVel: ${ship.simulator.debugVelocity} | Level: ${ship.level.bukkitName}")
+					Component.text("Pos: ${ship.origin} | Vel: (" +
+							"${ship.velocity.velocity.x.toString().take(5)}," +
+							"${ship.velocity.velocity.y.toString().take(5)}," +
+							"${ship.velocity.velocity.z.toString().take(5)})" +
+							"| CVel: ${ship.simulator.debugVelocity} | Level: ${ship.level.bukkitName}")
 				)
 
 			}
