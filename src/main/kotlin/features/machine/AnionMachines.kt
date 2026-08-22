@@ -6,7 +6,9 @@ import dev.diena.anion.features.machine.examples.BlinkerMachine
 import dev.diena.anion.features.machine.machine_types.CargoContainerMachine
 import dev.diena.anion.features.machine.machine_types.MEDIUM_CARGO_CONTAINER_STRUCTURE
 import dev.diena.anion.features.machine.machine_types.debug_furnace.DebugFurnaceMachine
+import dev.diena.anion.features.machine.machine_types.thrusters.DebugThrusterDown
 import dev.diena.anion.features.machine.machine_types.thrusters.DebugThrusterHorizontal
+import dev.diena.anion.features.machine.machine_types.thrusters.DebugThrusterUp
 import features.machine.machine_types.basic_test_machine.BasicTestMachine
 
 object AnionMachines {
@@ -15,6 +17,8 @@ object AnionMachines {
 	val BASIC_TEST = registerMachine { BasicTestMachine() }
 	val DEBUG_FURNACE = registerMachine { DebugFurnaceMachine() }
 	val DEBUG_THRUSTER_HORIZONTAL = registerMachine { DebugThrusterHorizontal() }
+	val DEBUG_THRUSTER_UP = registerMachine { DebugThrusterUp() }
+	val DEBUG_THRUSTER_DOWN = registerMachine { DebugThrusterDown() }
 
 	val MEDIUM_CARGO_CONTAINER = registerMachine {
 		CargoContainerMachine(
