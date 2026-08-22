@@ -205,6 +205,7 @@ abstract class Machine(
 
 				val coreVariants = blockSet.blockMap[Vec3i.ZERO]
 				val matchedOrigins = mutableSetOf<Vec3i>()
+				val matchedFootprints = mutableSetOf<Set<Vec3i>>()
 
 				for (rotation in Rotation.entries) for (anchorOffset in anchorOffsets) {
 
@@ -227,7 +228,12 @@ abstract class Machine(
 						if (coreVariants.none { it.matches(coreData) }) continue
 					}
 
-					resolveStructure(blockSet, level, origin, rotation) ?: continue
+					val resolved = resolveStructure(blockSet, level, origin, rotation) ?: continue
+
+					// a structure whose core sits off-centre in a symmetric shape matches at a *different*
+					// origin per rotation, all covering the same blocks. same machine, counted once.
+					val footprint = resolved.keys.mapTo(HashSet()) { origin + it.rotate(rotation) }
+					if (!matchedFootprints.add(footprint)) continue
 
 					matchedOrigins += origin
 					candidates += AssemblyCandidate(factory, origin, rotation)
@@ -691,6 +697,17 @@ abstract class Machine(
 			.filterValues { MachinePort.kindOf(it) != null }
 			.keys
 			.mapTo(mutableSetOf()) { localToWorld(it) }
+
+	/** Every world cell this machine's ports of [kind] occupy. */
+	fun portWorldCells(kind: MachinePort.Kind): Set<Vec3i> =
+		resolvedStructure
+			.filterValues { MachinePort.kindOf(it) == kind }
+			.keys
+			.mapTo(mutableSetOf()) { localToWorld(it) }
+
+	/** The strongest redstone signal reaching any of this machine's [kind] ports. */
+	fun portSignal(kind: MachinePort.Kind): Int =
+		portWorldCells(kind).maxOfOrNull { level.world.getBlockAt(it.x, it.y, it.z).blockPower } ?: 0
 
 	/** Empties every buffer and forgets them. Disassembly only — the machine is going away. */
 	private fun spillBuffers() {
