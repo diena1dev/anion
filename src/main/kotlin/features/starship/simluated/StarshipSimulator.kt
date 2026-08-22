@@ -60,6 +60,7 @@ class StarshipSimulator private constructor() {
 	fun simulate() {
 
 		// forces first, then latch the whole-block step they produced, then clamp that step to what actually fits.
+		applyAirDrag()
 		applyPlanetGravity()
 		applyDebugConstantVelocity()
 		this.starship.velocity.beginTick()
@@ -77,10 +78,36 @@ class StarshipSimulator private constructor() {
 		val velocity = this.starship.velocity
 
 		// jank jank jank bad
+		// not only does this apply even if it cannot move, it checks world with the worst function ever
 		// FIXME: unjank with world API
-		if (!level.bukkitName.endsWith("_space")) velocity.addVelocity(Vec3(0.0, -0.5, 0.0))
+		if (!level.bukkitName.endsWith("_space")) velocity.addVelocity(Vec3(0.0, -0.75, 0.0))
 
 	}
+
+	// FIXME: unJANK this
+	private fun applyAirDrag() {
+
+		val level = this.starship.level
+		val velocity = this.starship.velocity
+
+		if (velocity.velocity == Vec3(0.0, 0.0, 0.0)) return // if no vel then fine and no air drag
+		if (level.bukkitName.endsWith("_space")) return
+
+		velocity.addVelocity(dragDelta(velocity.velocity, 0.2))
+
+	}
+
+	/** The change that moves each axis of [velocity] toward zero by at most [amount]. */
+	private fun dragDelta(velocity: Vec3, amount: Double) = Vec3(
+		dragDelta(velocity.x, amount),
+		dragDelta(velocity.y, amount),
+		dragDelta(velocity.z, amount),
+	)
+
+	/** The change that moves [value] toward zero by at most [amount], never past it. */
+	// coerceIn caps the step when the ship is fast and shrinks it to exactly value when the ship is
+	// slower than one step, so the add lands on zero rather than reversing
+	private fun dragDelta(value: Double, amount: Double): Double = -value.coerceIn(-amount, amount)
 
 	//////////////////////////////////////////////////
 	///// VELOCITY SOURCES (Thrusters, Debug Velocity)
