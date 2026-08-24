@@ -6,6 +6,7 @@ import dev.diena.anion.features.machine.Machine
 import dev.diena.anion.features.machine.component.MachineSign
 import dev.diena.anion.features.machine.machine_types.scripting.ControlSeatMachine
 import io.papermc.paper.event.player.PlayerOpenSignEvent
+import org.bukkit.Location
 import org.bukkit.block.Block
 import org.bukkit.craftbukkit.CraftWorld
 import org.bukkit.event.EventHandler
@@ -15,7 +16,9 @@ import org.bukkit.event.player.PlayerAnimationEvent
 import org.bukkit.event.player.PlayerAnimationType
 import org.bukkit.event.player.PlayerInteractEvent
 import org.bukkit.event.player.PlayerJoinEvent
+import org.bukkit.event.player.PlayerMoveEvent
 import org.bukkit.event.player.PlayerQuitEvent
+import org.bukkit.event.player.PlayerTeleportEvent
 import org.bukkit.inventory.EquipmentSlot
 
 /**
@@ -116,6 +119,31 @@ object AnionScriptingListeners : Listener {
 	fun onJoin(event: PlayerJoinEvent) {
 
 		ControlSeatMachine.repairFrozen(event.player)
+
+	}
+
+	/**
+	 * A pilot may look wherever they like, but they do not walk out of their seat.
+	 *
+	 * Refusing the move rather than teleporting them back: a teleport every tick fights the client's own
+	 * prediction, and fights the carrier, which teleports everything in its hitbox when the ship moves.
+	 * Two things writing a player's position in one tick is what makes a seat jitter.
+	 */
+	@EventHandler
+	fun onMove(event: PlayerMoveEvent) {
+
+		// a ship carries its passengers by teleporting them, and that has to get through
+		if (event is PlayerTeleportEvent) return
+
+		val from = event.from
+		val to = event.to
+
+		// look-only movement is most of these events, and costs nothing to allow
+		if (from.x == to.x && from.y == to.y && from.z == to.z) return
+
+		if (ControlSeatMachine.seatOf(event.player) == null) return
+
+		event.setTo(Location(from.world, from.x, from.y, from.z, to.yaw, to.pitch))
 
 	}
 

@@ -63,10 +63,12 @@ class DcRuntime private constructor(private val mainframe: MainframeMachine) {
 	}
 
 	/**
-	 * Drops everything [machineName] was driving, sending one last off to whatever it had on.
+	 * Lets go of everything [machineName] was holding down, and leaves everything it latched.
 	 *
-	 * A latched toggle keeps its value — the pilot left the seat, they did not turn the weapons off — but
-	 * nothing carries on being driven by a machine that has stopped reporting.
+	 * Standing up is letting go of the keys, not switching the ship off. Anything on `hold` goes off with
+	 * the pilot; anything on `toggle` stays exactly where it was put until somebody presses it again. The
+	 * receiving machine is the one holding that value, so it keeps running with the seat empty — a hover
+	 * left on is still on when you get up to look out of the window.
 	 */
 	fun release(machineName: String) {
 
@@ -76,7 +78,13 @@ class DcRuntime private constructor(private val mainframe: MainframeMachine) {
 
 			if (key.machineName != machineName) continue
 
+			// the key is not down any more whichever mode it drove, or the next press would not read as one
 			state.down = false
+
+			// a latch is left exactly as it was found, still delivering, so it picks straight back up when
+			// somebody sits down again
+			if (key.mode != DcMode.HOLD) continue
+
 			if (!state.delivering) continue
 
 			for (binding in program.bindingsFor(key.input)) {

@@ -14,6 +14,7 @@ import org.bukkit.attribute.Attribute
 import org.bukkit.block.BlockType
 import org.bukkit.entity.Player
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 /** A seat with a dataport under it. Everything a pilot does with the keyboard leaves through that port. */
 val CONTROL_SEAT_STRUCTURE = BlockSet.new("control_seat")
@@ -40,18 +41,25 @@ class ControlSeatMachine : PortedMachine("Control Seat", CONTROL_SEAT_STRUCTURE)
 		/** ticks a click keeps reporting after the packet that caused it. */
 		const val CLICK_DECAY = 4
 
-		/** blocks a pilot may drift from the seat before being put back */
-		private const val HOLD_SLACK = 0.01
+		/**
+		 * blocks squared a pilot may end up from the seat before being put back.
+		 *
+		 * Coarse on purpose. The move listener is what actually holds them, so this only ever catches a
+		 * pilot something else moved — a piston, a portal, a ship that left without them.
+		 */
+		private const val HOLD_SLACK = 4.0
 
 		/** vanilla walk and fly speeds, restored to anyone found frozen with no seat to explain it */
 		const val DEFAULT_WALK_SPEED = 0.2f
 		const val DEFAULT_FLY_SPEED = 0.1f
 
+		/** the seat each pilot is in. a map rather than a scan — PlayerMoveEvent fires on every step. */
+		private val seats: MutableMap<UUID, ControlSeatMachine> = ConcurrentHashMap()
+
 		/** The seat [player] is sitting in, or null. */
+		// a seat that left the active list without vacating would otherwise pin its pilot forever
 		fun seatOf(player: Player): ControlSeatMachine? =
-			Machine.activeMachines.values
-				.filterIsInstance<ControlSeatMachine>()
-				.firstOrNull { it.pilot == player.uniqueId }
+			seats[player.uniqueId]?.takeIf { Machine.activeMachines[it.uuid] === it }
 
 		/** Gives movement back to a player who is frozen with no seat holding them. */
 		fun repairFrozen(player: Player) {
@@ -164,6 +172,7 @@ class ControlSeatMachine : PortedMachine("Control Seat", CONTROL_SEAT_STRUCTURE)
 
 		this.mainframe = mainframe
 		pilot = player.uniqueId
+		seats[player.uniqueId] = this
 
 		player.teleport(seatAnchor())
 		lockMovement(player)
@@ -219,7 +228,7 @@ class ControlSeatMachine : PortedMachine("Control Seat", CONTROL_SEAT_STRUCTURE)
 
 	}
 
-	/** Stands the pilot up and releases everything they were driving. */
+	/** Stands the pilot up, letting go of what they were holding down and leaving what they had latched. */
 	fun vacate() {
 
 		val seated = pilot ?: return
@@ -232,6 +241,7 @@ class ControlSeatMachine : PortedMachine("Control Seat", CONTROL_SEAT_STRUCTURE)
 		// the player is gone on a quit, and there is nothing to give back to a player who is not here
 		Bukkit.getPlayer(seated)?.let { unlockMovement(it) }
 
+		seats.remove(seated)
 		pilot = null
 
 	}
@@ -266,7 +276,13 @@ class ControlSeatMachine : PortedMachine("Control Seat", CONTROL_SEAT_STRUCTURE)
 
 	}
 
-	/** Puts a drifting pilot back on the seat, leaving them their own view direction. */
+	/**
+	 * Puts a pilot who has ended up somewhere else back on the seat, leaving them their view direction.
+	 *
+	 * A backstop, not the actual hold — that is [AnionScriptingListeners] refusing the move outright.
+	 * Teleporting every tick is what made the seat jitter: it fought the client's own prediction, and it
+	 * fought the carrier's entity mover, which teleports everything in the hitbox when a ship moves.
+	 */
 	private fun holdInPlace(player: Player) {
 
 		val anchor = seatAnchor()
@@ -281,6 +297,8 @@ class ControlSeatMachine : PortedMachine("Control Seat", CONTROL_SEAT_STRUCTURE)
 
 	}
 
-	private fun seatAnchor(): Location = Location(level.world, origin.x + 0.5, origin.y + 0.1, origin.z + 0.5)
+	// on top of the seat block, not inside it. the core is a stair, so feet at +0.1 sit in solid geometry
+	// and vanilla spends every tick pushing them back out of it
+	private fun seatAnchor(): Location = Location(level.world, origin.x + 0.5, origin.y + 1.0, origin.z + 0.5)
 
 }

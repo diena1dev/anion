@@ -4,6 +4,7 @@ import dev.diena.anion.extensions.blockPos
 import dev.diena.anion.extensions.minus
 import dev.diena.anion.extensions.plus
 import dev.diena.anion.extensions.rotateWithAnion
+import dev.diena.anion.extensions.rotationOf
 import net.minecraft.core.Vec3i
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.world.entity.PositionMoveRotation
@@ -283,6 +284,7 @@ object StarshipMovement {
 		val blockEntityNbtMap: HashMap<Vec3i, CompoundTag>   = hashMapOf()
 		val blockEntityBlockMap: HashMap<Vec3i, BlockState> = hashMapOf()
 		val provider                                        = starship.level.registryAccess()
+		val nmsRotation                                     = rotationOf(rotationSteps)
 
 		for ((vec, _) in starship.blockHashMap) {
 
@@ -296,7 +298,11 @@ object StarshipMovement {
 			nbt.putInt("z", newPos.z)
 
 			blockEntityNbtMap[newPos] = nbt
-			blockEntityBlockMap[newPos] = starship.level.getBlockState(vec.blockPos)
+
+			// turned like every other block. rotateBlocks() skips these cells because this function has
+			// already written them, so an unturned state here is the one the world keeps
+			blockEntityBlockMap[newPos] = starship.level.getBlockState(vec.blockPos).rotateWithAnion(nmsRotation)
+
 			starship.level.removeBlockEntity(vec.blockPos)
 
 		}
