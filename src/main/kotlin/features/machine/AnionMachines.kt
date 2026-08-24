@@ -4,6 +4,7 @@ import dev.diena.anion.data.registry.AnionRegistryKey
 import dev.diena.anion.data.registry.registries.AnionRegistries
 import dev.diena.anion.features.machine.examples.BlinkerMachine
 import dev.diena.anion.features.machine.machine_types.CargoContainerMachine
+import dev.diena.anion.features.machine.machine_types.DebugGyroWheel
 import dev.diena.anion.features.machine.machine_types.MEDIUM_CARGO_CONTAINER_STRUCTURE
 import dev.diena.anion.features.machine.machine_types.debug_furnace.DebugFurnaceMachine
 import dev.diena.anion.features.machine.machine_types.scripting.ControlSeatMachine
@@ -21,6 +22,7 @@ object AnionMachines {
 	val DEBUG_THRUSTER_HORIZONTAL = registerMachine { DebugThrusterHorizontal() }
 	val DEBUG_THRUSTER_UP = registerMachine { DebugThrusterUp() }
 	val DEBUG_THRUSTER_DOWN = registerMachine { DebugThrusterDown() }
+	val DEBUG_GYRO_WHEEL = registerMachine { DebugGyroWheel() }
 
 	val MAINFRAME = registerMachine { MainframeMachine() }
 	val CONTROL_SEAT = registerMachine { ControlSeatMachine() }
