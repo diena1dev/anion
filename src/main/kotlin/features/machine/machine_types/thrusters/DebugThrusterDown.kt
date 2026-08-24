@@ -6,7 +6,10 @@ import dev.diena.anion.extensions.times
 import dev.diena.anion.features.custom.blocks.AnionBlocks
 import dev.diena.anion.features.machine.BlockSet
 import dev.diena.anion.features.machine.Machine
+import dev.diena.anion.features.machine.component.MachinePort
+import dev.diena.anion.features.scripting.DcProgrammable
 import net.minecraft.core.Vec3i
+import net.minecraft.nbt.CompoundTag
 import net.minecraft.world.phys.Vec3
 import org.bukkit.Location
 import org.bukkit.Particle
@@ -54,8 +57,15 @@ val DEBUG_THRUSTER_DOWN = BlockSet.new("debug_thruster_down")
 
 // TODO: make generalized thruster class — three copies of this now, which is two more than the
 //       duplication was worth when there was only the horizontal one.
-/** Debug Thruster that outputs differing levels of thrust based on the strength of the redstone signal being input. */
-class DebugThrusterDown() : Machine("debug_thruster_down", DEBUG_THRUSTER_DOWN) {
+/**
+ * Debug Thruster that outputs differing levels of thrust based on the strength of the redstone signal
+ * being input.
+ *
+ * The up thruster's hold, mirrored: a hover pins the ship to the lowest altitude this thruster has
+ * carried it to, arresting any rise and pushing back down after one. This variant has no conduit in its
+ * casing, so the hover is datachannel only.
+ */
+class DebugThrusterDown() : Machine("debug_thruster_down", DEBUG_THRUSTER_DOWN), DcProgrammable {
 
 	companion object {
 
@@ -65,29 +75,68 @@ class DebugThrusterDown() : Machine("debug_thruster_down", DEBUG_THRUSTER_DOWN) 
 		/** blocks per tick the plume travels. with count 0 this is what scales the direction vector. */
 		const val PLUME_SPEED = -0.9
 
+		/** this one pushes down, so its pin only ever falls */
+		const val THRUST_SIGN = -1
+
+	}
+
+	private val controls = ThrusterThrottle.new()
+	private val hover = ThrusterHover.new(this, THRUST_SIGN)
+
+	override val dataInputs: List<String> = listOf("currnt_throttle", "toggled_state", "hover_state")
+	override val dataFunctions: List<String> = ThrusterThrottle.FUNCTIONS + ThrusterHover.FUNCTION
+
+	override fun invoke(function: String, active: Boolean) {
+
+		if (function == ThrusterHover.FUNCTION) hover.engage(active)
+		else if (!controls.invoke(function, active)) return
+
+		markDirty()
+
 	}
 
 	override fun tick() {
 
-		// FIXME: make this detect from any not just first
-		val vec = this.portWorldCells().firstOrNull() ?: return // early return if there are no dataports (it can only be dataport because of machine structure)
+		val thrust = maxOf(portSignal(MachinePort.Kind.DATA), controls.power())
+		val holding = hover.engaged
 
-		val power = level.world.getBlockAt(vec.x, vec.y, vec.z).blockPower
+		if (!holding) hover.release()
 
-		if (power > 0) {
+		if (thrust <= 0 && !holding) return
 
-			emitSmoke()
+		emitSmoke()
 
-			val ship = this.starship ?: return
-			val proportionateVelocity = getDirectionalVelocity(power)
-			ship.velocity.addVelocity(proportionateVelocity)
+		val ship = this.starship ?: return
 
-		}
+		// before the thrust below, so a hold never eats the velocity that same thrust just added
+		if (holding) hover.hold(ship)
+
+		if (thrust > 0) ship.velocity.addVelocity(getDirectionalVelocity(thrust))
 
 	}
 
 	override fun slowTick() {
 		// no-op
+	}
+
+	override fun debugLines(): List<String> = listOf(controls.describe(), hover.describe())
+
+	override fun saveState(tag: CompoundTag) {
+
+		super.saveState(tag)
+
+		controls.saveTo(tag)
+		hover.saveTo(tag)
+
+	}
+
+	override fun loadState(tag: CompoundTag) {
+
+		super.loadState(tag)
+
+		controls.loadFrom(tag)
+		hover.loadFrom(tag)
+
 	}
 
 	/** Returns a [Vec3] that respects the rotation of the thruster. */

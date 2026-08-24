@@ -279,9 +279,16 @@ and its runtime stayed in `features/scripting/`.
   server restart would drop every file on the ship, since machines load in an arbitrary order.
 - **A program that stops compiling is dropped, its source is kept.** Only a `groups.dcprgm` edit can do
   this — machine names are never released, so unplugging a machine cannot break a program that names it.
-- **`DebugThrusterHorizontal` is the one receiver wired up**, so the chain is testable end to end. It gains
+- **All three debug thrusters are receivers.** Each gains
   `increase_throttle`/`decrease_throttle`/`toggle`/`reset` and takes `max(redstone, datachannel)`, which
-  is decision 16's "alongside". The other two thrusters are untouched.
+  is decision 16's "alongside". The two vertical ones add a fifth function, `hover`.
+- **Thruster state lives in two shared helpers** (`ThrusterControls.kt`) rather than being copied a third
+  and fourth time — the file's own TODO had already called that out. `ThrusterThrottle` holds the
+  throttle and full-burn latch; `ThrusterHover` holds the altitude pin. `ThrusterHover` takes a `sign`
+  for which way its thruster pushes, so the down variant's hold is the up variant's algorithm mirrored:
+  its pin only ever falls, it arrests a rise instead of a sag, and it pushes back down after one.
+- **The down thruster has no conduit in its casing**, so unlike the up thruster its hover is datachannel
+  only. Wiring redstone hover to it would mean changing its BlockSet, which would break placed ones.
 - **Toggle latches live on the calling side.** A machine's `toggle` function just follows `active`, so it
   mirrors whatever the mainframe latched rather than keeping a second latch of its own.
 - **A seated pilot is frozen, not just held.** `walkSpeed` and `flySpeed` go to 0 and the
@@ -344,5 +351,6 @@ no registry key or `PlayerCustomClickEvent` handler is involved:
 
 - Floppy disks (decision 6).
 - Nothing consumes `dataInputs` values, and functions take no arguments (decisions 9 and 11, both v0.2).
-- Only `DebugThrusterHorizontal` is a receiver.
+- Only the three debug thrusters are receivers. Cargo containers and the furnace are visible to a
+  mainframe but cannot be commanded.
 - No way to delete a file from the console. `store.forget(name)` exists and has no caller.

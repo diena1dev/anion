@@ -59,52 +59,29 @@ class DebugThrusterHorizontal() : Machine("debug_thruster_horizontal", DEBUG_THR
 		/** blocks per tick the plume travels. with count 0 this is what scales the direction vector. */
 		const val PLUME_SPEED = -0.9
 
-		/** the throttle runs on the same 0-15 scale redstone does */
-		const val MAX_THROTTLE = 15
-
 	}
 
+	private val controls = ThrusterThrottle.new()
+
+	// no hover: this one pushes sideways, so there is no altitude for it to hold
 	override val dataInputs: List<String> = listOf("currnt_throttle", "toggled_state")
-	override val dataFunctions: List<String> = listOf("increase_throttle", "decrease_throttle", "toggle", "reset")
-
-	/** throttle set over the datachannel, stepped one notch per tick a step function is held */
-	private var throttle = 0
-
-	/** full burn, mirroring whatever latched the call. bypasses the throttle while it is on. */
-	private var toggled = false
+	override val dataFunctions: List<String> = ThrusterThrottle.FUNCTIONS
 
 	override fun invoke(function: String, active: Boolean) {
 
-		when (function) {
-
-			"increase_throttle" -> if (active) throttle = (throttle + 1).coerceAtMost(MAX_THROTTLE)
-			"decrease_throttle" -> if (active) throttle = (throttle - 1).coerceAtLeast(0)
-
-			// the latch lives on the calling side, so this just follows it
-			"toggle" -> toggled = active
-
-			"reset" -> if (!active) return else {
-
-				throttle = 0
-				toggled = false
-
-			}
-
-		}
+		if (!controls.invoke(function, active)) return
 
 		markDirty()
 
 	}
 
-	/** What the datachannel is asking for, on redstone's scale. */
-	private fun dataThrottle(): Int = if (toggled) MAX_THROTTLE else throttle
+	override fun debugLines(): List<String> = listOf(controls.describe())
 
 	override fun saveState(tag: CompoundTag) {
 
 		super.saveState(tag)
 
-		tag.putInt("throttle", throttle)
-		tag.putBoolean("toggled", toggled)
+		controls.saveTo(tag)
 
 	}
 
@@ -112,8 +89,7 @@ class DebugThrusterHorizontal() : Machine("debug_thruster_horizontal", DEBUG_THR
 
 		super.loadState(tag)
 
-		throttle = tag.getIntOr("throttle", 0)
-		toggled = tag.getBooleanOr("toggled", false)
+		controls.loadFrom(tag)
 
 	}
 
@@ -123,7 +99,7 @@ class DebugThrusterHorizontal() : Machine("debug_thruster_horizontal", DEBUG_THR
 		print("${this.portWorldCells().firstOrNull()}")
 		val vec = this.portWorldCells().firstOrNull() ?: return // early return if there are no dataports (it can only be dataport because of machine structure)
 
-		val power = maxOf(level.world.getBlockAt(vec.x, vec.y, vec.z).blockPower, dataThrottle())
+		val power = maxOf(level.world.getBlockAt(vec.x, vec.y, vec.z).blockPower, controls.power())
 
 		if (power > 0) {
 

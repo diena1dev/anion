@@ -7,8 +7,9 @@ import dev.diena.anion.features.custom.blocks.AnionBlocks
 import dev.diena.anion.features.machine.BlockSet
 import dev.diena.anion.features.machine.Machine
 import dev.diena.anion.features.machine.component.MachinePort
-import dev.diena.anion.features.starship.Starship
+import dev.diena.anion.features.scripting.DcProgrammable
 import net.minecraft.core.Vec3i
+import net.minecraft.nbt.CompoundTag
 import net.minecraft.world.phys.Vec3
 import org.bukkit.Location
 import org.bukkit.Particle
@@ -67,8 +68,11 @@ val DEBUG_THRUSTER_UP = BlockSet.new("debug_thruster_up")
  *
  * A powered dataport thrusts as normal and takes precedence on its own: the pin only ever rises, so
  * thrusting drags it up and releasing leaves the ship held wherever it coasted to.
+ *
+ * Datachannel throttle and hover run alongside both, and the stronger of redstone and datachannel wins —
+ * wiring a mainframe to one never takes the lever away.
  */
-class DebugThrusterUp() : Machine("debug_thruster_up", DEBUG_THRUSTER_UP) {
+class DebugThrusterUp() : Machine("debug_thruster_up", DEBUG_THRUSTER_UP), DcProgrammable {
 
 	companion object {
 
@@ -78,29 +82,32 @@ class DebugThrusterUp() : Machine("debug_thruster_up", DEBUG_THRUSTER_UP) {
 		/** blocks per tick the plume travels. with count 0 this is what scales the direction vector. */
 		const val PLUME_SPEED = -0.9
 
-		/** vertical velocity the hold aims for while climbing back to its pin. must beat gravity. */
-		const val HOLD_CLIMB_RATE = 1.5
-
-		/** most the hold may change vertical velocity by in one tick. */
-		const val HOLD_ACCELERATION = 0.15
+		/** this one pushes up, so its pin only ever rises */
+		const val THRUST_SIGN = 1
 
 	}
 
-	/** y the hold is pinned to, null while nothing is holding. */
-	private var heldAltitude: Int? = null
+	private val controls = ThrusterThrottle.new()
+	private val hover = ThrusterHover.new(this, THRUST_SIGN)
 
-	/** true while the hold is climbing back to its pin, so the climb cannot be mistaken for a real one. */
-	private var recovering = false
+	override val dataInputs: List<String> = listOf("currnt_throttle", "toggled_state", "hover_state")
+	override val dataFunctions: List<String> = ThrusterThrottle.FUNCTIONS + ThrusterHover.FUNCTION
+
+	override fun invoke(function: String, active: Boolean) {
+
+		if (function == ThrusterHover.FUNCTION) hover.engage(active)
+		else if (!controls.invoke(function, active)) return
+
+		markDirty()
+
+	}
 
 	override fun tick() {
 
-		val thrust = portSignal(MachinePort.Kind.DATA)
-		val holding = portSignal(MachinePort.Kind.CONDUIT) > 0
+		val thrust = maxOf(portSignal(MachinePort.Kind.DATA), controls.power())
+		val holding = portSignal(MachinePort.Kind.CONDUIT) > 0 || hover.engaged
 
-		if (!holding) {
-			heldAltitude = null
-			recovering = false
-		}
+		if (!holding) hover.release()
 
 		if (thrust <= 0 && !holding) return
 
@@ -109,62 +116,34 @@ class DebugThrusterUp() : Machine("debug_thruster_up", DEBUG_THRUSTER_UP) {
 		val ship = this.starship ?: return
 
 		// before the thrust below, so a hold never eats the velocity that same thrust just added
-		if (holding) holdAltitude(ship)
+		if (holding) hover.hold(ship)
 
 		if (thrust > 0) ship.velocity.addVelocity(getDirectionalVelocity(thrust))
 
 	}
 
-	/** Pins the ship to the altitude it was last carried to, climbing back to it if it sags. */
-	// against the sag rather than the cause of it: gravity and the whole-block latch happen together
-	// inside one simulator pass, so no machine tick can land between them to prevent the step
-	private fun holdAltitude(ship: Starship) {
-
-		val target = heldAltitude ?: origin.y.also { heldAltitude = it }
-		val motion = ship.velocity.velocity
-
-		if (origin.y < target) {
-
-			recovering = true
-			approachVerticalSpeed(ship, HOLD_CLIMB_RATE)
-			return
-
-		}
-
-		// still shedding the climb it just made. the pin must not follow a rise the hold itself caused,
-		// or every recovery leaves the ship a block higher than the last one.
-		if (recovering) {
-
-			if (motion.y > 0.0) {
-
-				approachVerticalSpeed(ship, 0.0)
-				return
-
-			}
-
-			recovering = false
-
-		}
-
-		// above the pin without recovering: thrust or its coast put the ship here, so the pin follows
-		if (origin.y > target) heldAltitude = origin.y
-
-		if (motion.y < 0.0) approachVerticalSpeed(ship, 0.0)
-
-	}
-
-	/** Nudges the ship's vertical velocity toward [desired] by at most [HOLD_ACCELERATION]. */
-	private fun approachVerticalSpeed(ship: Starship, desired: Double) {
-
-		val step = (desired - ship.velocity.velocity.y).coerceIn(-HOLD_ACCELERATION, HOLD_ACCELERATION)
-		if (step == 0.0) return
-
-		ship.velocity.addVelocity(Vec3(0.0, step, 0.0))
-
-	}
-
 	override fun slowTick() {
 		// no-op
+	}
+
+	override fun debugLines(): List<String> = listOf(controls.describe(), hover.describe())
+
+	override fun saveState(tag: CompoundTag) {
+
+		super.saveState(tag)
+
+		controls.saveTo(tag)
+		hover.saveTo(tag)
+
+	}
+
+	override fun loadState(tag: CompoundTag) {
+
+		super.loadState(tag)
+
+		controls.loadFrom(tag)
+		hover.loadFrom(tag)
+
 	}
 
 	/** Returns a [Vec3] that respects the rotation of the thruster. */
