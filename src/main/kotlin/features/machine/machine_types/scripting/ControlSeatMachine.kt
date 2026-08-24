@@ -7,11 +7,15 @@ import dev.diena.anion.features.machine.machine_types.PortedMachine
 import dev.diena.anion.features.scripting.DcProgrammable
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
+import net.minecraft.world.entity.PositionMoveRotation
+import net.minecraft.world.entity.Relative
+import net.minecraft.world.phys.Vec3
 import org.bukkit.Bukkit
 import org.bukkit.Input
 import org.bukkit.Location
 import org.bukkit.attribute.Attribute
 import org.bukkit.block.BlockType
+import org.bukkit.craftbukkit.entity.CraftPlayer
 import org.bukkit.entity.Player
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -47,7 +51,7 @@ class ControlSeatMachine : PortedMachine("Control Seat", CONTROL_SEAT_STRUCTURE)
 		 * Tight, because the move listener refuses walking outright — anything that gets past it moved the
 		 * player without asking, and should be corrected the same tick rather than left to drift.
 		 */
-		private const val HOLD_SLACK = 0.0025
+		private const val HOLD_SLACK = 0.1
 
 		/** vanilla walk and fly speeds, restored to anyone found frozen with no seat to explain it */
 		const val DEFAULT_WALK_SPEED = 0.2f
@@ -196,7 +200,12 @@ class ControlSeatMachine : PortedMachine("Control Seat", CONTROL_SEAT_STRUCTURE)
 		pilot = player.uniqueId
 		seats[player.uniqueId] = this
 
-		player.teleport(seatAnchor())
+		val destination = PositionMoveRotation(Vec3(seatAnchor().x, seatAnchor().y, seatAnchor().z), Vec3.ZERO, 0f, 0f)
+
+		(player as CraftPlayer).handle.connection.teleport(
+			destination,
+			setOf(Relative.X, Relative.Y, Relative.Z, Relative.Y_ROT, Relative.X_ROT)
+		)
 		lockMovement(player)
 
 		player.sendActionBar(Component.text("Activated control seat."))
@@ -300,10 +309,6 @@ class ControlSeatMachine : PortedMachine("Control Seat", CONTROL_SEAT_STRUCTURE)
 
 	/**
 	 * Puts a pilot who has ended up somewhere else back on the seat, leaving them their view direction.
-	 *
-	 * A backstop, not the actual hold — that is [AnionScriptingListeners] refusing the move outright.
-	 * Teleporting every tick is what made the seat jitter: it fought the client's own prediction, and it
-	 * fought the carrier's entity mover, which teleports everything in the hitbox when a ship moves.
 	 */
 	private fun holdInPlace(player: Player) {
 
@@ -312,15 +317,21 @@ class ControlSeatMachine : PortedMachine("Control Seat", CONTROL_SEAT_STRUCTURE)
 
 		if (location.distanceSquared(anchor) <= HOLD_SLACK) return
 
-		anchor.yaw = location.yaw
-		anchor.pitch = location.pitch
+		// the anchor is where the seat IS, so the position goes across absolutely. only the two rotations
+		// are relative, and both deltas are zero, which is what leaves the pilot looking where they were.
+		// listing X/Y/Z as relative here would add the seat's world coordinates to the player's own every
+		// time this fired, and it fires again the moment they are not on the seat
+		val destination = PositionMoveRotation(Vec3(anchor.x, anchor.y, anchor.z), Vec3.ZERO, 0f, 0f)
 
-		player.teleport(anchor)
+		(player as CraftPlayer).handle.connection.teleport(
+			destination,
+			setOf(Relative.Y_ROT, Relative.X_ROT)
+		)
 
 	}
 
-	// sat down in the seat rather than stood on top of it. being inside the stair's geometry is only a
-	// problem if the push-out is allowed to happen, and the move listener refuses it
-	private fun seatAnchor(): Location = Location(level.world, origin.x + 0.5, origin.y + 0.1, origin.z + 0.5)
+	// stood on top of the seat block. sitting inside it (+0.1) puts the pilot in the stair's own geometry,
+	// which vanilla spends every tick pushing them back out of
+	private fun seatAnchor(): Location = Location(level.world, origin.x + 0.5, origin.y.toDouble(), origin.z + 0.5)
 
 }
