@@ -261,6 +261,7 @@ object AnionTransportComponents {
 	private val byMaterial: Map<Material, AnionTransportComponent> = mapOf(
 		Material.CRAFTING_TABLE to VanillaContainerImporter,
 		Material.HOPPER to HopperFilter,
+		Material.IRON_CHAIN to DataLine,
 	)
 
 	/** The component [block] is, or null when it is not one. */

@@ -23,6 +23,7 @@ import net.minecraft.world.level.block.Rotation
 import org.bukkit.Location
 import org.bukkit.NamespacedKey
 import org.bukkit.block.data.BlockData
+import org.bukkit.entity.Player
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
@@ -312,6 +313,13 @@ abstract class Machine(
 		}
 
 		return StructureResult(brokenOffsets.isEmpty(), brokenOffsets)
+
+	}
+
+	/** Called when a player right-clicks a sign in this machine's structure. */
+	// recommended use: open a menu, step a page, flip a setting. machine signs are never editable by
+	// hand, so a click is the only thing a player can do to one — see [MachineSign]
+	open fun onSignClick(offset: Vec3i, player: Player, front: Boolean) {
 
 	}
 

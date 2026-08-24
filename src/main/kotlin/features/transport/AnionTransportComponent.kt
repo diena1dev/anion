@@ -28,6 +28,9 @@ import org.bukkit.inventory.Inventory
  */
 interface AnionTransportComponent {
 
+	/** Whether [AnionTransportIndex] records this component's cells, and so whether a pass visits them. */
+	val indexed: Boolean get() = true
+
 	/** Where something entering [block] through [entryFace] can go next, or null if it will not carry. */
 	fun exitsFor(block: Block, entryFace: BlockFace): List<BlockFace>?
 

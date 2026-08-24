@@ -1,0 +1,269 @@
+package dev.diena.anion.features.scripting
+
+/**
+ * dclang v0.1. Four statements, one per line, every identifier bracketed:
+ *
+ * ```
+ * // comment
+ * def_group [name]
+ * set [machine] and [machine] in [group] and [group]
+ * set [input] and [input] to [target:function] and [target:function] mode [toggle|hold]
+ * ```
+ *
+ * `and` chains both sides of a `set` into a cross product, so one line can write four bindings.
+ *
+ * The editor draws a header above the program (`--- editing ... ---`, `| available inputs: ...`).
+ * Those lines are skipped rather than rejected, so handing the whole buffer back still compiles.
+ */
+object DcParser {
+
+	/** Compiles a `groups.dcprgm`. [knownMachines] is every name the mainframe has handed out. */
+	fun parseGroups(source: String, knownMachines: Set<String>): DcResult<DcGroups> {
+
+		val errors = mutableListOf<DcIssue>()
+		val statements = statements(source)
+
+		// groups are collected first, so a set line may reference a group defined below it
+		val declared = mutableSetOf<String>()
+		for ((line, words) in statements) {
+
+			if (words[0] != "def_group") continue
+
+			val name = words.getOrNull(1)?.let { unwrap(it) }
+			if (name == null || words.size != 2) {
+				errors += DcIssue(line, "def_group takes one bracketed name, e.g. `def_group [weapons]`")
+				continue
+			}
+
+			if (name in knownMachines) errors += DcIssue(line, "'$name' is a machine, so it cannot also be a group")
+			if (!declared.add(name)) errors += DcIssue(line, "group '$name' is already defined")
+
+		}
+
+		val members = mutableMapOf<String, MutableSet<String>>()
+		for (name in declared) members[name] = mutableSetOf()
+
+		for ((line, words) in statements) {
+
+			when (words[0]) {
+
+				"def_group" -> continue
+
+				"set" -> {
+
+					val machines = readList(words, 1)
+					if (machines == null) {
+						errors += DcIssue(line, "expected a bracketed machine name after `set`")
+						continue
+					}
+
+					val (machineNames, afterMachines) = machines
+
+					if (words.getOrNull(afterMachines) != "in") {
+						errors += DcIssue(line, "expected `in` after the machines being assigned")
+						continue
+					}
+
+					val groups = readList(words, afterMachines + 1)
+					if (groups == null || groups.second != words.size) {
+						errors += DcIssue(line, "expected bracketed group names after `in`")
+						continue
+					}
+
+					for (machineName in machineNames) {
+						if (machineName !in knownMachines) errors += DcIssue(line, "no machine named '$machineName' is wired to this mainframe")
+					}
+
+					for (groupName in groups.first) {
+
+						if (groupName !in declared) {
+							errors += DcIssue(line, "group '$groupName' is never defined — add `def_group [$groupName]`")
+							continue
+						}
+
+						members.getValue(groupName).addAll(machineNames)
+
+					}
+
+				}
+
+				else -> errors += DcIssue(line, "'${words[0]}' is not a dclang statement")
+
+			}
+
+		}
+
+		if (errors.isNotEmpty()) return DcResult.Failed(errors)
+
+		return DcResult.Ok(DcGroups(members.mapValues { it.value.toSet() }))
+
+	}
+
+	/**
+	 * Compiles a machine's `main.dcprgm`.
+	 *
+	 * [availableInputs] is null when the machine is not there to be asked, and its inputs go unchecked —
+	 * a program must survive its machine being unplugged, or a reboot would delete every file on the ship.
+	 *
+	 * [functionsOf] answers what a machine name can be told to do, or null when nothing is there to ask.
+	 * A function nothing implements is a warning rather than an error — the readme's whole point is that
+	 * a broadcast does not care whether anyone is listening.
+	 */
+	fun parseProgram(
+
+		source: String,
+		availableInputs: Set<String>?,
+		groups: DcGroups,
+		knownMachines: Set<String>,
+		functionsOf: (machineName: String) -> Set<String>?,
+
+	): DcResult<DcProgram> {
+
+		val errors = mutableListOf<DcIssue>()
+		val warnings = mutableListOf<DcIssue>()
+		val bindings = mutableMapOf<String, MutableList<DcBinding>>()
+
+		for ((line, words) in statements(source)) {
+
+			if (words[0] != "set") {
+				errors += DcIssue(line, "'${words[0]}' is not a dclang statement — a program binds inputs with `set`")
+				continue
+			}
+
+			val inputs = readList(words, 1)
+			if (inputs == null) {
+				errors += DcIssue(line, "expected a bracketed input name after `set`")
+				continue
+			}
+
+			val (inputNames, afterInputs) = inputs
+
+			if (words.getOrNull(afterInputs) != "to") {
+				errors += DcIssue(line, "expected `to` after the input being bound")
+				continue
+			}
+
+			val targets = readList(words, afterInputs + 1)
+			if (targets == null) {
+				errors += DcIssue(line, "expected `[target:function]` after `to`")
+				continue
+			}
+
+			val (calls, afterTargets) = targets
+
+			if (words.getOrNull(afterTargets) != "mode") {
+				errors += DcIssue(line, "expected `mode [toggle]` or `mode [hold]` at the end of the line")
+				continue
+			}
+
+			val modeName = words.getOrNull(afterTargets + 1)?.let { unwrap(it) }
+			if (modeName == null || afterTargets + 2 != words.size) {
+				errors += DcIssue(line, "`mode` takes one bracketed mode, e.g. `mode [hold]`")
+				continue
+			}
+
+			val mode = DcMode.named(modeName)
+			if (mode == null) {
+				errors += DcIssue(line, "'$modeName' is not a mode — dclang v0.1 has [toggle] and [hold]")
+				continue
+			}
+
+			if (availableInputs != null) for (inputName in inputNames) {
+				if (inputName !in availableInputs) errors += DcIssue(line, "'$inputName' is not an input this machine emits")
+			}
+
+			for (call in calls) {
+
+				val separator = call.indexOf(':')
+				if (separator <= 0 || separator == call.lastIndex) {
+					errors += DcIssue(line, "'$call' is not a call — write it as [target:function]")
+					continue
+				}
+
+				val target = call.substring(0, separator)
+				val function = call.substring(separator + 1)
+
+				if (target !in groups.names && target !in knownMachines) {
+					errors += DcIssue(line, "'$target' is neither a group nor a machine wired to this mainframe")
+					continue
+				}
+
+				for (member in groups.membersOf(target)) {
+
+					val functions = functionsOf(member) ?: continue // offline, so there is nothing to check against
+					if (function in functions) continue
+
+					warnings += DcIssue(line, "'$member' has no function '$function' — the call will be ignored")
+
+				}
+
+				for (inputName in inputNames) {
+					bindings.getOrPut(inputName) { mutableListOf() } += DcBinding(target, function, mode)
+				}
+
+			}
+
+		}
+
+		if (errors.isNotEmpty()) return DcResult.Failed(errors)
+
+		return DcResult.Ok(DcProgram(bindings.mapValues { it.value.toList() }), warnings)
+
+	}
+
+	/////////////////
+	///// LEXING
+	/////////////////
+
+	/** Every line that says something, as its line number and its words. */
+	private fun statements(source: String): List<Pair<Int, List<String>>> =
+		source.lines()
+			.mapIndexed { index, raw -> (index + 1) to strip(raw) }
+			.filter { it.second.isNotEmpty() }
+			.map { (line, text) -> line to text.split(WHITESPACE) }
+
+	/** Drops comments, indentation, and the editor's header block. */
+	private fun strip(raw: String): String {
+
+		val text = raw.substringBefore("//").trim()
+		if (text.startsWith("---") || text.startsWith("|")) return ""
+
+		return text
+
+	}
+
+	/** The name inside `[brackets]`, or null when [word] is not one. */
+	private fun unwrap(word: String): String? {
+
+		if (word.length <= 2) return null
+		if (!word.startsWith('[') || !word.endsWith(']')) return null
+
+		return word.substring(1, word.length - 1)
+
+	}
+
+	/** Reads `[a] and [b] and [c]` from [start]. Returns the names and where the list stopped. */
+	private fun readList(words: List<String>, start: Int): Pair<List<String>, Int>? {
+
+		val names = mutableListOf<String>()
+		var cursor = start
+
+		while (cursor < words.size) {
+
+			names += unwrap(words[cursor]) ?: return null
+			cursor++
+
+			if (words.getOrNull(cursor) != "and") break
+			cursor++
+
+		}
+
+		if (names.isEmpty()) return null
+
+		return names to cursor
+
+	}
+
+	private val WHITESPACE = Regex("\\s+")
+
+}

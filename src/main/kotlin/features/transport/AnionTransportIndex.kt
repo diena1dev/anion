@@ -52,9 +52,10 @@ object AnionTransportIndex {
 	fun isComponent(block: Block): Boolean = AnionTransportComponents.at(block) != null
 
 	/** Records [block] as a component, in memory and on disk. No-op if it is not one. */
+	// a component nothing drives says so itself — a decorative chain has no business on disk
 	fun register(block: Block) {
 
-		if (!isComponent(block)) return
+		if (AnionTransportComponents.at(block)?.indexed != true) return
 
 		val worldUid = block.world.uid
 		if (!cells.computeIfAbsent(worldUid) { ConcurrentHashMap.newKeySet() }.add(block.vec3i)) return

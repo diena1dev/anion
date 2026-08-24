@@ -5,6 +5,7 @@ import dev.diena.anion.data.registry.registries.AnionRegistries
 import dev.diena.anion.extensions.gradient
 import dev.diena.anion.features.custom.items.AnionItems
 import dev.diena.anion.features.machine.component.MachinePort
+import dev.diena.anion.features.transport.AnionDataJunctionBlock
 import dev.diena.anion.features.transport.AnionItemChuteBlock
 import dev.diena.anion.features.transport.AnionItemPipeBlock
 import dev.diena.anion.features.transport.AnionItemPipeJunctionBlock
@@ -151,6 +152,15 @@ object AnionBlocks {
 			"Item Chute",
 			Instrument.ZOMBIE,
 			17,
+		)
+	)
+
+	// the data line itself is the vanilla chain — see AnionTransportComponents.byMaterial
+	val DATA_JUNCTION = registerBlock(
+		AnionDataJunctionBlock(
+			"Data Junction",
+			Instrument.ZOMBIE,
+			18,
 		)
 	)
 
