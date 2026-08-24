@@ -28,6 +28,7 @@ object AnionItems {
 		)
 	)
 
+	// projectile weapons
 	val ANION_BLASTER_PISTOL = registerItem(
 		AnionBlasterPistolItem()
 	)
@@ -71,6 +72,7 @@ object AnionItems {
 	val ITEM_PIPE          = registerBlock(AnionBlocks.ITEM_PIPE)
 	val ITEM_PIPE_JUNCTION = registerBlock(AnionBlocks.ITEM_PIPE_JUNCTION)
 	val ITEM_CHUTE         = registerBlock(AnionBlocks.ITEM_CHUTE)
+	val DATA_JUNCTION      = registerBlock(AnionBlocks.DATA_JUNCTION)
 
 	private fun registerItem(item: AnionItem) = item.also {
 		AnionRegistries.ITEM_REGISTRY.register(AnionRegistryKey(it.namespacedKey.key), it)

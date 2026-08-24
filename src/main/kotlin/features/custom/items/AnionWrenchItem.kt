@@ -22,8 +22,8 @@ import org.bukkit.inventory.ItemType
 class AnionWrenchItem : AnionItem(
 
 	displayName = "Wrench",
-	itemRepresentation = ItemType.IRON_INGOT,
-	styledDisplayName = Component.text("Wrench").color(NamedTextColor.GRAY),
+	itemRepresentation = ItemType.STICK,
+	stacksTo = 1,
 
 ) {
 

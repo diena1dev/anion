@@ -21,8 +21,8 @@ import org.bukkit.inventory.ItemType
 class AnionScrewdriverItem : AnionItem(
 
 	displayName = "Screwdriver",
-	itemRepresentation = ItemType.COPPER_INGOT,
-	styledDisplayName = Component.text("Screwdriver").color(NamedTextColor.GOLD),
+	itemRepresentation = ItemType.STICK,
+	stacksTo = 1,
 
 ) {
 
