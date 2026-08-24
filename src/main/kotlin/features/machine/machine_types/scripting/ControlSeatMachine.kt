@@ -44,10 +44,10 @@ class ControlSeatMachine : PortedMachine("Control Seat", CONTROL_SEAT_STRUCTURE)
 		/**
 		 * blocks squared a pilot may end up from the seat before being put back.
 		 *
-		 * Coarse on purpose. The move listener is what actually holds them, so this only ever catches a
-		 * pilot something else moved — a piston, a portal, a ship that left without them.
+		 * Tight, because the move listener refuses walking outright — anything that gets past it moved the
+		 * player without asking, and should be corrected the same tick rather than left to drift.
 		 */
-		private const val HOLD_SLACK = 4.0
+		private const val HOLD_SLACK = 0.0025
 
 		/** vanilla walk and fly speeds, restored to anyone found frozen with no seat to explain it */
 		const val DEFAULT_WALK_SPEED = 0.2f
@@ -102,6 +102,10 @@ class ControlSeatMachine : PortedMachine("Control Seat", CONTROL_SEAT_STRUCTURE)
 
 		holdInPlace(player)
 
+		// a pilot who cannot move cannot sprint, and toggle-sprint latching on would pin the ctrl
+		// modifier true forever — every plain input would report false for the rest of the flight
+		if (player.isSprinting) player.isSprinting = false
+
 		val mainframe = this.mainframe ?: return
 		val seatName = mainframe.nameOf(this) ?: return
 
@@ -138,10 +142,28 @@ class ControlSeatMachine : PortedMachine("Control Seat", CONTROL_SEAT_STRUCTURE)
 
 	}
 
-	override fun debugLines(): List<String> = listOf(
-		"pilot=${pilot?.let { Bukkit.getOfflinePlayer(it).name } ?: "none"}",
-		"mainframe=${mainframe?.let { frame -> frame.nameOf(this) ?: "wired, unnamed" } ?: "not wired"}",
-	)
+	override fun debugLines(): List<String> {
+
+		val seated = pilot?.let { Bukkit.getPlayer(it) }
+
+		val lines = mutableListOf(
+			"pilot=${pilot?.let { Bukkit.getOfflinePlayer(it).name } ?: "none"}",
+			"mainframe=${mainframe?.let { frame -> frame.nameOf(this) ?: "wired, unnamed" } ?: "not wired"}",
+		)
+
+		// which half of every input pair is live. a modifier stuck on is why a plain input goes dead
+		if (seated != null) {
+
+			val input = seated.currentInput
+
+			lines += "ctrl modifier: ${input.isSprint}"
+			lines += "down: " + inputStates(input).filterValues { it }.keys.sorted().joinToString(", ").ifEmpty { "nothing" }
+
+		}
+
+		return lines
+
+	}
 
 	/** Sits [player] down, or stands them up if they are already here. */
 	fun toggleSeat(player: Player) {
@@ -297,8 +319,8 @@ class ControlSeatMachine : PortedMachine("Control Seat", CONTROL_SEAT_STRUCTURE)
 
 	}
 
-	// on top of the seat block, not inside it. the core is a stair, so feet at +0.1 sit in solid geometry
-	// and vanilla spends every tick pushing them back out of it
-	private fun seatAnchor(): Location = Location(level.world, origin.x + 0.5, origin.y + 1.0, origin.z + 0.5)
+	// sat down in the seat rather than stood on top of it. being inside the stair's geometry is only a
+	// problem if the push-out is allowed to happen, and the move listener refuses it
+	private fun seatAnchor(): Location = Location(level.world, origin.x + 0.5, origin.y + 0.1, origin.z + 0.5)
 
 }

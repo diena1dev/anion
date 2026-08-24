@@ -329,19 +329,27 @@ object StarshipMovement {
 
 	) {
 
+		// rotateVec turns east into south, which is a quarter turn clockwise, and entity yaw rises
+		// clockwise too — so a step is plainly +90 with no sign to work out
+		val yawDelta = (rotationSteps * 90).toFloat()
+
+		// a ship only ever turns about y, so nothing aboard it is tipped forwards or backwards. carried
+		// through as an explicit zero rather than left out, so the rotation this applies is all in one place
+		val pitchDelta = 0.0f
+
 		for (entity in starship.hitbox.getEntitiesWithin()) {
 
 			val entityVec = Vec3i(entity.x.toInt(), entity.y.toInt(), entity.z.toInt())
 			val rotatedVec = starship.origin + rotateVec(entityVec - starship.origin, rotationSteps)
 
-			val newX = (rotatedVec.x - entityVec.x).toDouble()
-			val newY = (rotatedVec.y - entityVec.y).toDouble()
-			val newZ = (rotatedVec.z - entityVec.z).toDouble()
+			val deltaX = (rotatedVec.x - entityVec.x).toDouble()
+			val deltaY = (rotatedVec.y - entityVec.y).toDouble()
+			val deltaZ = (rotatedVec.z - entityVec.z).toDouble()
 
 			val bukkitEntity = entity.bukkitEntity
 			if (bukkitEntity is Player) {
 				// I FUCKING HATE NMS
-				val destination = PositionMoveRotation(Vec3(newX, newY, newZ), Vec3.ZERO, 0f, 0f)
+				val destination = PositionMoveRotation(Vec3(deltaX, deltaY, deltaZ), Vec3.ZERO, yawDelta, pitchDelta)
 
 				(bukkitEntity as CraftPlayer).handle.connection.teleport(
 					destination,
@@ -350,12 +358,21 @@ object StarshipMovement {
 
 			} else {
 
-				bukkitEntity.teleport(bukkitEntity.location.add(newX, newY, newZ))
+				// Location.add leaves yaw and pitch alone, so a mob turns only because this says to
+				val destination = bukkitEntity.location.add(deltaX, deltaY, deltaZ)
+
+				destination.yaw = wrapYaw(destination.yaw + yawDelta)
+				destination.pitch += pitchDelta
+
+				bukkitEntity.teleport(destination)
 
 			}
 
 		}
 
 	}
+
+	/** Keeps a yaw in the -180..180 the client expects, however many turns have been added to it. */
+	private fun wrapYaw(yaw: Float): Float = ((yaw + 180.0f) % 360.0f + 360.0f) % 360.0f - 180.0f
 
 }
