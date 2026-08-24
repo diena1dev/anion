@@ -36,7 +36,19 @@ class StarshipSimulator private constructor() {
 	 *  [setDebugConstantVelocity] / [resetDebugConstantVelocity]. */
 	val debugVelocity: Vec3 get() = this.debugConstantVelocity
 
+	/** which movement sub-step of the current physics pass this is. forces only run on the first. */
+	private var subStep = 0
+
 	companion object {
+
+		/**
+		 * movement steps per physics pass.
+		 *
+		 * The loop runs this many times faster than the ship is simulated, and each pass folds this
+		 * fraction of the velocity. The ship covers exactly the same ground over a physics pass — it just
+		 * gets there in smaller, more frequent steps, so a move reads as travel rather than a jump.
+		 */
+		const val MOVEMENT_SUBSTEPS = 3
 
 		/** creates a new starship hitbox */
 		fun new(
@@ -59,12 +71,21 @@ class StarshipSimulator private constructor() {
 
 	fun simulate() {
 
-		// forces first, then latch the whole-block step they produced, then clamp that step to what actually fits.
-		applyAirDrag()
-		applyPlanetGravity()
-		applyDebugConstantVelocity()
-		this.starship.velocity.beginTick()
+		// forces once per physics pass, so running the loop faster redraws the ship more often without
+		// applying gravity or drag any harder
+		if (this.subStep == 0) {
+
+			applyAirDrag()
+			applyPlanetGravity()
+			applyDebugConstantVelocity()
+
+		}
+
+		// then latch the fraction of the step this sub-step is worth, and clamp it to what actually fits.
+		this.starship.velocity.beginTick(MOVEMENT_SUBSTEPS)
 		clampVelocityToCollision()
+
+		this.subStep = (this.subStep + 1) % MOVEMENT_SUBSTEPS
 
 	}
 

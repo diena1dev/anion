@@ -10,6 +10,7 @@ import dev.diena.anion.features.machine.AnionMachines
 import dev.diena.anion.features.machine.Machine
 import dev.diena.anion.features.machine.MachineIndex
 import dev.diena.anion.features.starship.Starship
+import dev.diena.anion.features.starship.simluated.StarshipSimulator
 import dev.diena.anion.features.transport.AnionTransport
 import dev.diena.anion.features.recipes.AnionRecipes
 import io.papermc.paper.plugin.bootstrap.BootstrapContext
@@ -54,12 +55,23 @@ class Anion : JavaPlugin() {
 		AnionRecipes
 		AnionMachines
 
-		// starship slowTick updates
-		Tasks.scheduleAsync(1, 1, TimeUnit.SECONDS, Runnable {
+		// starship slowTick updates. the loop runs MOVEMENT_SUBSTEPS times per physics pass — the simulator
+		// only applies forces on the first of them, so ships redraw that much more often while gravity,
+		// drag and thrust stay on the cadence they were tuned at
+		val movementPeriod = 1000L / StarshipSimulator.MOVEMENT_SUBSTEPS
+		var movementPass = 0
+
+		Tasks.scheduleAsync(movementPeriod, movementPeriod, TimeUnit.MILLISECONDS, Runnable {
+
+			// saving stays on the physics cadence: a moving ship is dirty every step, and there is nothing
+			// to be gained from writing it to disk twice as often
+			val saving = movementPass % StarshipSimulator.MOVEMENT_SUBSTEPS == 0
+			movementPass++
+
 			for ((uuid, ship) in Starship.loadedStarships) {
 
 				// saving
-				if (ship.dirty) AnionPersistence.saveStarship(uuid, ship)
+				if (saving && ship.dirty) AnionPersistence.saveStarship(uuid, ship)
 
 				// ticking (sync for API safety)
 				Tasks.runSync { ship.slowTick() }

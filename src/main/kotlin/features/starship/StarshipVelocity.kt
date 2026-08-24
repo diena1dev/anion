@@ -51,10 +51,13 @@ class StarshipVelocity private constructor() {
 	////////////////////
 
 	/** folds this tick's velocity into [subBlockOffset] and latches the whole-block step the ship will attempt.
-	 *  must run after all forces are applied for the tick and before [applyVelocity]. */
-	fun beginTick() {
+	 *  must run after all forces are applied for the tick and before [applyVelocity].
+	 *
+	 *  [subSteps] is how many of these run per physics pass, so each one folds that fraction of the
+	 *  velocity. Splitting the pass changes when the ship arrives, never how far it goes. */
+	fun beginTick(subSteps: Int = 1) {
 
-		this.subBlockOffset += this.velocity
+		this.subBlockOffset += this.velocity.scale(1.0 / subSteps)
 		this.pendingStep = this.subBlockOffset.floorVec3i
 
 	}
