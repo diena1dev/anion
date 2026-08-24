@@ -101,7 +101,7 @@ class MachinePort(
 		 *
 		 * Returns whether the click was spent. Only a load that actually moved something spends it —
 		 * anything else leaves the click to the placement path, so a port stays a block you can build
-		 * against.
+		 * against. Sneaking skips the whole thing, which is the reliable way to build against one.
 		 */
 		fun insertHeld(event: PlayerInteractEvent): Boolean {
 
@@ -112,8 +112,13 @@ class MachinePort(
 			val held = player.inventory.itemInMainHand
 			if (held.isEmpty) return false
 
-			// a tool clicked on a port is being used on it, not fed into it
+			// a tool clicked on a port is being used on it, not fed into it. a canister that works a gas
+			// or fluid port claims its click the same way, which is why this comes first
 			if (held.toAnionItem()?.handlesBlockInteraction == true) return false
+
+			// sneaking is building, never loading. a port is a block you have to be able to put things
+			// against without feeding the machine whatever you were holding
+			if (player.isSneaking) return false
 
 			val block = event.clickedBlock ?: return false
 			val port = at((block.world as CraftWorld).handle, block.vec3i) ?: return false
@@ -122,6 +127,10 @@ class MachinePort(
 				player.sendActionBar(Component.text("${port.kind} port is not bound to a buffer.").color(NamedTextColor.RED))
 				return false
 			}
+
+			// gas, fluid and anything else that cannot be carried in a hand. silent: the player is holding
+			// a block at a port that will never take one, so they are building, not loading
+			if (!buffer.handLoadable) return false
 
 			val key = ItemKey.of(held)
 

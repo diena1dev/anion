@@ -77,7 +77,7 @@ object DcParser {
 					for (groupName in groups.first) {
 
 						if (groupName !in declared) {
-							errors += DcIssue(line, "group '$groupName' is never defined — add `def_group [$groupName]`")
+							errors += DcIssue(line, "group '$groupName' is never defined | add `def_group [$groupName]`")
 							continue
 						}
 
@@ -126,7 +126,7 @@ object DcParser {
 		for ((line, words) in statements(source)) {
 
 			if (words[0] != "set") {
-				errors += DcIssue(line, "'${words[0]}' is not a dclang statement — a program binds inputs with `set`")
+				errors += DcIssue(line, "'${words[0]}' is not a dclang statement | a program binds inputs with `set`")
 				continue
 			}
 
@@ -164,7 +164,7 @@ object DcParser {
 
 			val mode = DcMode.named(modeName)
 			if (mode == null) {
-				errors += DcIssue(line, "'$modeName' is not a mode — dclang v0.1 has [toggle] and [hold]")
+				errors += DcIssue(line, "'$modeName' is not a mode | dclang v0.1 has [toggle] and [hold]")
 				continue
 			}
 
@@ -176,7 +176,7 @@ object DcParser {
 
 				val separator = call.indexOf(':')
 				if (separator <= 0 || separator == call.lastIndex) {
-					errors += DcIssue(line, "'$call' is not a call — write it as [target:function]")
+					errors += DcIssue(line, "'$call' is not a call | write it as [target:function]")
 					continue
 				}
 
@@ -193,7 +193,7 @@ object DcParser {
 					val functions = functionsOf(member) ?: continue // offline, so there is nothing to check against
 					if (function in functions) continue
 
-					warnings += DcIssue(line, "'$member' has no function '$function' — the call will be ignored")
+					warnings += DcIssue(line, "[$member] has no function [:$function] | the call will be ignored")
 
 				}
 

@@ -34,6 +34,10 @@ open class MachineBuffer(
 	 * thousands of items on the floor. Disassembly ignores this — the machine is going away either way.
 	 */
 	val spillable: Boolean = true,
+	/**
+	 * Whether clicking a port bound to this buffer with something in hand loads it.
+	 */
+	val handLoadable: Boolean = resourceType == ItemKey::class,
 
 ) {
 
@@ -144,7 +148,8 @@ open class MachineBuffer(
 	}
 
 	/** One line for a debug readout. */
-	open fun describe(): String = "$key ${used()}/$capacity ports=${boundPorts.size} rate=${transferLimit()}/pass"
+	open fun describe(): String =
+		"$key ${used()}/$capacity ports=${boundPorts.size} rate=${transferLimit()}/pass${if (handLoadable) "" else " [no hand loading]"}"
 
 	/** Drops the whole contents. Called when the machine is disassembled. */
 	open fun clear() {
@@ -205,7 +210,8 @@ open class BulkItemBuffer(
 	fun typesUsed(): Int = stored.size
 
 	override fun describe(): String =
-		"$key ${used()}/$capacity ${typesUsed()}/$typeLimit types ports=${boundPorts.size} rate=${transferLimit()}/pass"
+		"$key ${used()}/$capacity ${typesUsed()}/$typeLimit types ports=${boundPorts.size} rate=${transferLimit()}/pass" +
+			if (handLoadable) "" else " [no hand loading]"
 
 	override fun accepts(resource: AnionResource): Boolean {
 
