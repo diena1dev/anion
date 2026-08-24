@@ -50,14 +50,14 @@ class AnionScrewdriverItem : AnionItem(
 		val level = (block.world as CraftWorld).handle
 
 		val port = MachinePort.at(level, block.vec3i) ?: run {
-			player.sendActionBar(Component.text("Not a machine port.").color(NamedTextColor.RED))
+			player.sendActionBar(Component.text("not a machine port").color(NamedTextColor.RED))
 			return
 		}
 
 		if (!player.isSneaking) {
 
 			if (port.machine.buffers.isEmpty()) {
-				player.sendActionBar(Component.text("This machine has no buffers.").color(NamedTextColor.RED))
+				player.sendActionBar(Component.text("no buffers").color(NamedTextColor.RED))
 				return
 			}
 
@@ -78,7 +78,7 @@ class AnionScrewdriverItem : AnionItem(
 
 		if (!buffer.spillable) {
 			player.sendActionBar(
-				Component.text("${buffer.key} will not be dumped — break the machine to empty it.")
+				Component.text("${buffer.key} cannot not be dumped")
 					.color(NamedTextColor.RED)
 			)
 			return
@@ -92,7 +92,7 @@ class AnionScrewdriverItem : AnionItem(
 		port.machine.spill(buffer, front)
 
 		player.sendActionBar(
-			Component.text("Emptied ${buffer.key}, dropped $held").color(NamedTextColor.YELLOW)
+			Component.text("emptied ${buffer.key}, dropped $held").color(NamedTextColor.YELLOW)
 		)
 
 	}

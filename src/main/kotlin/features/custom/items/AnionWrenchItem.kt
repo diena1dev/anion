@@ -56,7 +56,7 @@ class AnionWrenchItem : AnionItem(
 			val machines = Machine.machinesAt(level, cell)
 
 			if (machines.isEmpty()) {
-				player.sendActionBar(Component.text("No machine here.").color(NamedTextColor.RED))
+				player.sendActionBar(Component.text("no machine here").color(NamedTextColor.RED))
 				return
 			}
 
@@ -64,7 +64,7 @@ class AnionWrenchItem : AnionItem(
 			for (machine in machines) machine.disassemble()
 
 			player.sendActionBar(
-				Component.text("Disassembled ${machines.joinToString(", ") { it.namespacedKey.key }}")
+				Component.text("disassembled ${machines.joinToString(", ") { it.namespacedKey.key }}")
 					.color(NamedTextColor.YELLOW)
 			)
 
@@ -88,14 +88,14 @@ class AnionWrenchItem : AnionItem(
 		val candidates = Machine.candidatesAt(level, cell)
 
 		if (candidates.isEmpty()) {
-			player.sendActionBar(Component.text("Nothing here completes a machine.").color(NamedTextColor.RED))
+			player.sendActionBar(Component.text("no machine candidate").color(NamedTextColor.RED))
 			return
 		}
 
 		// a block that completes two different structures at once is an ambiguity, not a coin flip
 		if (candidates.size > 1) {
 			player.sendActionBar(
-				Component.text("Ambiguous: ${candidates.size} structures match. Break one apart.")
+				Component.text("ambiguous: ${candidates.size} structures match.")
 					.color(NamedTextColor.RED)
 			)
 			return
@@ -105,12 +105,12 @@ class AnionWrenchItem : AnionItem(
 		val assembled = candidate.factory().assemble(level, candidate.origin, candidate.rotation)
 
 		if (assembled == null) {
-			player.sendActionBar(Component.text("Assembly failed — a port cell is already claimed.").color(NamedTextColor.RED))
+			player.sendActionBar(Component.text("assembly failed | a port cell is already claimed.").color(NamedTextColor.RED))
 			return
 		}
 
 		player.sendActionBar(
-			Component.text("Assembled ${assembled.namespacedKey.key}").color(NamedTextColor.GREEN)
+			Component.text("assembled ${assembled.namespacedKey.key}").color(NamedTextColor.GREEN)
 		)
 
 	}
