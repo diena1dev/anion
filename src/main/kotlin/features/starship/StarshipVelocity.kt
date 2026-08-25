@@ -23,8 +23,14 @@ class StarshipVelocity private constructor() {
 	/** outstanding holds taken by [pause]. */
 	private var pauseCount = 0
 
+	/** sticky hold set by a player. survives grab and release, unlike [pause], and is persisted. */
+	var frozen = false; private set
+
 	/** true while something outside the simulation owns this ship's motion. */
 	val paused get() = pauseCount > 0
+
+	/** true while the ship must not be simulated, for any reason. */
+	val held get() = paused || frozen
 
 	companion object {
 
@@ -98,6 +104,9 @@ class StarshipVelocity private constructor() {
 		this.velocity = other.velocity
 		this.subBlockOffset = other.subBlockOffset
 
+		// a piece broken off a frozen ship stays put instead of falling away from it
+		if (other.frozen) freeze()
+
 	}
 
 	/** clamps the latched [pendingStep] down to [safeDistance]. used by
@@ -143,6 +152,30 @@ class StarshipVelocity private constructor() {
 		if (this.pauseCount > 0) this.pauseCount--
 
 	}
+
+	/** pins the ship in place until unfrozen, clearing whatever motion it had. returns the new state. */
+	fun freeze(): Boolean {
+
+		this.frozen = true
+		this.starship.dirty = true
+		resetVelocity()
+
+		return this.frozen
+
+	}
+
+	/** releases the sticky hold, handing the ship back to the simulation. returns the new state. */
+	fun unfreeze(): Boolean {
+
+		this.frozen = false
+		this.starship.dirty = true
+
+		return this.frozen
+
+	}
+
+	/** flips the frozen state. returns the new state. */
+	fun toggleFreeze(): Boolean = if (this.frozen) unfreeze() else freeze()
 
 	fun resetVelocity() : Vec3 {
 

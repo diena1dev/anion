@@ -57,7 +57,8 @@ object StarshipCommand {
 							"${ship.velocity.velocity.x.toString().take(5)}," +
 							"${ship.velocity.velocity.y.toString().take(5)}," +
 							"${ship.velocity.velocity.z.toString().take(5)})" +
-							"| CVel: ${ship.simulator.debugVelocity} | Level: ${ship.level.bukkitName}")
+							"| CVel: ${ship.simulator.debugVelocity} | Level: ${ship.level.bukkitName}" +
+							if (ship.velocity.frozen) " | FROZEN" else "")
 				)
 
 			}
@@ -196,6 +197,7 @@ object StarshipCommand {
 			"\n|- UUID: ${ship.uuid.toString().take(5)}..." +
 			"\n|- Size: ${ship.size}" +
 			"\n|- Velocity: ${ship.velocity.velocity}" +
+			"\n|- Frozen: ${ship.velocity.frozen}" +
 			"\n|- Pos: ${ship.origin}" +
 			"\n|- Level: ${ship.level.bukkitName}" +
 			"\n|- DEBUG CVelocity: ${ship.simulator.debugVelocity}"
@@ -263,6 +265,30 @@ object StarshipCommand {
 		} else {
 			sender.info("Failed to teleport starship by provided Vec3i{$x, $y, $z}!")
 		}
+
+	}
+
+	/** pin the selected ship in place, or hand it back to the simulation */
+	@Subcommand
+	@Permission("${Keys.COMMAND_PERMISSION_TREE}.starship.freeze")
+	fun freeze(
+
+		@Sender sender: Player,
+		frozen: Boolean? = null,
+
+	) {
+
+		val ship = getSelectedStarship(sender) ?: return
+
+		val state = when (frozen) {
+
+			null -> ship.velocity.toggleFreeze()
+			true -> ship.velocity.freeze()
+			false -> ship.velocity.unfreeze()
+
+		}
+
+		sender.info(if (state) "Froze starship in place." else "Unfroze starship.")
 
 	}
 

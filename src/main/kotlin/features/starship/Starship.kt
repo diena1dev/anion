@@ -86,8 +86,8 @@ class Starship {
 
 	fun slowTick() {
 
-		// a paused ship's motion belongs to something else, and keeps the velocity it had for when it resumes
-		if (velocity.paused) return
+		// a held ship's motion belongs to something else: a tool gun grab, or a player freeze
+		if (velocity.held) return
 
 		// simulate starship (for now apply static gravity if not in world ending in _space.)
 		simulator.simulate()
@@ -158,6 +158,7 @@ class Starship {
 		level: ServerLevel,
 		origin: Vec3i,
 		yaw: Double,
+		frozen: Boolean,
 		blocks: ConcurrentHashMap<Vec3i, BlockState>
 
 	): Starship {
@@ -179,6 +180,9 @@ class Starship {
 
 		// components have no such ordering problem: they are cells, and this ship's blocks are all here
 		this.transport.rebuild()
+
+		if (frozen) this.velocity.freeze()
+		this.dirty = false // restored state already matches what is on disk
 
 		return this
 

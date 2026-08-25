@@ -27,8 +27,12 @@ class AnionToolGunItem : AnionBlasterItem("Tool Gun") {
 
 	)
 
+	/** what the next shot does to the ship it lands on. */
+	private enum class ShotMode { GRAB, FREEZE }
+
 	private var heldStarship: HeldStarship? = null
 	private var playerHolding: Player? = null
+	private var shotMode = ShotMode.GRAB
 
 	companion object {
 
@@ -52,13 +56,30 @@ class AnionToolGunItem : AnionBlasterItem("Tool Gun") {
 	override fun onRightClick(player: Player) {
 
 		if (releaseStarship()) return
+
+		shotMode = ShotMode.GRAB
 		shootBullet(player)
 
 	}
 
-	// no-op
-	// TODO: freeze starship in place if starship is held.
-	override fun onLeftClick(player: Player) {}
+	/** left click freezes the ship being held, or the ship the shot lands on. */
+	override fun onLeftClick(player: Player) {
+
+		val held = heldStarship?.starship
+
+		// a frozen ship must not still be dragged to the crosshair
+		if (held != null) {
+
+			releaseStarship()
+			held.velocity.toggleFreeze()
+			return
+
+		}
+
+		shotMode = ShotMode.FREEZE
+		shootBullet(player)
+
+	}
 
 	override fun onRemove(player: Player) {
 
@@ -70,6 +91,20 @@ class AnionToolGunItem : AnionBlasterItem("Tool Gun") {
 
 		val level = (player.world as CraftWorld).handle
 		val starship = Starship.starshipAt(level, block.vec3i) ?: return
+
+		StarshipSelection.select(player, starship)
+
+		when (shotMode) {
+
+			ShotMode.FREEZE -> starship.velocity.toggleFreeze()
+			ShotMode.GRAB -> grabStarship(player, starship)
+
+		}
+
+	}
+
+	/** puts [starship] on [player]'s crosshair and takes over its motion until it is released. */
+	private fun grabStarship(player: Player, starship: Starship) {
 
 		val origin = Vector(starship.origin.x.toDouble(), starship.origin.y.toDouble(), starship.origin.z.toDouble())
 
@@ -85,8 +120,6 @@ class AnionToolGunItem : AnionBlasterItem("Tool Gun") {
 
 		// the tool gun drives the ship by hand until it is let go
 		starship.velocity.pause()
-
-		StarshipSelection.select(player, starship)
 
 	}
 

@@ -13,7 +13,7 @@ import java.io.File
 import java.nio.ByteBuffer
 
 const val DB_VERSION: Short         = 1
-const val STARSHIPS_VERSION: Short  = 1
+const val STARSHIPS_VERSION: Short  = 2
 const val MACHINES_VERSION: Short   = 2
 const val PLAYERS_VERSION: Short    = 1
 const val NATIONS_VERSION: Short    = 1

@@ -6,6 +6,7 @@ object Migrators {
 
 	private val all: List<SchemaMigrator> = listOf(
 		MachinesV1ToV2,
+		StarshipsV1ToV2,
 	)
 
 	fun find(cfName: String, from: Short, to: Short): SchemaMigrator? =

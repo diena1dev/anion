@@ -32,6 +32,7 @@ object StarshipSerializer {
 		dos.writeInt(ship.origin.z)
 
 		dos.writeDouble(ship.yaw)
+		dos.writeBoolean(ship.velocity.frozen)
 
 		dos.writeInt(ship.blockHashMap.size)
 		for ((vec, state) in ship.blockHashMap) {
@@ -78,6 +79,7 @@ object StarshipSerializer {
 		val origin = Vec3i(originX, originY, originZ)
 
 		val yaw = dis.readDouble()
+		val frozen = dis.readBoolean()
 
 		val blockCount = dis.readInt()
 		val blocks = ConcurrentHashMap<Vec3i, BlockState>(blockCount)
@@ -101,7 +103,7 @@ object StarshipSerializer {
 		val machineRefCount = dis.readInt()
 		repeat(machineRefCount) { dis.readLong() }
 
-		return Starship().load(uuid, world, origin, yaw, blocks)
+		return Starship().load(uuid, world, origin, yaw, frozen, blocks)
 	}
 
 /** Reads the origin out of a stored blob without deserializing the whole ship. */
