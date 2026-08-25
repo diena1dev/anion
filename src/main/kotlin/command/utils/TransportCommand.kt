@@ -1,4 +1,4 @@
-package dev.diena.anion.command.admin
+package dev.diena.anion.command.utils
 
 import dev.astralchroma.processor.annotations.Command
 import dev.astralchroma.processor.annotations.Name

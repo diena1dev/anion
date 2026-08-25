@@ -1,5 +1,6 @@
 package dev.diena.anion.data.database
 
+import dev.diena.anion.data.database.migrators.Migrators
 import org.rocksdb.ColumnFamilyDescriptor
 import org.rocksdb.ColumnFamilyHandle
 import org.rocksdb.ColumnFamilyOptions
@@ -25,6 +26,7 @@ object AnionDatabase {
 
 	// columns are identified by index
 	private val CF_NAMES = listOf(
+
 		RocksDB.DEFAULT_COLUMN_FAMILY,
 		"metadata".toByteArray(),
 		"starships".toByteArray(),
@@ -38,6 +40,7 @@ object AnionDatabase {
 		// transport components, keyed by the chunk they sit in. cells rather than instances, because a
 		// pipe is a block and nothing else.
 		"transport".toByteArray(),
+
 	)
 
 	private const val IDX_METADATA        = 1

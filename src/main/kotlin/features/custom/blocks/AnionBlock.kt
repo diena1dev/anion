@@ -36,6 +36,7 @@ open class AnionBlock(
 ) : AnionResource {
 
 	companion object {
+
 		private val internalBlock = BlockType.NOTE_BLOCK
 
 		fun AnionBlock.getBlockState(): BlockState? {
@@ -45,18 +46,14 @@ open class AnionBlock(
 
 			return block?.createBlockState()
 		}
+
 	}
 
 	init {
 		if (note !in 0..24) throw IllegalStateException("note must be 0–24, got $note for ${this.namespacedKey}")
 	}
 
-	/**
-	 * The note this block should carry after [rotation]. Defaults to unchanged.
-	 *
-	 * A note block has no rotatable vanilla property, so anything an anion block encodes in its note
-	 * has to be turned here or it survives a starship rotation pointing the way it started.
-	 */
+	/** The note this block should carry after [rotation]. Defaults to unchanged. */
 	open fun noteAfterRotation(note: Int, rotation: Rotation): Int = note
 
 	open fun onPlace(block: Block, player: Player?) { placeHandler?.invoke(block, player) }

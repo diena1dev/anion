@@ -1,4 +1,4 @@
-package dev.diena.anion.command.admin
+package dev.diena.anion.command.utils
 
 import com.destroystokyo.paper.event.server.ServerTickEndEvent
 import dev.astralchroma.processor.annotations.Command
@@ -29,7 +29,6 @@ import kotlin.collections.map
 import kotlin.collections.mutableSetOf
 import kotlin.collections.toSet
 
-// TODO: add permission nodes
 // TODO: add better cache per-player (PLAYER DATA)
 @Command
 @Name("starship")
@@ -52,6 +51,7 @@ object StarshipCommand {
 
 				val ship = getSelectedStarship(player, false) ?: continue
 
+				// this looks weird because we need to trim the length of velocity vectors (since they are double values)
 				player.sendActionBar(
 					Component.text("Pos: ${ship.origin} | Vel: (" +
 							"${ship.velocity.velocity.x.toString().take(5)}," +

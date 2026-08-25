@@ -1,5 +1,6 @@
-package dev.diena.anion.data.database
+package dev.diena.anion.data.database.serializers
 
+import dev.diena.anion.data.database.STARSHIPS_VERSION
 import dev.diena.anion.features.starship.Starship
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Vec3i
@@ -11,8 +12,9 @@ import net.minecraft.world.level.block.state.BlockState
 import java.io.*
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.collections.iterator
 
-// and we all say "thank you, Claude", because surely nothing ill will come of me not actually learning how to use a database
+/**  */
 object StarshipSerializer {
 
 	fun serialize(ship: Starship): ByteArray {
@@ -64,7 +66,7 @@ object StarshipSerializer {
 
 		val schemaVersion = dis.readShort()
 		check(schemaVersion == STARSHIPS_VERSION) {
-			"unsupported starship schema v$schemaVersion (code at v$STARSHIPS_VERSION)"
+			"unsupported starship schema v$schemaVersion (code at v${STARSHIPS_VERSION})"
 		}
 
 		dis.readLong() // world uuid MSB

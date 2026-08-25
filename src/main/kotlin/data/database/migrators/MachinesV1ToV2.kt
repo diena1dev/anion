@@ -1,5 +1,6 @@
-package dev.diena.anion.data.database
+package dev.diena.anion.data.database.migrators
 
+import dev.diena.anion.data.database.migrators.SchemaMigrator
 import org.rocksdb.ColumnFamilyHandle
 import org.rocksdb.RocksDB
 import org.rocksdb.WriteBatch
@@ -8,17 +9,7 @@ import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.DataInputStream
 import java.io.DataOutputStream
-
-object Migrators {
-
-	private val all: List<SchemaMigrator> = listOf(
-		MachinesV1ToV2,
-	)
-
-	fun find(cfName: String, from: Short, to: Short): SchemaMigrator? =
-		all.firstOrNull { it.columnFamily == cfName && it.fromVersion == from && it.toVersion == to }
-
-}
+import kotlin.use
 
 /**
  * Drops the world uuid from stored machines. Machines are only ever loaded through the `machine_chunks`

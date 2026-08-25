@@ -1,5 +1,8 @@
 package dev.diena.anion.data.database
 
+import dev.diena.anion.Tasks
+import dev.diena.anion.data.database.serializers.MachineSerializer
+import dev.diena.anion.data.database.serializers.StarshipSerializer
 import dev.diena.anion.features.machine.Machine
 import dev.diena.anion.features.machine.MachineIndex
 import dev.diena.anion.features.starship.Starship
@@ -17,9 +20,12 @@ object AnionPersistence {
 
 	private val NO_VALUE = ByteArray(0)
 
-	// Starship
+	///////////////
+	///// STARSHIPS
+	///////////////
 
 	fun saveStarship(uuid: UUID, ship: Starship) {
+
 		val batch = WriteBatch()
 		val key = uuidToBytes(uuid)
 		val worldUid = ship.level.world.uid
@@ -35,24 +41,29 @@ object AnionPersistence {
 
 		AnionDatabase.write(batch)
 		ship.dirty = false
+
 	}
 
 	fun loadStarship(uuid: UUID, world: ServerLevel): Starship? {
+
 		val bytes = AnionDatabase.get(AnionDatabase.starships, uuidToBytes(uuid)) ?: return null
 		return StarshipSerializer.deserialize(uuid, bytes, world)
+
 	}
 
 	fun unloadStarship(uuid: UUID) {
+
 		val ship = Starship.loadedStarships.remove(uuid) ?: return
 		saveStarship(uuid, ship)
 
-		// carried machines leave memory with their ship. detaching first is what makes them eligible
-		// for unloadMachine(), which refuses to drop anything still attached to a loaded ship — and
-		// their own chunk-unload event has already come and gone, so nothing else would collect them.
+		// carried machines leave memory with their ship, which is why we detach them first.
 		for (machine in ship.machines.detachAll()) unloadMachine(machine.uuid)
+
 	}
 
+	/** Drops the given [Starship] from the database. */
 	fun deleteStarship(uuid: UUID) {
+
 		val key = uuidToBytes(uuid)
 		val ship = Starship.loadedStarships.remove(uuid)
 
@@ -63,110 +74,112 @@ object AnionPersistence {
 
 		AnionDatabase.delete(AnionDatabase.starships, key)
 		ship?.machines?.detachAll()
+
 	}
 
 	/** Loads every starship whose origin falls in the given chunk, via the `starship_chunks` index. */
 	fun loadStarshipsForChunk(world: ServerLevel, chunkX: Int, chunkZ: Int) {
+
 		for (uuid in indexedUuids(AnionDatabase.starshipChunks, world.world.uid, chunkX, chunkZ)) {
 			if (Starship.loadedStarships.containsKey(uuid)) continue
 
 			val bytes = AnionDatabase.get(AnionDatabase.starships, uuidToBytes(uuid)) ?: continue
 			Starship.loadedStarships[uuid] = StarshipSerializer.deserialize(uuid, bytes, world)
 		}
+
 	}
 
-	// Machine
+	//////////////
+	///// MACHINES
+	//////////////
 
 	/** A machine already turned into bytes. Holds nothing live, so the writer thread may touch it. */
 	private class PendingWrite(val worldUid: UUID, val origin: Vec3i, val bytes: ByteArray)
 
-	/**
-	 * Snapshots waiting to be written, keyed by machine.
-	 *
-	 * Keyed rather than queued on purpose: a newer snapshot replaces an older one, so a four-thread
-	 * pool can never put a stale record down after a fresh one.
-	 */
+	/** Snapshots waiting to be written, keyed by machine. */
 	private val pendingMachines = ConcurrentHashMap<UUID, PendingWrite>()
 
-	/**
-	 * Snapshots [machine] for the writer. **Main thread only.**
-	 *
-	 * Serialising walks live buffer contents and the structure map, both plain collections the main
-	 * thread mutates — doing it off-thread raced them, and a ConcurrentModificationException here means
-	 * the save throws, `dirty` never clears, and the machine is silently never written again.
-	 */
+	/** Snapshots [machine] for the writer. */
 	fun saveMachine(uuid: UUID, machine: Machine) {
 
-		pendingMachines[uuid] = PendingWrite(
-			machine.level.world.uid,
-			machine.origin,
-			MachineSerializer.serialize(machine),
-		)
+		// guarantee thread safety
+		Tasks.runSync {
 
-		machine.dirty = false
+			pendingMachines[uuid] = PendingWrite(
+				machine.level.world.uid,
+				machine.origin,
+				MachineSerializer.serialize(machine),
+			)
+
+			machine.dirty = false
+		}
 
 	}
 
-	/** Writes every queued snapshot. Off-thread — it reads nothing but the bytes it was handed. */
+	/** Writes every queued snapshot. */
 	fun flushMachineWrites() {
 
 		if (pendingMachines.isEmpty()) return
 
-		val queued = pendingMachines.entries.iterator()
+		// guarantee async, since we're not touching any Bukkit or NMS code.
+		Tasks.runAsync {
 
-		while (queued.hasNext()) {
+			val queued = pendingMachines.entries.iterator()
 
-			val (uuid, pending) = queued.next()
-			queued.remove()
+			while (queued.hasNext()) {
 
-			val batch = WriteBatch()
-			val key = uuidToBytes(uuid)
+				val (uuid, pending) = queued.next()
+				queued.remove()
 
-			// drop the stale chunk row first — a carried machine's origin chunk changes as its ship moves
-			val previousOrigin = AnionDatabase.get(AnionDatabase.machines, key)?.let { MachineSerializer.readOrigin(it) }
-			if (previousOrigin != null) {
-				batch.delete(AnionDatabase.machineChunks, chunkIndexKey(pending.worldUid, previousOrigin, uuid))
+				val batch = WriteBatch()
+				val key = uuidToBytes(uuid)
+
+				// drop the stale chunk row first, as a carried machine's origin chunk changes as its ship moves.
+				val previousOrigin = AnionDatabase.get(AnionDatabase.machines, key)?.let { MachineSerializer.readOrigin(it) }
+				if (previousOrigin != null) {
+					batch.delete(AnionDatabase.machineChunks, chunkIndexKey(pending.worldUid, previousOrigin, uuid))
+				}
+
+				batch.put(AnionDatabase.machines, key, pending.bytes)
+				batch.put(AnionDatabase.machineChunks, chunkIndexKey(pending.worldUid, pending.origin, uuid), NO_VALUE)
+
+				AnionDatabase.write(batch)
+
 			}
-
-			batch.put(AnionDatabase.machines, key, pending.bytes)
-			batch.put(AnionDatabase.machineChunks, chunkIndexKey(pending.worldUid, pending.origin, uuid), NO_VALUE)
-
-			AnionDatabase.write(batch)
 
 		}
 
 	}
 
+	/** Loads a machine based on the provided [UUID] and [ServerLevel]. */
 	fun loadMachine(uuid: UUID, world: ServerLevel): Machine? {
+
 		val bytes = AnionDatabase.get(AnionDatabase.machines, uuidToBytes(uuid)) ?: return null
 		return MachineSerializer.deserialize(uuid, bytes, world)
+
 	}
 
-	/** Persists [uuid]'s machine and drops it from memory. The machine still exists, it is just not loaded. */
-	// deliberately does NOT run onDisassemble() — that hook means "this machine was destroyed".
+	/** Saves [uuid]'s machine and drops it from memory. */
 	// TODO: machines holding attached entities will need an onUnload() hook to shut them down here.
 	fun unloadMachine(uuid: UUID) {
-		val machine = Machine.activeMachines[uuid] ?: return
 
-		// a carried machine stays loaded as long as its ship is: ships unload on their own origin
-		// chunk, so this machine's chunk can go down while the ship keeps moving. dropping it here
-		// would freeze it at the origin it happened to have at unload time and save that.
+		val machine = Machine.activeMachines[uuid] ?: return
 		if (machine.starship != null) return
 
 		MachineIndex.unregister(machine)
 		Machine.activeMachines.remove(uuid)
 
-		// written before returning, not queued: the chunk can come back up inside the writer's next
-		// interval, and loadMachinesForChunk reads the database rather than the pending snapshots
 		saveMachine(uuid, machine)
 		flushMachineWrites()
+
 	}
 
-	/** Erases [uuid]'s machine. [level] is the world it was assembled in, needed to find its index row. */
+	/** Erases [uuid]'s machine. */
 	fun deleteMachine(uuid: UUID, level: ServerLevel) {
+
 		val key = uuidToBytes(uuid)
 
-		// a snapshot taken before the teardown would otherwise be written back afterwards
+		// a snapshot taken before the teardown would otherwise be written back afterward
 		pendingMachines.remove(uuid)
 
 		val storedOrigin = AnionDatabase.get(AnionDatabase.machines, key)?.let { MachineSerializer.readOrigin(it) }
@@ -176,33 +189,42 @@ object AnionPersistence {
 
 		AnionDatabase.delete(AnionDatabase.machines, key)
 		Machine.activeMachines.remove(uuid)
+
 	}
 
 	/** Loads every machine whose core block falls in the given chunk, via the `machine_chunks` index. */
 	fun loadMachinesForChunk(world: ServerLevel, chunkX: Int, chunkZ: Int) {
+
 		for (uuid in indexedUuids(AnionDatabase.machineChunks, world.world.uid, chunkX, chunkZ)) {
+
 			if (Machine.activeMachines.containsKey(uuid)) continue
 
 			// deserialize() registers the machine in activeMachines and claims its carrier ship
 			val bytes = AnionDatabase.get(AnionDatabase.machines, uuidToBytes(uuid)) ?: continue
 			MachineSerializer.deserialize(uuid, bytes, world)
+
 		}
+
 	}
 
 	/** Saves all in-memory dirty starships and machines. Called on plugin disable. */
 	fun flushAll() {
+
 		for ((uuid, ship) in Starship.loadedStarships) {
 			if (ship.dirty) saveStarship(uuid, ship)
 		}
+
 		for ((uuid, machine) in Machine.activeMachines) {
 			if (machine.dirty) saveMachine(uuid, machine)
 		}
 
-		// there is no later to write in — the task executor is about to be shut down
 		flushMachineWrites()
+
 	}
 
-	// Transport components
+	///////////////
+	///// TRANSPORT
+	///////////////
 
 	/** Records a transport component cell so a chunk load can find it again. */
 	fun saveTransportCell(worldUid: UUID, cell: Vec3i) {
@@ -365,7 +387,9 @@ object AnionPersistence {
 
 	}
 
-	// Key encoding
+	/////////////
+	///// HELPERS
+	/////////////
 
 	fun uuidToBytes(uuid: UUID): ByteArray =
 		ByteBuffer.allocate(16)
@@ -377,4 +401,5 @@ object AnionPersistence {
 		val buf = ByteBuffer.wrap(bytes)
 		return UUID(buf.long, buf.long)
 	}
+
 }

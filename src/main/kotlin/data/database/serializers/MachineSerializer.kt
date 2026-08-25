@@ -1,6 +1,7 @@
-package dev.diena.anion.data.database
+package dev.diena.anion.data.database.serializers
 
 import dev.diena.anion.Anion
+import dev.diena.anion.data.database.MACHINES_VERSION
 import dev.diena.anion.data.registry.AnionRegistryKey
 import dev.diena.anion.data.registry.registries.AnionRegistries
 import dev.diena.anion.extensions.quarterTurns
@@ -16,17 +17,12 @@ import java.util.logging.Level
 
 /**
  * Machines are stored per-instance in their own column family, keyed by machine uuid, and are found
- * by chunk through the `machine_chunks` index — exactly how [StarshipSerializer] handles ships.
- *
- * The world is not stored: a machine is only ever loaded through that index, whose key already carries
- * the world uuid, so the caller always knows which world it is restoring into.
- *
- * Carrier ships are deliberately not stored either — which ship owns a machine is fully derivable from
- * the ship's blockHashMap, so it is re-established on load by whichever of the two comes up second.
+ * by chunk through the `machine_chunks` index.
  */
 object MachineSerializer {
 
 	fun serialize(machine: Machine): ByteArray {
+
 		val baos = ByteArrayOutputStream()
 		val dos = DataOutputStream(baos)
 
@@ -52,15 +48,17 @@ object MachineSerializer {
 
 		dos.flush()
 		return baos.toByteArray()
+
 	}
 
-	/** null when the stored machine type is no longer registered — the entry is skipped, not dropped. */
+	/** null when the stored machine type is no longer registered, so the entry is skipped, not dropped. */
 	fun deserialize(uuid: UUID, bytes: ByteArray, world: ServerLevel): Machine? {
+
 		val dis = DataInputStream(ByteArrayInputStream(bytes))
 
 		val schemaVersion = dis.readShort()
 		check(schemaVersion == MACHINES_VERSION) {
-			"unsupported machine schema v$schemaVersion (code at v$MACHINES_VERSION)"
+			"unsupported machine schema v$schemaVersion (code at v${MACHINES_VERSION})"
 		}
 
 		val originX = dis.readInt()
@@ -81,14 +79,18 @@ object MachineSerializer {
 
 		val nbtLen = dis.readInt()
 		val nbtBytes = ByteArray(nbtLen)
+
 		dis.readFully(nbtBytes)
+
 		val tag = NbtIo.read(DataInputStream(ByteArrayInputStream(nbtBytes)))
 
 		return factory().load(uuid, world, origin, rotation, tag)
+
 	}
 
 	/** Reads the core block position out of a stored blob without deserializing the machine. */
 	fun readOrigin(bytes: ByteArray): Vec3i? {
+
 		return try {
 			val dis = DataInputStream(ByteArrayInputStream(bytes))
 			dis.readShort() // schema version
@@ -96,5 +98,7 @@ object MachineSerializer {
 		} catch (_: Exception) {
 			null
 		}
+
 	}
+
 }

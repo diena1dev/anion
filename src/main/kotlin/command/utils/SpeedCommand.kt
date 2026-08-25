@@ -20,6 +20,7 @@ import java.util.concurrent.CompletableFuture
 // <type> <speed>
 // <type> <speed> <player>
 
+// FIXME: brigadier direct since inferred permissions do not work properly
 @Command
 @Name("speed")
 @Permission("${Keys.COMMAND_PERMISSION_TREE}.speed")

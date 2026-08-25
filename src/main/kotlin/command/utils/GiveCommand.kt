@@ -19,7 +19,6 @@ import io.papermc.paper.command.brigadier.argument.ArgumentTypes
 import io.papermc.paper.command.brigadier.argument.CustomArgumentType
 import net.kyori.adventure.key.Key
 import net.kyori.adventure.key.Key.key
-import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.Component.text
 import org.bukkit.Registry
 import org.bukkit.entity.Player
@@ -30,20 +29,34 @@ import java.util.concurrent.CompletableFuture
 @Permission("${Keys.COMMAND_PERMISSION_TREE}.give")
 object GiveCommand {
 
-	/** FIXME: AnionItem/AnionBlock suggestion provider */
 	@Inferred
+	@Permission("${Keys.COMMAND_PERMISSION_TREE}.give.self")
 	fun self(
 
 		@Sender sender: Player, // require player
-		@CustomType(Item::class) itemKey: Key
+		@CustomType(Item::class) itemKey: Key,
+		amount: Int,
 
-	) {
+	) = give(sender, itemKey, amount)
 
-		fun fail() = sender.sendMessage(Component.text("ohnaurrrr we can't fwind the item sworry >w<"))
+	@Inferred
+	@Permission("${Keys.COMMAND_PERMISSION_TREE}.give.self")
+	fun self(
 
-		val stack = when (itemKey.namespace()) {
-			"minecraft" -> Registry.ITEM[itemKey]!!.createItemStack(1)
-			"anion" -> AnionRegistries.ITEM_REGISTRY.all[AnionRegistryKey(itemKey.value())]!!.asItemStack(1)
+		@Sender sender: Player, // require player
+		@CustomType(Item::class) itemKey: Key,
+		target: Player,
+		amount: Int,
+
+		) = give(sender, itemKey, amount, target)
+
+	// helper function
+	fun give(sender: Player, key: Key, amount: Int = 1, target: Player = sender) {
+		fun fail() = sender.sendMessage(text("ohnaurrrr we can't fwind the item sworry >w<"))
+
+		val stack = when (key.namespace()) {
+			"minecraft" -> Registry.ITEM[key]!!.createItemStack(amount)
+			"anion" -> AnionRegistries.ITEM_REGISTRY.all[AnionRegistryKey(key.value())]!!.asItemStack(1)
 			else -> {
 				fail()
 				return
@@ -51,15 +64,16 @@ object GiveCommand {
 		}
 
 		sender.sendMessage(
-			text("Gave 1 ")
-			.append(stack.displayName())
-			.append(Component.text(" to "))
-			.append(sender.displayName()))
-		sender.give(stack)
-
+			text("Gave $amount ")
+				.append(stack.displayName())
+				.append(text(" to "))
+				.append(target.displayName()))
+		target.give(stack)
 	}
+
 }
 
+// ~~stolen~~ borrowed from solarium's give command suggester
 object Item : CustomArgumentType<Key, Key> {
 	private val ITEM_DOES_NOT_EXIST_ERROR = DynamicCommandExceptionType { key ->
 		MessageComponentSerializer.message().serialize(text("\"$key\" does not exist!"))

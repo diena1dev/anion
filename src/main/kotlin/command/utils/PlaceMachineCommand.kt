@@ -1,4 +1,4 @@
-package dev.diena.anion.command.admin
+package dev.diena.anion.command.utils
 
 import com.mojang.brigadier.StringReader
 import com.mojang.brigadier.context.CommandContext
@@ -25,11 +25,12 @@ import net.kyori.adventure.text.Component.text
 import org.bukkit.entity.Player
 import org.bukkit.util.Vector
 import java.util.concurrent.CompletableFuture
+import kotlin.collections.iterator
 
 @Command
 @Name("placemachine")
 @Permission("${Keys.COMMAND_PERMISSION_TREE}.placemachine")
-object PlaceMachine {
+object PlaceMachineCommand {
 
 	@Inferred
 	fun self(

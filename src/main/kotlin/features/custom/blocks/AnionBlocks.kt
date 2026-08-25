@@ -125,8 +125,7 @@ object AnionBlocks {
 		)
 	)
 
-	// transport components. what each one does lives on its own class — see AnionTransportComponent.
-	// notes 13-15 are free, left over from when the pipe was six one-way facings.
+	// transport components. what each one does lives on its own class.
 	val ITEM_PIPE = registerPillarBlock(
 		AnionItemPipeBlock(
 			"Item Pipe",
@@ -155,7 +154,10 @@ object AnionBlocks {
 		)
 	)
 
-	// the data line itself is the vanilla chain — see AnionTransportComponents.byMaterial
+	// the data line is the vanilla chain, see: [AnionTransportComponents.byMaterial].
+	// TODO: create an AnionBlock component that owns a vanilla block and prevents mutation of it using the same listeners that AnionBlock relies upon.
+	//       the mindset behind such a feature would be to allow copper chains and their variants to be used as custom blocks directly....
+	//       which would leave al the waxed (default in Anion) variants open for building!
 	val DATA_JUNCTION = registerBlock(
 		AnionDataJunctionBlock(
 			"Data Junction",

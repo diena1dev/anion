@@ -1,4 +1,4 @@
-package dev.diena.anion.command.admin
+package dev.diena.anion.command.utils
 
 import dev.astralchroma.processor.annotations.Command
 import dev.astralchroma.processor.annotations.Name
@@ -8,16 +8,12 @@ import dev.astralchroma.processor.annotations.Subcommand
 import dev.diena.anion.Keys
 import dev.diena.anion.extensions.vec3i
 import dev.diena.anion.features.machine.Machine
-import dev.diena.anion.features.machine.examples.BlinkerMachine
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.TextColor
 import org.bukkit.Color
 import org.bukkit.craftbukkit.CraftWorld
 import org.bukkit.entity.Player
 
-// TODO: add permission nodes
-// the wrench and screwdriver do all of this in world now. these stay as the admin path: they reach
-// further, they name the machine type, and they work without the tools in hand.
 @Command
 @Name("machine")
 @Permission("${Keys.COMMAND_PERMISSION_TREE}.machine")
@@ -49,7 +45,7 @@ object MachineCommand {
 
 		// a block that completes two different structures at once is an ambiguity, not a coin flip
 		if (candidates.size > 1) {
-			sender.info("Machine ambiguity at $clicked: ${candidates.size} structures match. Break one apart.")
+			sender.info("Machine ambiguity at $clicked: ${candidates.size} structures match.")
 			return
 		}
 
@@ -57,7 +53,7 @@ object MachineCommand {
 		val machine = candidate.factory()
 			.assemble(level, candidate.origin, candidate.rotation)
 			?: run {
-				sender.info("Structure matched but could not be claimed — a port block already belongs to another machine.")
+				sender.info("A port block in the structure already belongs to another machine.")
 				return
 			}
 
@@ -88,7 +84,7 @@ object MachineCommand {
 	/** Empties a buffer onto the floor. The way out of loading the wrong resource into the wrong one. */
 	@Subcommand
 	@Permission("${Keys.COMMAND_PERMISSION_TREE}.clear")
-	fun clear(
+	fun clearBuffer(
 
 		@Sender sender: Player,
 		buffer: String,
@@ -108,7 +104,7 @@ object MachineCommand {
 			}
 
 			if (!store.spillable) {
-				sender.info("'$buffer' will not be dumped — disassemble the machine to empty it.")
+				sender.info("'$buffer' disassemble the machine to empty this buffer.")
 				continue
 			}
 
@@ -137,6 +133,10 @@ object MachineCommand {
 		}
 
 	}
+
+	/////////////
+	///// HELPERS
+	/////////////
 
 	/** Every machine holding the block the sender is looking at, or null once the sender has been told why not. */
 	private fun machinesAt(sender: Player): List<Machine>? {

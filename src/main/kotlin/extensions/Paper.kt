@@ -51,7 +51,6 @@ inline fun <reified E: Entity> Location.spawn(
 	noinline function: (entity: E) -> Unit,
 ): E = world.spawn(this, reason, function)
 
-@Suppress("UnstableApiUsage")
 fun ItemStack.toAnionItem(): AnionItem? {
 	val model: Key = getData(DataComponentTypes.ITEM_MODEL) ?: return null
 	return AnionRegistries.ITEM_REGISTRY.getValue(AnionRegistryKey(model.value()))
@@ -59,14 +58,14 @@ fun ItemStack.toAnionItem(): AnionItem? {
 
 @Experimental
 inline operator fun <T : Any> ItemStack.set(
-	@Suppress("UnstableApiUsage") component: DataComponentType.Valued<T>,
+	component: DataComponentType.Valued<T>,
 	value: T
-) = @Suppress("UnstableApiUsage") setData(component, value)
+) = setData(component, value)
 
 @Experimental
 inline operator fun<T : Any> ItemStack.get(
-	@Suppress("UnstableApiUsage") component: DataComponentType.Valued<T>,
-): T? = @Suppress("UnstableApiUsage") getData(component)
+	component: DataComponentType.Valued<T>,
+): T? = getData(component)
 
 inline operator fun Location.plus(other: Vector) = add(other)
 inline operator fun Location.plusAssign(other: Vector) { add(other) }
@@ -170,7 +169,7 @@ fun BlockFace.rotateLeft() = when (this) {
 	else -> throw NotImplementedError("non-cartesian faces are not supported")
 }
 
-/** Quantises a yaw in degrees down to the cardinal face it currently reads as. */
+/** Quantizes a yaw in degrees down to the cardinal face it currently reads as. */
 // NOTE: the bounds overlap, so an exact 90/180/270 resolves to the lower face. preserved from the
 // three private copies this replaced — do not "fix" it without checking the rotation path still lines up.
 fun Double.toFace(): BlockFace = when (this) {
@@ -201,7 +200,7 @@ inline fun Vec3i.rotate(rotation: Rotation): Vec3i =
 		Rotation.NONE -> this
 	}
 
-/** Rotate [point] around [origin] by [rotation]. */
+/** Rotate the given [Vec3i] around [origin] by [rotation]. */
 fun Vec3i.rotateAround(origin: Vec3i, rotation: Rotation): Vec3i {
 	val relative = this - origin
 	return origin + relative.rotate(rotation)
@@ -378,12 +377,14 @@ fun Inventory.pushItem(key: ItemKey, units: Long): Long {
 
 /** the six cartesian faces, in the order everything that walks a grid should use */
 val CARTESIAN_FACES = listOf(
+
 	BlockFace.NORTH,
 	BlockFace.EAST,
 	BlockFace.SOUTH,
 	BlockFace.WEST,
 	BlockFace.UP,
 	BlockFace.DOWN,
+
 )
 
 inline val BlockFace.vec3i get() = Vec3i(modX, modY, modZ)
@@ -426,12 +427,7 @@ fun Axis.rotated(rotation: Rotation): Axis = when (rotation) {
 
 }
 
-/**
- * Rotates this block state, including the part vanilla cannot do for us.
- *
- * A note block has no rotatable property, and an [AnionPillarBlock] keeps its axis in the note, so
- * plain [BlockState.rotate] leaves a pipe lying the way it was before the ship turned.
- */
+/** Rotates this block state, including the part vanilla cannot do for us. */
 fun BlockState.rotateWithAnion(rotation: Rotation): BlockState {
 
 	val rotated = this.rotate(rotation)

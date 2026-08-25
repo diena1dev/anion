@@ -12,7 +12,6 @@ import org.bukkit.Color
 import org.bukkit.FireworkEffect
 import org.bukkit.entity.Firework
 import org.bukkit.entity.Player
-import org.bukkit.inventory.meta.FireworkMeta
 
 /** Horizon's End uses the `/usa` command as an alias to `/unsetall`, which is lame. >:3 */
 @Command
