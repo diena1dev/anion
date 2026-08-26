@@ -17,9 +17,11 @@ enum class DcMode {
 
 }
 
-/** One `set [input] to [target:function] mode [mode]` line, compiled. */
+/** One `set <expression> to [target:function] mode [mode]` line, compiled. */
 data class DcBinding(
 
+	/** what drives this binding */
+	val source: DcExpr,
 	/** a group name or a machine name */
 	val target: String,
 	val function: String,
@@ -27,24 +29,34 @@ data class DcBinding(
 
 )
 
-/** A compiled `main.dcprgm`: what each of its machine's inputs does. */
-class DcProgram(private val bindingsByInput: Map<String, List<DcBinding>>) {
+/** A compiled `main.dcprgm`: what its machine's inputs do. */
+class DcProgram(private val bindings: List<DcBinding>) {
 
 	companion object {
 
-		val EMPTY = DcProgram(emptyMap())
+		val EMPTY = DcProgram(emptyList())
 
 	}
 
-	/** inputs this program actually binds. everything else the machine emits is unused. */
-	val boundInputs: Set<String> get() = bindingsByInput.keys
+	/** inputs this program actually reads. everything else the machine emits is unused. */
+	val boundInputs: Set<String> = bindings.flatMapTo(mutableSetOf()) { it.source.inputs }
 
-	fun bindingsFor(input: String): List<DcBinding> = bindingsByInput[input].orEmpty()
+	/** what one evaluation of every binding costs. what a mainframe's compute budget is charged. */
+	val cost: Int = bindings.sumOf { it.source.cost }
+
+	// built once: the runtime hits this every time an input changes
+	private val bindingsByInput: Map<String, List<DcBinding>> =
+		boundInputs.associateWith { input -> bindings.filter { input in it.source.inputs } }
+
+	/** every binding whose expression reads [input]. */
+	fun bindingsReading(input: String): List<DcBinding> = bindingsByInput[input].orEmpty()
+
+	/** every binding driven by exactly [source] in [mode] — one latch's worth. */
+	fun bindingsDrivenBy(source: DcExpr, mode: DcMode): List<DcBinding> =
+		bindings.filter { it.source == source && it.mode == mode }
 
 	fun describe(): List<String> =
-		bindingsByInput.entries.flatMap { (input, bindings) ->
-			bindings.map { "$input -> ${it.target}:${it.function} [${it.mode.name.lowercase()}]" }
-		}
+		bindings.map { "${it.source} -> ${it.target}:${it.function} [${it.mode.name.lowercase()}]" }
 
 }
 

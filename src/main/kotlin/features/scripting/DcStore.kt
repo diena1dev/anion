@@ -177,12 +177,26 @@ class DcStore private constructor(private val mainframe: MainframeMachine) {
 
 		val emitter = mainframe.machineNamed(machineName) as? DcProgrammable
 
-		return DcParser.parseProgram(
+		val result = DcParser.parseProgram(
 			source,
 			emitter?.dataInputs?.toSet(), // null while it is unplugged: its inputs go unchecked
 			groups,
 			mainframe.machineNames,
 		) { name -> (mainframe.machineNamed(name) as? DcProgrammable)?.dataFunctions?.toSet() }
+
+		// over budget is a warning, never an error: browning out mid-flight is the mechanic, and refusing
+		// the save would take the decision off the pilot. line 0 means the file rather than a statement.
+		val limit = mainframe.budget.limit
+		if (result is DcResult.Ok && result.value.cost > limit) {
+
+			return DcResult.Ok(
+				result.value,
+				result.warnings + DcIssue(0, "costs ${result.value.cost} of $limit compute | this mainframe will trip if it all fires at once"),
+			)
+
+		}
+
+		return result
 
 	}
 

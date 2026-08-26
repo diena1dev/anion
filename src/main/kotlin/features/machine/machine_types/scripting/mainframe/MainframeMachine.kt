@@ -1,10 +1,12 @@
 package dev.diena.anion.features.machine.machine_types.scripting.mainframe
 
+import dev.diena.anion.Anion
 import dev.diena.anion.features.custom.blocks.AnionBlocks
 import dev.diena.anion.features.machine.BlockSet
 import dev.diena.anion.features.machine.Machine
 import dev.diena.anion.features.machine.component.MachineSign
 import dev.diena.anion.features.machine.machine_types.PortedMachine
+import dev.diena.anion.features.scripting.DcBudget
 import dev.diena.anion.features.scripting.DcGroups
 import dev.diena.anion.features.scripting.DcProgram
 import dev.diena.anion.features.scripting.DcRuntime
@@ -65,11 +67,16 @@ class MainframeMachine : PortedMachine("Mainframe", MAINFRAME_STRUCTURE) {
 		/** what a machine name is allowed to look like, so a rename cannot produce something unparseable */
 		private val NAME_PATTERN = Regex("[a-z0-9_]+")
 
+		/** dclang operations this mainframe may spend per tick */
+		// TODO: scale with a mainframe tier once there is more than one mainframe
+		const val COMPUTE_BUDGET = 256
+
 	}
 
 	val store: DcStore = DcStore.new(this)
 	val runtime: DcRuntime = DcRuntime.new(this)
 	val console: MainframeConsole = MainframeConsole.new(this)
+	val budget: DcBudget = DcBudget.new(COMPUTE_BUDGET)
 
 	/** every name this mainframe has handed out, and what it was given to. names are never reused. */
 	// kept for machines that have been unplugged, so their file survives being rewired
@@ -102,6 +109,16 @@ class MainframeMachine : PortedMachine("Mainframe", MAINFRAME_STRUCTURE) {
 	/** Files changed, so the mainframe owes the database a write. */
 	internal fun markProgramsDirty() = markDirty()
 
+	/** The runtime blew this mainframe's compute budget and let go of everything it was driving. */
+	internal fun reportOverrun() {
+
+		Anion.plugin.logger.warning(
+			"[dcprgm] '${nameOf(this) ?: uuid}' compute overrun at ${budget.peak}/${budget.limit} ops, " +
+			"rebooting for ${DcBudget.REBOOT_TICKS} ticks"
+		)
+
+	}
+
 	// dispatch happens on the emitting machine's tick, so a mainframe with nothing to walk does nothing
 	override fun tick() {
 	}
@@ -117,6 +134,7 @@ class MainframeMachine : PortedMachine("Mainframe", MAINFRAME_STRUCTURE) {
 		super.onAssemble()
 
 		MachineSign.seal(this)
+		budget.reset() // a freshly assembled mainframe is not still rebooting from its last life
 		store.recompile()
 		console.render()
 
@@ -171,6 +189,8 @@ class MainframeMachine : PortedMachine("Mainframe", MAINFRAME_STRUCTURE) {
 		val lines = mutableListOf<String>()
 
 		lines += "attached=${attached.size} online=${online.size}"
+		lines += if (budget.tripped) "compute: TRIPPED, ${budget.rebootRemaining} ticks to reboot (peak ${budget.peak}/${budget.limit})"
+			else "compute: ${budget.spent}/${budget.limit} this tick, peak ${budget.peak}"
 
 		for ((machineName, uuid) in attached) {
 

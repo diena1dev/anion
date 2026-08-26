@@ -155,23 +155,34 @@ Small machine, `DcProgrammable` with `dataInputs` = the readme's input list.
 
 ```
 DcProgrammable.kt   capability interface (above)
+DcExpr.kt           DcValue, the DcOperators table, and the compiled expression tree
 DcParser.kt         source text -> DcProgram | List<DcError>
-DcProgram.kt        compiled: Map<inputName, List<DcBinding>>; DcBinding(target, function, mode)
+DcProgram.kt        compiled: List<DcBinding>, indexed by input; DcBinding(source, target, function, mode)
 DcGroups.kt         compiled groups.dcprgm: Map<groupName, Set<machineName>>
-DcRuntime.kt        latch/hold state per (machine, input); resolves a binding to live machines and invokes
+DcRuntime.kt        latch/hold state per (machine, expression, mode); resolves a binding and invokes
 DcStore.kt          per-mainframe file store: read, write, compile-on-save, report errors
 ```
 
-### Grammar (v0.1, complete)
+### Grammar (v0.2)
 
 ```
 // comment
 def_group [name]
 set [a] and [b] in [group1] and [group2]        // cross product, per the readme
-set [input] to [target:function] mode [toggle|hold]
+set <expression> to [target:function] mode [toggle|hold]
+
+expression := [input] | <prefix> expression | expression <infix> expression
 ```
 
 `target` is a group name or a machine name. All identifiers are bracketed. Statement per line.
+
+Operators live in `DcOperators` and nowhere else — a new one is one entry in that table, and the parser,
+the evaluator and the cost model all read it from there. v0.2 ships `not` (prefix), `and` and `or`
+(infix, `and` binding tighter). Arithmetic slots in above `and` when values stop being only 0 and 1.
+
+**`and` means two different things by position, deliberately.** On the input side of a program's `set` it
+is boolean conjunction. In `groups.dcprgm`, and on the target side of `to`, it is still the readme's list
+separator — names are not booleans, so there is nothing there to conjoin.
 
 ### Compile
 
@@ -182,7 +193,8 @@ machine does not have is a runtime no-op plus a warning (decision 12).
 
 ### Runtime
 
-`DcRuntime` holds, per mainframe, the mode state for every bound input:
+`DcRuntime` holds, per mainframe, the last reported value of every input on every machine (an expression
+needs the inputs that did **not** change this tick), and the mode state per `(machine, expression, mode)`:
 
 - `hold` — `invoke(fn, true)` every tick the key is down, one `invoke(fn, false)` on release.
 - `toggle` — a press flips a latched bool, subject to a **5 tick cooldown**; while latched on, the value is
@@ -193,6 +205,24 @@ machine does not have is a runtime no-op plus a warning (decision 12).
 Dispatch resolves a binding's target through `DcGroups` to a set of names, each name through
 `MainframeMachine.attached` to a live `Machine`, and calls `invoke` on the ones that are `DcProgrammable`.
 Offline or missing machines are skipped silently; a live machine missing the function warns.
+
+### Compute budget
+
+A mainframe spends `MainframeMachine.COMPUTE_BUDGET` dclang operations per tick, charged in `DcBudget`:
+`DcExpr.cost` per expression evaluated, plus one per machine a binding fans out to. **Operations, never
+milliseconds** — a program that trips has to trip on the same tick on every server, or an overrun is a bug
+report rather than something a pilot can learn to fly around.
+
+Overrunning **trips** the mainframe: everything currently delivering is released (latches included, unlike
+`release()`), the latch table and the input cache are dropped, and it dispatches nothing for
+`DcBudget.REBOOT_TICKS`. Releasing on the way out is the point — a tick that stops halfway leaves `hold`
+bindings that were on without their `false`, which welds a throttle open with no way to close it.
+
+The allowance rolls over on first charge of a tick rather than on the mainframe's own `tick()`, because
+machines tick in no defined order and the emitting machine may run first.
+
+Going over budget is a **compile warning, not an error**. Saving a program that might trip is the pilot's
+call; a ship browning out mid-fight is a mechanic, not a failure to be prevented at the editor.
 
 ---
 

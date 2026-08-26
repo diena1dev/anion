@@ -22,8 +22,8 @@ class DcRuntime private constructor(private val mainframe: MainframeMachine) {
 
 	}
 
-	/** mode state is per input per mode: two bindings on one key in one mode share a latch. */
-	private data class StateKey(val machineName: String, val input: String, val mode: DcMode)
+	/** mode state is per expression per mode: two bindings on one expression in one mode share a latch. */
+	private data class StateKey(val machineName: String, val source: DcExpr, val mode: DcMode)
 
 	private class InputState {
 
@@ -36,29 +36,59 @@ class DcRuntime private constructor(private val mainframe: MainframeMachine) {
 
 	private val states: MutableMap<StateKey, InputState> = mutableMapOf()
 
+	/** last reported value of every input, per machine. an expression needs the ones that did not change. */
+	private val inputValues: MutableMap<String, MutableMap<String, DcValue>> = mutableMapOf()
+
 	/** calls already reported as unimplemented, so a bad binding warns once instead of every tick */
 	private val warned: MutableSet<String> = mutableSetOf()
 
 	/** Reports what [input] on [machineName] is doing this tick, and delivers whatever that drives. */
-	fun input(machineName: String, input: String, down: Boolean) {
+	fun input(machineName: String, input: String, down: Boolean) = input(machineName, input, DcValue.of(down))
+
+	/** Reports [input]'s value on [machineName] this tick, and delivers whatever that drives. */
+	fun input(machineName: String, input: String, value: DcValue) {
+
+		if (mainframe.budget.tripped) return
 
 		val program = mainframe.programOf(machineName) ?: return
 
-		val bindings = program.bindingsFor(input)
-		if (bindings.isEmpty()) return
+		val values = inputValues.getOrPut(machineName) { seed(machineName) }
+		values[input] = value
 
-		for ((mode, boundInMode) in bindings.groupBy { it.mode }) {
+		// bindings sharing an expression and a mode share a latch, so they resolve once and deliver together.
+		// groupBy keeps encounter order, so an overrun always drops the same statements — a pilot can only
+		// learn to fly around a failure that lands in the same place every time.
+		val affected = program.bindingsReading(input).groupBy { StateKey(machineName, it.source, it.mode) }
 
-			val state = states.getOrPut(StateKey(machineName, input, mode)) { InputState() }
-			val active = resolve(state, mode, down)
+		for ((key, boundToExpression) in affected) {
 
-			// an input that is off and was already off has nothing to say
+			if (!spend(key.source.cost)) return
+
+			val state = states.getOrPut(key) { InputState() }
+			val active = resolve(state, key.mode, key.source.evaluate { values[it] ?: DcValue.FALSE }.truthy)
+
+			// an expression that is off and was already off has nothing to say
 			if (!active && !state.delivering) continue
 
-			for (binding in boundInMode) deliver(binding, active)
+			for (binding in boundToExpression) {
+
+				if (!spend(mainframe.groups.membersOf(binding.target).size)) return
+				deliver(binding, active)
+
+			}
+
 			state.delivering = active
 
 		}
+
+	}
+
+	/** Every input [machineName] emits, at zero. `not [x]` has to read false before x is ever reported. */
+	private fun seed(machineName: String): MutableMap<String, DcValue> {
+
+		val emitter = mainframe.machineNamed(machineName) as? DcProgrammable ?: return mutableMapOf()
+
+		return emitter.dataInputs.associateWithTo(mutableMapOf()) { DcValue.FALSE }
 
 	}
 
@@ -66,6 +96,9 @@ class DcRuntime private constructor(private val mainframe: MainframeMachine) {
 	fun release(machineName: String) {
 
 		val program = mainframe.programOf(machineName) ?: return
+
+		// expressions read the cache, not the latch state, so the inputs themselves have to go quiet
+		inputValues[machineName]?.replaceAll { _, _ -> DcValue.FALSE }
 
 		for ((key, state) in states) {
 
@@ -80,9 +113,7 @@ class DcRuntime private constructor(private val mainframe: MainframeMachine) {
 
 			if (!state.delivering) continue
 
-			for (binding in program.bindingsFor(key.input)) {
-				if (binding.mode == key.mode) deliver(binding, false)
-			}
+			for (binding in program.bindingsDrivenBy(key.source, key.mode)) deliver(binding, false)
 
 			state.delivering = false
 
@@ -94,6 +125,7 @@ class DcRuntime private constructor(private val mainframe: MainframeMachine) {
 	fun forget(machineName: String) {
 
 		states.keys.removeIf { it.machineName == machineName }
+		inputValues.remove(machineName)
 
 	}
 
@@ -115,6 +147,44 @@ class DcRuntime private constructor(private val mainframe: MainframeMachine) {
 		}
 
 		return state.latched
+
+	}
+
+	/**
+	 * Charges [operations] to the mainframe's budget. On an overrun it trips the mainframe and returns
+	 * false, which is the caller's cue to stop dispatching.
+	 */
+	private fun spend(operations: Int): Boolean {
+
+		if (mainframe.budget.charge(operations)) return true
+
+		trip()
+		return false
+
+	}
+
+	/** Takes the mainframe down, letting go of everything it was driving on the way out. */
+	// a half-delivered tick welds thrusters on, so everything still delivering is released — latches
+	// included, which is what makes this different from release()
+	private fun trip() {
+
+		mainframe.budget.trip()
+
+		for ((key, state) in states) {
+
+			if (!state.delivering) continue
+
+			val program = mainframe.programOf(key.machineName) ?: continue
+
+			// shutdown is never charged: a mainframe that cannot afford to let go is a stuck throttle
+			for (binding in program.bindingsDrivenBy(key.source, key.mode)) deliver(binding, false)
+
+		}
+
+		states.clear()
+		inputValues.clear()
+
+		mainframe.reportOverrun()
 
 	}
 

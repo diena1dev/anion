@@ -1,16 +1,18 @@
 package dev.diena.anion.features.scripting
 
 /**
- * dclang v0.1. Four statements, one per line, every identifier bracketed:
+ * dclang v0.2. Four statements, one per line, every identifier bracketed:
  *
  * ```
  * // comment
  * def_group [name]
  * set [machine] and [machine] in [group] and [group]
- * set [input] and [input] to [target:function] and [target:function] mode [toggle|hold]
+ * set [input] and not [input] to [target:function] and [target:function] mode [toggle|hold]
  * ```
  *
- * `and` chains both sides of a `set` into a cross product, so one line can write four bindings.
+ * The input side of a program's `set` is a boolean expression over [DcOperators]; `and` there means
+ * both at once, not both separately. In `groups.dcprgm` and on the target side of `to`, `and` is still
+ * a list separator chaining a cross product, because names are not booleans.
  *
  * The editor draws a header above the program (`--- editing ... ---`, `| available inputs: ...`).
  * Those lines are skipped rather than rejected, so handing the whole buffer back still compiles.
@@ -121,7 +123,7 @@ object DcParser {
 
 		val errors = mutableListOf<DcIssue>()
 		val warnings = mutableListOf<DcIssue>()
-		val bindings = mutableMapOf<String, MutableList<DcBinding>>()
+		val bindings = mutableListOf<DcBinding>()
 
 		for ((line, words) in statements(source)) {
 
@@ -130,13 +132,13 @@ object DcParser {
 				continue
 			}
 
-			val inputs = readList(words, 1)
+			val inputs = readExpr(words, 1)
 			if (inputs == null) {
-				errors += DcIssue(line, "expected a bracketed input name after `set`")
+				errors += DcIssue(line, "expected an input expression after `set`, e.g. `set [w] and not [sh]`")
 				continue
 			}
 
-			val (inputNames, afterInputs) = inputs
+			val (expression, afterInputs) = inputs
 
 			if (words.getOrNull(afterInputs) != "to") {
 				errors += DcIssue(line, "expected `to` after the input being bound")
@@ -168,7 +170,7 @@ object DcParser {
 				continue
 			}
 
-			if (availableInputs != null) for (inputName in inputNames) {
+			if (availableInputs != null) for (inputName in expression.inputs) {
 				if (inputName !in availableInputs) errors += DcIssue(line, "'$inputName' is not an input this machine emits")
 			}
 
@@ -197,9 +199,7 @@ object DcParser {
 
 				}
 
-				for (inputName in inputNames) {
-					bindings.getOrPut(inputName) { mutableListOf() } += DcBinding(target, function, mode)
-				}
+				bindings += DcBinding(expression, target, function, mode)
 
 			}
 
@@ -207,7 +207,7 @@ object DcParser {
 
 		if (errors.isNotEmpty()) return DcResult.Failed(errors)
 
-		return DcResult.Ok(DcProgram(bindings.mapValues { it.value.toList() }), warnings)
+		return DcResult.Ok(DcProgram(bindings), warnings)
 
 	}
 
@@ -239,6 +239,51 @@ object DcParser {
 		if (!word.startsWith('[') || !word.endsWith(']')) return null
 
 		return word.substring(1, word.length - 1)
+
+	}
+
+	/**
+	 * Reads an expression from [start] by precedence climbing over [DcOperators]. Returns it and where
+	 * it stopped — on the first word that is not an operator, which is how `to` and `mode` survive.
+	 *
+	 * [minPrecedence] is the tightest binding this call will accept; callers start at 0.
+	 */
+	private fun readExpr(words: List<String>, start: Int, minPrecedence: Int = 0): Pair<DcExpr, Int>? {
+
+		var (left, cursor) = readUnary(words, start) ?: return null
+
+		while (true) {
+
+			val operator = words.getOrNull(cursor)?.let { DcOperators.infixFor(it) } ?: break
+			if (operator.precedence < minPrecedence) break
+
+			// left-associative: the right operand may only take operators that bind tighter than this one
+			val (right, next) = readExpr(words, cursor + 1, operator.precedence + 1) ?: return null
+
+			left = DcExpr.Binary(operator, left, right)
+			cursor = next
+
+		}
+
+		return left to cursor
+
+	}
+
+	/** A prefix operator applied to whatever follows it, or a bare `[input]`. */
+	private fun readUnary(words: List<String>, start: Int): Pair<DcExpr, Int>? {
+
+		val word = words.getOrNull(start) ?: return null
+
+		val operator = DcOperators.prefixFor(word)
+		if (operator != null) {
+
+			val (operand, cursor) = readUnary(words, start + 1) ?: return null
+			return DcExpr.Unary(operator, operand) to cursor
+
+		}
+
+		val name = unwrap(word) ?: return null
+		return DcExpr.Input(name) to start + 1
 
 	}
 

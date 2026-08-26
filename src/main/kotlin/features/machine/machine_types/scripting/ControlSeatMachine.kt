@@ -114,6 +114,17 @@ class ControlSeatMachine : PortedMachine("Control Seat", CONTROL_SEAT_STRUCTURE)
 		val mainframe = this.mainframe ?: return
 		val seatName = mainframe.nameOf(this) ?: return
 
+		// the pilot is owed an explanation for controls that just went dead
+		if (mainframe.budget.tripped) {
+
+			player.sendActionBar(
+				Component.text("MAINFRAME OVERRUN | rebooting in ${mainframe.budget.rebootRemaining / 20 + 1}s")
+					.color(NamedTextColor.RED)
+			)
+			return
+
+		}
+
 		for ((inputName, down) in inputStates(player.currentInput)) {
 			mainframe.runtime.input(seatName, inputName, down)
 		}
