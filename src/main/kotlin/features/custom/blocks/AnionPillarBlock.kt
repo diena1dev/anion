@@ -101,6 +101,13 @@ open class AnionPillarBlock(
 
 	}
 
+	/** A fresh pillar lies along the axis its placement implies. */
+	override fun noteOnPlacement(block: Block, clickedFace: BlockFace?, player: Player?): Int? =
+		noteFor(axisFor(clickedFace))
+
+	override fun stateVariants(): Map<Int, Pair<Int, Int>> =
+		notesByAxis.entries.associate { (axis, note) -> note to modelRotation(axis) }
+
 	/**
 	 * Blockstate model rotation for [axis], as `x` to `y` degrees. Assumes the model stands on Y,
 	 * matching vanilla's own convention for pillars.

@@ -5,11 +5,9 @@ import dev.astralchroma.processor.annotations.Register
 import dev.diena.anion.data.registry.AnionRegistryKey
 import dev.diena.anion.data.registry.registries.AnionRegistries
 import dev.diena.anion.extensions.toAnionItem
-import dev.diena.anion.extensions.axis
 import dev.diena.anion.extensions.vec3i
 import dev.diena.anion.features.custom.blocks.AnionBlock
 import dev.diena.anion.features.custom.blocks.AnionBlocks
-import dev.diena.anion.features.custom.blocks.AnionPillarBlock
 import dev.diena.anion.features.custom.items.AnionBlockItem
 import dev.diena.anion.features.machine.MachineIndex
 import dev.diena.anion.features.starship.Starship
@@ -22,7 +20,6 @@ import net.minecraft.world.InteractionHand
 import net.minecraft.world.item.context.UseOnContext
 import net.minecraft.world.phys.BlockHitResult
 import net.minecraft.world.phys.Vec3
-import org.bukkit.Axis
 import org.bukkit.GameMode
 import org.bukkit.Material
 import org.bukkit.Note
@@ -132,11 +129,17 @@ object AnionBlockListeners : Listener {
 
 	}
 
-	/** Lays a freshly placed pillar block along the axis the placement implies. */
-	private fun layOnPlacement(block: Block, pillar: AnionPillarBlock, event: BlockPlaceEvent) {
+	/** Turns a freshly placed block to whatever orientation its own type says the placement implies. */
+	// which orientations exist, and how a click maps onto one, is the block's business — a pillar lies
+	// along an axis and a directional block points a face, and neither is named here
+	private fun orientOnPlacement(block: Block, anionBlock: AnionBlock, event: BlockPlaceEvent) {
 
-		val note = pillar.noteFor(placementAxis(pillar, event)) ?: return
+		val clickedFace = lastClickedFace[event.player] ?: event.blockAgainst.getFace(event.blockPlaced)
+
+		val note = anionBlock.noteOnPlacement(block, clickedFace, event.player) ?: return
 		val data = noteData(block) ?: return
+
+		if (data.note.id.toInt() == note) return
 
 		data.note = Note(note)
 		block.setBlockData(data, false) // no physics: the note swap is not a world change worth firing on
@@ -145,14 +148,6 @@ object AnionBlockListeners : Listener {
 
 	/** The face each player last clicked, since [BlockPlaceEvent] does not carry one. */
 	private val lastClickedFace = WeakHashMap<Player, BlockFace>()
-
-	/** The axis a pillar lands on: the one running out of the face that was clicked. */
-	private fun placementAxis(pillar: AnionPillarBlock, event: BlockPlaceEvent): Axis {
-
-		val clickedFace = lastClickedFace[event.player] ?: event.blockAgainst.getFace(event.blockPlaced)
-		return pillar.axisFor(clickedFace)
-
-	}
 
 	// helpers endregion
 
@@ -184,7 +179,7 @@ object AnionBlockListeners : Listener {
 
 		val anionBlock = anionBlockAt(block) ?: return
 
-		if (anionBlock is AnionPillarBlock) layOnPlacement(block, anionBlock, event)
+		orientOnPlacement(block, anionBlock, event)
 
 		anionBlock.onPlace(block, event.player)
 	}

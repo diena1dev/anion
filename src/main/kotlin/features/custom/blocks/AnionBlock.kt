@@ -9,6 +9,7 @@ import org.bukkit.NamespacedKey
 import org.bukkit.SoundGroup
 import org.bukkit.Note
 import org.bukkit.block.Block
+import org.bukkit.block.BlockFace
 import org.bukkit.block.BlockState
 import org.bukkit.block.BlockType
 import org.bukkit.block.data.type.NoteBlock
@@ -55,6 +56,20 @@ open class AnionBlock(
 
 	/** The note this block should carry after [rotation]. Defaults to unchanged. */
 	open fun noteAfterRotation(note: Int, rotation: Rotation): Int = note
+
+	/**
+	 * The note a fresh placement should be restated to, or null to leave it as the item placed it.
+	 *
+	 * [clickedFace] is the face of the block that was built against. A block with one orientation has
+	 * nothing to decide; one with several answers here rather than being special-cased by the listener.
+	 */
+	open fun noteOnPlacement(block: Block, clickedFace: BlockFace?, player: Player?): Int? = null
+
+	/**
+	 * Every note this block occupies, and the `x` to `y` model spin the resource pack should give each
+	 * one. A block with a single orientation occupies exactly its own note, unrotated.
+	 */
+	open fun stateVariants(): Map<Int, Pair<Int, Int>> = mapOf(note to (0 to 0))
 
 	open fun onPlace(block: Block, player: Player?) { placeHandler?.invoke(block, player) }
 	open fun onBreak(block: Block, player: Player?) { breakHandler?.invoke(block, player) }

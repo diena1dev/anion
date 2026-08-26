@@ -12,7 +12,6 @@ import org.bukkit.craftbukkit.block.data.CraftBlockData
 import java.io.File
 import java.util.Base64
 
-// FIXME: un-jank this so it consistently generates clean resource packs.
 /** Iterates all registered AnionItems and AnionBlocks and produces a resource pack with generated model files. */
 class AnionResourcePackDatagen(private val outputDir: File) {
 
@@ -208,16 +207,9 @@ class AnionResourcePackDatagen(private val outputDir: File) {
 			val nmsInstrument = CraftBlockData.toVanilla(block.instrument, NoteBlockInstrument::class.java)
 			val model = "anion:block/${block.namespacedKey.key}"
 
-			if (block is AnionPillarBlock) {
-
-				for ((axis, note) in block.notesByAxis) {
-					anionStateModels[nmsInstrument.serializedName to note] = model to block.modelRotation(axis)
-				}
-
-			} else {
-
-				anionStateModels[nmsInstrument.serializedName to block.note] = model to (0 to 0)
-
+			// a block owns however many notes its orientations need, and the spin each one wants
+			for ((note, rotation) in block.stateVariants()) {
+				anionStateModels[nmsInstrument.serializedName to note] = model to rotation
 			}
 
 		}
