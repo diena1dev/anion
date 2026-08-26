@@ -7,7 +7,10 @@ enum class DcMode {
 	HOLD,
 
 	/** a press flips a latched value, which stays where it was put */
-	TOGGLE;
+	TOGGLE,
+
+	/** one signal per press, however long the press lasts. re-arms when the input goes back off */
+	PUSH;
 
 	companion object {
 

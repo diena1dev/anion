@@ -8,6 +8,7 @@ import dev.diena.anion.features.machine.BlockSet
 import dev.diena.anion.features.machine.Machine
 import dev.diena.anion.features.machine.machine_types.thrusters.ThrusterThrottle
 import dev.diena.anion.features.scripting.DcProgrammable
+import dev.diena.anion.features.scripting.DcType
 import net.minecraft.core.Vec3i
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.world.phys.Vec3
@@ -60,7 +61,8 @@ class DebugThrusterHorizontal() : Machine("debug_thruster_horizontal", DEBUG_THR
 	private val controls = ThrusterThrottle.Companion.new()
 
 	// no hover: this one pushes sideways, so there is no altitude for it to hold
-	override val dataInputs: List<String> = listOf("currnt_throttle", "toggled_state")
+	override val dataInputs: Map<String, DcType> =
+		mapOf("currnt_throttle" to DcType.NUM, "toggled_state" to DcType.NUM)
 	override val dataFunctions: List<String> = ThrusterThrottle.Companion.FUNCTIONS
 
 	override fun invoke(function: String, active: Boolean) {

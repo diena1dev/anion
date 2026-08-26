@@ -5,6 +5,7 @@ import dev.diena.anion.features.machine.BlockSet
 import dev.diena.anion.features.machine.Machine
 import dev.diena.anion.features.machine.component.MachinePort
 import dev.diena.anion.features.scripting.DcProgrammable
+import dev.diena.anion.features.scripting.DcType
 import net.minecraft.core.Vec3i
 import org.bukkit.Location
 import org.bukkit.Particle
@@ -61,7 +62,8 @@ class DebugGyroWheel() : Machine("debug_gyro_wheel", DEBUG_GYRO_WHEEL), DcProgra
 
 	}
 
-	override val dataInputs: List<String> = listOf("currnt_yaw", "spinning_state")
+	override val dataInputs: Map<String, DcType> =
+		mapOf("currnt_yaw" to DcType.NUM, "spinning_state" to DcType.NUM)
 	override val dataFunctions: List<String> =
 		listOf("rotate_left", "rotate_right", "snap_left", "snap_right")
 

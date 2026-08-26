@@ -55,6 +55,8 @@ class DcRuntime private constructor(private val mainframe: MainframeMachine) {
 		val values = inputValues.getOrPut(machineName) { seed(machineName) }
 		values[input] = value
 
+		val eval = DcEval(values, mainframe.budget)
+
 		// bindings sharing an expression and a mode share a latch, so they resolve once and deliver together.
 		// groupBy keeps encounter order, so an overrun always drops the same statements — a pilot can only
 		// learn to fly around a failure that lands in the same place every time.
@@ -62,18 +64,40 @@ class DcRuntime private constructor(private val mainframe: MainframeMachine) {
 
 		for ((key, boundToExpression) in affected) {
 
-			if (!spend(key.source.cost)) return
-
 			val state = states.getOrPut(key) { InputState() }
-			val active = resolve(state, key.mode, key.source.evaluate { values[it] ?: DcValue.FALSE }.truthy)
+
+			val driven = try {
+
+				key.source.evaluate(eval)
+
+			} catch (_: DcOverrun) {
+
+				trip()
+				return
+
+			} catch (typeError: DcTypeError) {
+
+				// TODO: crash the mainframe here. A type error is a program fault, not a load fault, so
+				//       rebooting into the same program just faults again — it needs its own failure mode
+				//       and its own way to be cleared. Specified by the developer; until then it is
+				//       reported once and the binding is skipped.
+				warnTypeError(machineName, key.source, typeError)
+				continue
+
+			}
+
+			val active = resolve(state, key.mode, driven.truthy)
 
 			// an expression that is off and was already off has nothing to say
 			if (!active && !state.delivering) continue
 
+			// the value is what the function is told, so a `hold` binding on a list hands over the list
+			val delivered = if (active) driven else DcValue.of(false)
+
 			for (binding in boundToExpression) {
 
 				if (!spend(mainframe.groups.membersOf(binding.target).size)) return
-				deliver(binding, active)
+				deliver(binding, delivered)
 
 			}
 
@@ -83,12 +107,16 @@ class DcRuntime private constructor(private val mainframe: MainframeMachine) {
 
 	}
 
-	/** Every input [machineName] emits, at zero. `not [x]` has to read false before x is ever reported. */
+	/** Every input [machineName] emits, at its type's zero. `not [x]` has to read false before x is
+	 *  reported, and `count [x]` has to read an empty list rather than a number. */
 	private fun seed(machineName: String): MutableMap<String, DcValue> {
 
 		val emitter = mainframe.machineNamed(machineName) as? DcProgrammable ?: return mutableMapOf()
 
-		return emitter.dataInputs.associateWithTo(mutableMapOf()) { DcValue.FALSE }
+		val values = mutableMapOf<String, DcValue>()
+		for ((input, type) in emitter.dataInputs) values[input] = DcValue.zeroOf(type)
+
+		return values
 
 	}
 
@@ -97,8 +125,9 @@ class DcRuntime private constructor(private val mainframe: MainframeMachine) {
 
 		val program = mainframe.programOf(machineName) ?: return
 
-		// expressions read the cache, not the latch state, so the inputs themselves have to go quiet
-		inputValues[machineName]?.replaceAll { _, _ -> DcValue.FALSE }
+		// expressions read the cache, not the latch state, so the inputs themselves have to go quiet.
+		// each one goes back to its own type's zero, not to a number.
+		inputValues[machineName]?.replaceAll { _, held -> DcValue.zeroOf(held.type) }
 
 		for ((key, state) in states) {
 
@@ -108,12 +137,12 @@ class DcRuntime private constructor(private val mainframe: MainframeMachine) {
 			state.down = false
 
 			// a latch is left exactly as it was found, still delivering, so it picks straight back up when
-			// somebody sits down again
-			if (key.mode != DcMode.HOLD) continue
+			// somebody sits down again. hold and push both let go.
+			if (key.mode == DcMode.TOGGLE) continue
 
 			if (!state.delivering) continue
 
-			for (binding in program.bindingsDrivenBy(key.source, key.mode)) deliver(binding, false)
+			for (binding in program.bindingsDrivenBy(key.source, key.mode)) deliver(binding, DcValue.of(false))
 
 			state.delivering = false
 
@@ -129,13 +158,16 @@ class DcRuntime private constructor(private val mainframe: MainframeMachine) {
 
 	}
 
-	/** Where a mode's value comes from: the key itself, or a latch the key flips. */
+	/** Where a mode's value comes from: the key itself, its rising edge, or a latch the key flips. */
 	private fun resolve(state: InputState, mode: DcMode, down: Boolean): Boolean {
 
 		val pressed = down && !state.down
 		state.down = down
 
 		if (mode == DcMode.HOLD) return down
+
+		// one signal per press: only the edge is on, so holding the key changes nothing after it
+		if (mode == DcMode.PUSH) return pressed
 
 		val tick = Bukkit.getCurrentTick()
 
@@ -177,7 +209,7 @@ class DcRuntime private constructor(private val mainframe: MainframeMachine) {
 			val program = mainframe.programOf(key.machineName) ?: continue
 
 			// shutdown is never charged: a mainframe that cannot afford to let go is a stuck throttle
-			for (binding in program.bindingsDrivenBy(key.source, key.mode)) deliver(binding, false)
+			for (binding in program.bindingsDrivenBy(key.source, key.mode)) deliver(binding, DcValue.of(false))
 
 		}
 
@@ -191,7 +223,7 @@ class DcRuntime private constructor(private val mainframe: MainframeMachine) {
 	/** Resolves [binding] to live machines and calls the function on each of them. */
 	// a broadcast does not care whether anyone is listening: a group with nothing in it, an offline
 	// machine and a machine without the function are all no-ops.
-	private fun deliver(binding: DcBinding, active: Boolean) {
+	private fun deliver(binding: DcBinding, value: DcValue) {
 
 		for (machineName in mainframe.groups.membersOf(binding.target)) {
 
@@ -204,7 +236,7 @@ class DcRuntime private constructor(private val mainframe: MainframeMachine) {
 
 			}
 
-			programmable.invoke(binding.function, active)
+			programmable.invoke(binding.function, value)
 
 		}
 
@@ -215,6 +247,16 @@ class DcRuntime private constructor(private val mainframe: MainframeMachine) {
 		if (!warned.add("$machineName:$function")) return
 
 		Anion.plugin.logger.warning("[dcprgm] '$machineName' has no function '$function'")
+
+	}
+
+	/** Reports a type error once per expression. The compiler catches these whenever the emitting machine
+	 *  is plugged in, so anything reaching here came from a program compiled against an absent one. */
+	private fun warnTypeError(machineName: String, source: DcExpr, typeError: DcTypeError) {
+
+		if (!warned.add("$machineName!$source")) return
+
+		Anion.plugin.logger.warning("[dcprgm] '$machineName' $source: ${typeError.message}")
 
 	}
 

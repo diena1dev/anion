@@ -28,6 +28,10 @@ class DcStore private constructor(private val mainframe: MainframeMachine) {
 	/** Every machine name that has a file, whether or not it currently compiles. */
 	val fileNames: Set<String> get() = sources.keys
 
+	/** What every compiled program would spend if all of them fired on the same tick. An estimate:
+	 *  see [DcExpr.cost]. Programs that do not compile are not running, so they cost nothing. */
+	val totalCost: Int get() = programs.values.sumOf { it.cost }
+
 	fun sourceOf(machineName: String): String = sources[machineName].orEmpty()
 
 	fun programOf(machineName: String): DcProgram? = programs[machineName]
@@ -132,9 +136,11 @@ class DcStore private constructor(private val mainframe: MainframeMachine) {
 		lines += "$GROUPS_FILE: ${groups.names.size} groups"
 		for (line in groups.describe()) lines += "  $line"
 
+		lines += "demand: $totalCost/${mainframe.budget.limit} across ${programs.size} programs"
+
 		for ((machineName, program) in programs) {
 
-			lines += "$machineName/$PROGRAM_FILE:"
+			lines += "$machineName/$PROGRAM_FILE: ${program.cost} compute"
 			for (line in program.describe()) lines += "  $line"
 
 		}
@@ -179,7 +185,7 @@ class DcStore private constructor(private val mainframe: MainframeMachine) {
 
 		val result = DcParser.parseProgram(
 			source,
-			emitter?.dataInputs?.toSet(), // null while it is unplugged: its inputs go unchecked
+			emitter?.dataInputs, // null while it is unplugged: its inputs and their types go unchecked
 			groups,
 			mainframe.machineNames,
 		) { name -> (mainframe.machineNamed(name) as? DcProgrammable)?.dataFunctions?.toSet() }

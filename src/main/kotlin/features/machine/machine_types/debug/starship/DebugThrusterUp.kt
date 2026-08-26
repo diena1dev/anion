@@ -10,6 +10,7 @@ import dev.diena.anion.features.machine.component.MachinePort
 import dev.diena.anion.features.machine.machine_types.thrusters.ThrusterHover
 import dev.diena.anion.features.machine.machine_types.thrusters.ThrusterThrottle
 import dev.diena.anion.features.scripting.DcProgrammable
+import dev.diena.anion.features.scripting.DcType
 import net.minecraft.core.Vec3i
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.world.phys.Vec3
@@ -73,7 +74,8 @@ class DebugThrusterUp() : Machine("debug_thruster_up", DEBUG_THRUSTER_UP), DcPro
 	private val controls = ThrusterThrottle.Companion.new()
 	private val hover = ThrusterHover.Companion.new(this, THRUST_SIGN)
 
-	override val dataInputs: List<String> = listOf("currnt_throttle", "toggled_state", "hover_state")
+	override val dataInputs: Map<String, DcType> =
+		mapOf("currnt_throttle" to DcType.NUM, "toggled_state" to DcType.NUM, "hover_state" to DcType.NUM)
 	override val dataFunctions: List<String> = ThrusterThrottle.Companion.FUNCTIONS + ThrusterHover.Companion.FUNCTION
 
 	override fun invoke(function: String, active: Boolean) {

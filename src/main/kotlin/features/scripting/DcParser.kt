@@ -38,6 +38,10 @@ object DcParser {
 			}
 
 			if (name in knownMachines) errors += DcIssue(line, "'$name' is a machine, so it cannot also be a group")
+
+			// a bracketed number is a literal everywhere else, so a group may not take that spelling
+			if (name.toDoubleOrNull() != null) errors += DcIssue(line, "group names may not be numbers | '$name' would parse as a value")
+
 			if (!declared.add(name)) errors += DcIssue(line, "group '$name' is already defined")
 
 		}
@@ -106,6 +110,8 @@ object DcParser {
 	 *
 	 * [availableInputs] is null when the machine is not there to be asked, and its inputs go unchecked —
 	 * a program must survive its machine being unplugged, or a reboot would delete every file on the ship.
+	 * When it is there, its declared types also let a comparison that cannot work be caught here rather
+	 * than in flight.
 	 *
 	 * [functionsOf] answers what a machine name can be told to do, or null when nothing is there to ask.
 	 * A function nothing implements is a warning rather than an error — the readme's whole point is that
@@ -114,7 +120,7 @@ object DcParser {
 	fun parseProgram(
 
 		source: String,
-		availableInputs: Set<String>?,
+		availableInputs: Map<String, DcType>?,
 		groups: DcGroups,
 		knownMachines: Set<String>,
 		functionsOf: (machineName: String) -> Set<String>?,
@@ -154,7 +160,7 @@ object DcParser {
 			val (calls, afterTargets) = targets
 
 			if (words.getOrNull(afterTargets) != "mode") {
-				errors += DcIssue(line, "expected `mode [toggle]` or `mode [hold]` at the end of the line")
+				errors += DcIssue(line, "expected `mode [hold]`, `mode [toggle]` or `mode [push]` at the end of the line")
 				continue
 			}
 
@@ -166,13 +172,17 @@ object DcParser {
 
 			val mode = DcMode.named(modeName)
 			if (mode == null) {
-				errors += DcIssue(line, "'$modeName' is not a mode | dclang v0.1 has [toggle] and [hold]")
+				errors += DcIssue(line, "'$modeName' is not a mode | dclang has ${DcMode.entries.joinToString(", ") { "[${it.name.lowercase()}]" }}")
 				continue
 			}
 
 			if (availableInputs != null) for (inputName in expression.inputs) {
 				if (inputName !in availableInputs) errors += DcIssue(line, "'$inputName' is not an input this machine emits")
 			}
+
+			// a type error is caught here whenever the machine is around to declare its shapes. what gets
+			// past this is only ever an unplugged machine, and that crashes the mainframe at runtime.
+			for (problem in typeErrors(expression, availableInputs)) errors += DcIssue(line, problem)
 
 			for (call in calls) {
 
@@ -300,7 +310,60 @@ object DcParser {
 		}
 
 		val name = unwrap(word) ?: return null
-		return DcExpr.Input(name) to start + 1
+
+		return (literal(name) ?: DcExpr.Input(name)) to start + 1
+
+	}
+
+	/** The literal `[content]` spells, or null when it names an input. */
+	private fun literal(content: String): DcExpr.Literal? {
+
+		// text is quoted inside the brackets. words are split on whitespace, so a literal cannot hold any.
+		if (content.length >= 2 && content.startsWith('"') && content.endsWith('"')) {
+			return DcExpr.Literal(DcValue.Str(content.substring(1, content.length - 1)))
+		}
+
+		val number = content.toDoubleOrNull() ?: return null
+		return DcExpr.Literal(DcValue.Num(number))
+
+	}
+
+	/** Every type problem in [expression], given the machine's [declared] shapes. Empty when unknowable. */
+	private fun typeErrors(expression: DcExpr, declared: Map<String, DcType>?): List<String> {
+
+		val problems = mutableListOf<String>()
+		collectTypeErrors(expression, declared, problems)
+
+		return problems
+
+	}
+
+	private fun collectTypeErrors(expression: DcExpr, declared: Map<String, DcType>?, into: MutableList<String>) {
+
+		when (expression) {
+
+			is DcExpr.Literal, is DcExpr.Input -> return
+
+			is DcExpr.Unary -> {
+
+				collectTypeErrors(expression.operand, declared, into)
+				expression.operator.accepts(expression.operand.typeOf(declared))?.let { into += it }
+
+			}
+
+			is DcExpr.Binary -> {
+
+				collectTypeErrors(expression.left, declared, into)
+				collectTypeErrors(expression.right, declared, into)
+
+				expression.operator.accepts(
+					expression.left.typeOf(declared),
+					expression.right.typeOf(declared),
+				)?.let { into += it }
+
+			}
+
+		}
 
 	}
 

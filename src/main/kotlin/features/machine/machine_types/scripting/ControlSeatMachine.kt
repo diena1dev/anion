@@ -6,6 +6,7 @@ import dev.diena.anion.features.machine.Machine
 import dev.diena.anion.features.machine.machine_types.PortedMachine
 import dev.diena.anion.features.machine.machine_types.scripting.mainframe.MainframeMachine
 import dev.diena.anion.features.scripting.DcProgrammable
+import dev.diena.anion.features.scripting.DcType
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
 import net.minecraft.world.entity.PositionMoveRotation
@@ -81,7 +82,8 @@ class ControlSeatMachine : PortedMachine("Control Seat", CONTROL_SEAT_STRUCTURE)
 
 	}
 
-	override val dataInputs: List<String> = SEAT_INPUTS
+	// every key is a switch, so every seat input is a number
+	override val dataInputs: Map<String, DcType> = SEAT_INPUTS.associateWith { DcType.NUM }
 
 	var pilot: UUID? = null; private set
 

@@ -1,12 +1,32 @@
-# dcprgm implementation plan (v0.1)
+# dcprgm implementation plan
 
 Companion to `dcprgm_readme.md`. **That file is the spec and is owned by the developer — do not edit
 it.** This file is the agreed build plan, written after a Q&A pass, so a fresh agent can pick the work
 up without re-asking. Anything marked OPEN is still undecided.
 
-**Status: v0.1 built, not yet tested in-game.** §10 lists exactly what landed where. The editor UI is
-deliberately absent — the sign hooks it needs are in place and `MainframeMachine.onSignClick` is an empty
-override with a TODO on it.
+## Status
+
+| version | state                 | where it is written down                         |
+|---------|-----------------------|--------------------------------------------------|
+| v0.1    | built, tested         | this file, §10 lists what landed where           |
+| v0.2    | built, tested         | this file (§6 grammar, budget); no separate spec |
+| v0.3    | built, not yet tested | `dcprgm_v0.3_spec.md`                            |
+| v0.4    | **not started**       | `dcprgm_v0.4_spec.md`                            |
+
+§6 and §10 describe the language and the runtime **as they are now**, at v0.3 — not as v0.1 shipped them.
+Sections outside §6 have not been revisited since v0.1 and may describe intent rather than code.
+
+v0.2 added boolean operators and the per-tick compute budget. v0.3 replaced the boolean value with a typed
+`DcValue`, gave inputs declared types, and let machines be handed a value rather than a bit. The `push`
+mode arrived alongside v0.4 planning.
+
+The editor UI is deliberately absent — the sign hooks it needs are in place and
+`MainframeMachine.onSignClick` is an empty override with a TODO on it.
+
+**Two TODOs are load-bearing and need the developer**, not an agent guessing:
+
+- mainframe **crash** semantics for a runtime type error (`DcRuntime.input`, and `dcprgm_v0.3_spec.md` §4.4)
+- `DcOperators.AGGREGATE_COST` is a guess at 8 and wants real `/machine debug` numbers
 
 ---
 
@@ -22,24 +42,24 @@ as flying a ship.
 
 ## 2. Decisions locked in Q&A
 
-| # | Decision |
-|---|---|
-| 1 | Mainframe is a `Machine` (multiblock, owns the file store and the editor entry point). |
-| 2 | Mainframe scope is **physical wiring**, not proximity and not ship membership. Machines are reached over a data line network terminating on `COPPER_MACHINE_DATAPORT` cells. A data transport subsystem has to exist for this, and it also answers "is this machine still connected". |
-| 3 | Two mainframes wired to the same machines each keep their **own disjoint set** — their own names, their own files. Overlap is legal; each mainframe commands independently. |
-| 4 | Names are auto-generated when a machine is added to a mainframe: `<machine key>_<n>`, e.g. `medium_cargo_container_1`, then `_2`. |
-| 5 | Editor UI is in-world signs on the mainframe driving Paper's dialog API. **The developer writes the UI.** This work only supplies: signs that are un-editable, signs that report clicks to their machine, and a compile-on-save API for the UI to call. |
-| 6 | Floppy-disk items for backup/transfer are **out of scope** for v0.1. |
-| 7 | One `main.dcprgm` per machine, exactly one `groups.dcprgm` per mainframe, no other files. The files **live on the mainframe**; per-machine files are references, not machine state. |
-| 8 | v0.1 grammar is exactly: `def_group`, `set ... in ...`, `set ... to ... mode ...`, `//` comments. No arithmetic, no conditionals. |
-| 9 | A machine's `available inputs` are values it *emits*. In v0.1 they are declared and broadcast; the only planned consumer (a sign readout) is v0.2. |
-| 10 | `hold` — invoke every tick the key is down. `toggle` — flips a latched value with a **5 tick cooldown**, and the value stays on until clicked again. |
-| 11 | Functions take **no arguments** in v0.1. Arguments land in v0.2 so displays can receive data. |
-| 12 | Calling a function a machine does not have is a **no-op plus a warning**. |
-| 13 | Programs **compile on save**, never per tick. |
-| 14 | Control seat does not use a vehicle entity (sneak would dismount). The player is **locked in place** while the seat is active. |
-| 15 | The `alt` modifier in the readme is **ctrl**, read off `PlayerInputEvent` / `Input`. |
-| 16 | Debug thrusters keep redstone control **alongside** dcprgm. Future thrusters are primarily data-driven. |
+| #  | Decision                                                                                                                                                                                                                                                                              |
+|----|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 1  | Mainframe is a `Machine` (multiblock, owns the file store and the editor entry point).                                                                                                                                                                                                |
+| 2  | Mainframe scope is **physical wiring**, not proximity and not ship membership. Machines are reached over a data line network terminating on `COPPER_MACHINE_DATAPORT` cells. A data transport subsystem has to exist for this, and it also answers "is this machine still connected". |
+| 3  | Two mainframes wired to the same machines each keep their **own disjoint set** — their own names, their own files. Overlap is legal; each mainframe commands independently.                                                                                                           |
+| 4  | Names are auto-generated when a machine is added to a mainframe: `<machine key>_<n>`, e.g. `medium_cargo_container_1`, then `_2`.                                                                                                                                                     |
+| 5  | Editor UI is in-world signs on the mainframe driving Paper's dialog API. **The developer writes the UI.** This work only supplies: signs that are un-editable, signs that report clicks to their machine, and a compile-on-save API for the UI to call.                               |
+| 6  | Floppy-disk items for backup/transfer are **out of scope** for v0.1.                                                                                                                                                                                                                  |
+| 7  | One `main.dcprgm` per machine, exactly one `groups.dcprgm` per mainframe, no other files. The files **live on the mainframe**; per-machine files are references, not machine state.                                                                                                   |
+| 8  | v0.1 grammar is exactly: `def_group`, `set ... in ...`, `set ... to ... mode ...`, `//` comments. No arithmetic, no conditionals.                                                                                                                                                     |
+| 9  | A machine's `available inputs` are values it *emits*. In v0.1 they are declared and broadcast; the only planned consumer (a sign readout) is v0.2.                                                                                                                                    |
+| 10 | `hold` — invoke every tick the key is down. `toggle` — flips a latched value with a **5 tick cooldown**, and the value stays on until clicked again.                                                                                                                                  |
+| 11 | Functions take **no arguments** in v0.1. Arguments land in v0.2 so displays can receive data.                                                                                                                                                                                         |
+| 12 | Calling a function a machine does not have is a **no-op plus a warning**.                                                                                                                                                                                                             |
+| 13 | Programs **compile on save**, never per tick.                                                                                                                                                                                                                                         |
+| 14 | Control seat does not use a vehicle entity (sneak would dismount). The player is **locked in place** while the seat is active.                                                                                                                                                        |
+| 15 | The `alt` modifier in the readme is **ctrl**, read off `PlayerInputEvent` / `Input`.                                                                                                                                                                                                  |
+| 16 | Debug thrusters keep redstone control **alongside** dcprgm. Future thrusters are primarily data-driven.                                                                                                                                                                               |
 
 ## 3. Deliverables
 
@@ -101,11 +121,12 @@ Per MACHINE_README rule 2: a capability interface checked with `is`, no new inhe
 
 ```kotlin
 interface DcProgrammable {
-	/** values this machine emits. declared in v0.1, consumed in v0.2. */
-	val dataInputs: List<String> get() = emptyList()
+	/** values this machine emits, and what shape each one is. types added in v0.3. */
+	val dataInputs: Map<String, DcType> get() = emptyMap()
 	/** function names other machines may call on this one. */
 	val dataFunctions: List<String> get() = emptyList()
-	/** [active] is the latched/held bit. no arguments until v0.2. */
+	/** the value that drove the call. added in v0.3; delegates to the boolean form by default. */
+	fun invoke(function: String, value: DcValue) = invoke(function, value.truthy)
 	fun invoke(function: String, active: Boolean) {}
 }
 ```
@@ -163,24 +184,55 @@ DcRuntime.kt        latch/hold state per (machine, expression, mode); resolves a
 DcStore.kt          per-mainframe file store: read, write, compile-on-save, report errors
 ```
 
-### Grammar (v0.2)
+### Grammar (v0.3)
 
 ```
 // comment
 def_group [name]
 set [a] and [b] in [group1] and [group2]        // cross product, per the readme
-set <expression> to [target:function] mode [toggle|hold]
+set <expression> to [target:function] mode [hold|toggle|push]
 
-expression := [input] | ( expression ) | <prefix> expression | expression <infix> expression
+expression := [input] | literal | ( expression ) | <prefix> expression | expression <infix> expression
+literal    := [12.5] | ["some text"]
 ```
 
-Parentheses need no surrounding spaces — the lexer splits them off before words are read.
+Parentheses need no surrounding spaces — the lexer splits them off before words are read. A bracketed
+word that parses as a number is a number literal and one wrapped in quotes is text, so `def_group`
+rejects a numeric group name. Text literals hold no whitespace: words are split on it.
 
 `target` is a group name or a machine name. All identifiers are bracketed. Statement per line.
 
 Operators live in `DcOperators` and nowhere else — a new one is one entry in that table, and the parser,
-the evaluator and the cost model all read it from there. v0.2 ships `not` (prefix), `and` and `or`
-(infix, `and` binding tighter). Arithmetic slots in above `and` when values stop being only 0 and 1.
+the evaluator, the type checker and the cost model all read it from there.
+
+| precedence | operators                        |
+|------------|----------------------------------|
+| 1          | `or`                             |
+| 2          | `and`                            |
+| 3          | `=` `!=` `<` `>` `<=` `>=`       |
+| 4          | `+` `-`                          |
+| 5          | `*` `/`                          |
+| prefix     | `not` `count` `any` `all` `text` |
+
+### Modes
+
+| mode     | value                                                                                    |
+|----------|------------------------------------------------------------------------------------------|
+| `hold`   | on for exactly as long as the expression is                                              |
+| `toggle` | a rising edge flips a latch, subject to `TOGGLE_COOLDOWN`                                |
+| `push`   | on for the one tick of the rising edge, whatever happens after; re-arms when it goes off |
+
+`push` is the "fire once per press" mode: holding the key does nothing after the first tick. Like `hold`,
+and unlike `toggle`, it is let go when a machine goes quiet — see `DcRuntime.release`.
+
+### Values (v0.3)
+
+`DcValue` is `Num` \| `Str` \| `Vec` \| `Lst`. Truthy means non-zero, non-empty; a `Vec` is always truthy.
+Inputs declare their `DcType`, which is what lets `DcParser` reject `[a_list] > [5]` at save time.
+
+A type error that gets past the compiler — only possible against an unplugged machine, whose inputs go
+unchecked — throws `DcTypeError` inside evaluation. **See the TODO in `DcRuntime.input`: crashing the
+mainframe on one is unspecified, so it currently warns once and skips the binding.**
 
 **`and` means two different things by position, deliberately.** On the input side of a program's `set` it
 is boolean conjunction. In `groups.dcprgm`, and on the target side of `to`, it is still the readme's list
@@ -199,6 +251,8 @@ machine does not have is a runtime no-op plus a warning (decision 12).
 needs the inputs that did **not** change this tick), and the mode state per `(machine, expression, mode)`:
 
 - `hold` — `invoke(fn, true)` every tick the key is down, one `invoke(fn, false)` on release.
+- `push` — one `invoke(fn, true)` on the tick the expression goes true, then `invoke(fn, false)`, however
+  long the key is held. Re-arms only once the expression has gone false again.
 - `toggle` — a press flips a latched bool, subject to a **5 tick cooldown**; while latched on, the value is
   continuously on. **ASSUMPTION:** "continuously on" is implemented as `invoke(fn, true)` every tick while
   latched, mirroring hold, with one `invoke(fn, false)` on the tick it latches off. Confirm before relying
@@ -222,6 +276,25 @@ bindings that were on without their `false`, which welds a throttle open with no
 
 The allowance rolls over on first charge of a tick rather than on the mainframe's own `tick()`, because
 machines tick in no defined order and the emitting machine may run first.
+
+The console's `MAIN` page shows two readings, and `!! OVERRUN <n>s` in red while tripped:
+
+| line | meaning |
+| --- | --- |
+| `load_<peak>/<limit>` | what is actually being spent, as a rolling peak |
+| `demand_<total>/<limit>` | what every compiled program would spend if it all fired at once |
+
+`load` reads the **peak**, not `spent` — a sign render lands at an arbitrary point in a tick, so the live
+figure is noise. `DcBudget.agePeak()` runs off the mainframe's `tick()` and lets the reading fall after
+`PEAK_WINDOW`, so an idle mainframe drops back to zero rather than sitting on an old high.
+
+`demand` over the limit is drawn red but is **not a fault**. It means the ship trips if enough of it
+happens on one tick, which is a fitting decision rather than an error — the same reason an over-budget
+program is a compile warning and not a compile error.
+
+Per-program cost (`DcProgram.cost`) shows on the console's selector page as `main.dcprgm_<cost>`, in the
+editor's save confirmation, and in `/machine debug`. A file that no longer compiles reads `main.dcprgm ERR`
+rather than a cost of zero, which would look like a program that does nothing.
 
 Going over budget is a **compile warning, not an error**. Saving a program that might trip is the pilot's
 call; a ship browning out mid-fight is a mechanic, not a failure to be prevented at the editor.
@@ -277,28 +350,28 @@ Machines went to `features/machine/machine_types/scripting/` rather than under `
 every `Machine` subclass stays in one tree the way the thrusters and containers already do. The language
 and its runtime stayed in `features/scripting/`.
 
-| file | what it is |
-|---|---|
-| `features/transport/AnionDataComponents.kt` | `AnionDataComponent` marker, `DataLine` (vanilla chain), `AnionDataJunctionBlock` |
-| `features/transport/DataNetwork.kt` | `reachableFrom(machine)` BFS + `describe()` |
-| `features/transport/AnionTransportComponent.kt` | gained `val indexed` |
-| `features/transport/AnionTransportIndex.kt` | `register` now asks `indexed` |
-| `features/transport/AnionTransportComponents.kt` | one `byMaterial` line for `CHAIN` |
-| `features/scripting/DcProgram.kt` | `DcMode`, `DcBinding`, `DcProgram`, `DcGroups`, `DcIssue`, `DcResult` |
-| `features/scripting/DcParser.kt` | the whole v0.1 grammar |
-| `features/scripting/DcProgrammable.kt` | capability interface |
-| `features/scripting/DcRuntime.kt` | latch/hold state, dispatch, once-per-binding warnings |
-| `features/scripting/DcStore.kt` | file store, compile-on-save, recompile |
-| `features/machine/component/MachineSign.kt` | `ownerAt`, `write`, `seal` |
-| `features/machine/Machine.kt` | gained `open fun onSignClick(offset, player, front)` |
-| `features/machine/machine_types/scripting/MainframeMachine.kt` | structure, naming, walk, persistence, rename |
-| `features/machine/machine_types/scripting/MainframeConsole.kt` | the three-sign menu state machine |
-| `features/machine/machine_types/scripting/MainframeDialogs.kt` | Paper dialogs: editor, groups editor, rename |
-| `features/machine/machine_types/scripting/ControlSeatMachine.kt` | pilot lock, input reading |
-| `features/listeners/AnionScriptingListeners.kt` | sign edit cancel, sign click, seat mount/dismount, clicks, quit |
-| `features/custom/blocks/AnionBlocks.kt` | `DATA_JUNCTION`, note 18 |
-| `features/machine/AnionMachines.kt` | `MAINFRAME`, `CONTROL_SEAT` |
-| `features/machine/machine_types/thrusters/DebugThrusterHorizontal.kt` | now `DcProgrammable` |
+| file                                                                  | what it is                                                                        |
+|-----------------------------------------------------------------------|-----------------------------------------------------------------------------------|
+| `features/transport/AnionDataComponents.kt`                           | `AnionDataComponent` marker, `DataLine` (vanilla chain), `AnionDataJunctionBlock` |
+| `features/transport/DataNetwork.kt`                                   | `reachableFrom(machine)` BFS + `describe()`                                       |
+| `features/transport/AnionTransportComponent.kt`                       | gained `val indexed`                                                              |
+| `features/transport/AnionTransportIndex.kt`                           | `register` now asks `indexed`                                                     |
+| `features/transport/AnionTransportComponents.kt`                      | one `byMaterial` line for `CHAIN`                                                 |
+| `features/scripting/DcProgram.kt`                                     | `DcMode`, `DcBinding`, `DcProgram`, `DcGroups`, `DcIssue`, `DcResult`             |
+| `features/scripting/DcParser.kt`                                      | the whole v0.1 grammar                                                            |
+| `features/scripting/DcProgrammable.kt`                                | capability interface                                                              |
+| `features/scripting/DcRuntime.kt`                                     | latch/hold state, dispatch, once-per-binding warnings                             |
+| `features/scripting/DcStore.kt`                                       | file store, compile-on-save, recompile                                            |
+| `features/machine/component/MachineSign.kt`                           | `ownerAt`, `write`, `seal`                                                        |
+| `features/machine/Machine.kt`                                         | gained `open fun onSignClick(offset, player, front)`                              |
+| `features/machine/machine_types/scripting/MainframeMachine.kt`        | structure, naming, walk, persistence, rename                                      |
+| `features/machine/machine_types/scripting/MainframeConsole.kt`        | the three-sign menu state machine                                                 |
+| `features/machine/machine_types/scripting/MainframeDialogs.kt`        | Paper dialogs: editor, groups editor, rename                                      |
+| `features/machine/machine_types/scripting/ControlSeatMachine.kt`      | pilot lock, input reading                                                         |
+| `features/listeners/AnionScriptingListeners.kt`                       | sign edit cancel, sign click, seat mount/dismount, clicks, quit                   |
+| `features/custom/blocks/AnionBlocks.kt`                               | `DATA_JUNCTION`, note 18                                                          |
+| `features/machine/AnionMachines.kt`                                   | `MAINFRAME`, `CONTROL_SEAT`                                                       |
+| `features/machine/machine_types/thrusters/DebugThrusterHorizontal.kt` | now `DcProgrammable`                                                              |
 
 ### Decisions taken while building, not in the Q&A
 
@@ -382,7 +455,8 @@ no registry key or `PlayerCustomClickEvent` handler is involved:
 ### Not done
 
 - Floppy disks (decision 6).
-- Nothing consumes `dataInputs` values, and functions take no arguments (decisions 9 and 11, both v0.2).
+- No machine yet *emits* a non-number input. `Lst`, `Str` and `Vec` exist and are carried end to end, but
+  nothing produces one until the radar lands.
 - Only the three debug thrusters are receivers. Cargo containers and the furnace are visible to a
   mainframe but cannot be commanded.
 - No way to delete a file from the console. `store.forget(name)` exists and has no caller.
