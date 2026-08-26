@@ -6,6 +6,10 @@
 **One sentence:** dclang gains a second *execution context* — code that runs on a trigger, top to bottom,
 with local variables and bounded loops — without becoming a second language.
 
+Carries two smaller changes deferred out of v0.3 because they break existing programs and this is the
+version that reshapes the grammar anyway: **`{}` for groups and macros**, and **macros** themselves.
+Both are §6.5, and neither depends on the execution model — they could land first.
+
 Read `dcprgm_v0.3_spec.md` first. This builds directly on its value types and its budget.
 
 ---
@@ -47,6 +51,7 @@ Expressions inside both are the same expressions, parsed by the same `readExpr`.
 | piece | why it does not exist yet |
 | --- | --- |
 | statements with a body | the grammar is one statement per line, no nesting |
+| a body that runs on a schedule | every binding is edge-driven, so nothing can simply redraw state (§6.1, §8.0) |
 | local variables | nothing in dclang has ever stored anything; latches live in the runtime, not the language |
 | bounded iteration | there is no control flow at all |
 | a trigger | reactive code is driven by input edges; procedural code needs a reason to start |
@@ -78,11 +83,13 @@ object DcStatements {
 
 ```
 on <expression> do ... end      // trigger: run the body when the expression goes true
+every do ... end                // trigger: run the body every tick, see §6.1
 let [name] = <expression>       // assign a local
 if <expression> then <call>     // one-line conditional
 if <expression> do ... end      // block conditional
 for each [name] in <expression> do ... end
 call [target:function]          // fire a function without binding an input to it
+call [target:function] with <expression>
 wait [ticks]                    // yield until later, see §5
 ```
 
@@ -206,6 +213,87 @@ Consequences worth stating:
 - Triggers cost budget like any other expression evaluation, charged to the reactive per-tick allowance.
 - `mode` does not apply to `on`. A trigger is always edge-driven, which is `push` semantics.
 
+### 6.1 `every`, and why an edge is not enough
+
+`on <expression>` fires on a **rising edge**, which is the wrong shape for anything that redraws state.
+
+The case that proves it is a screen listing whichever movement keys are held. `on [w] or [a] or [s] or
+[d]` fires when the first key goes down and then not again — release `a` while `w` is still held and the
+disjunction never went false, so the screen keeps showing a key nobody is pressing. Every "redraw what is
+currently true" job has this shape.
+
+So the procedural context also gets `every`, which runs its body once a tick. Reading state is what it is
+for; the per-tick reactive budget is what stops it being free, and a body that overruns trips the
+mainframe exactly as a wall of `set` lines would.
+
+That is the whole reason to prefer `every` over inventing a change-detecting trigger. `on change
+<expression>` would need per-routine memory of the last value, and for a set of inputs it collapses to
+the same disjunction problem — `on change ([w] or [a])` cannot see `a` release while `w` is held either.
+A body that simply reads the world each tick has no such blind spot.
+
+---
+
+## 6.5 DECIDED: `{}` for sets of targets, and macros
+
+Deferred out of v0.3 deliberately — it breaks every program already written, and v0.4 is the version
+that is going to reshape the grammar anyway. Land it here, before anyone writes programs worth keeping.
+
+### Braces
+
+A name in `[]` is one thing. A name in `{}` is a set of things.
+
+```dclang
+set [sp] to [engine_1:start] mode [push]        // one machine
+set [altlc] to {weapons:fire} mode [toggle]     // a group, broadcast
+set [altsp] to {launch} mode [push]             // a macro
+```
+
+This is not cosmetic. It puts group and macro names in a different syntactic space from machine names,
+which removes three separate problems rather than tidying one:
+
+- the `def_group [5000]` number-versus-name ambiguity (v0.3 §3) stops existing, so the numeric-name
+  check in `parseGroups` can go
+- a machine and a group cannot collide, so that check can go too
+- `DcGroups.membersOf` currently ends with *"a name that is not a group stands for itself"*. That
+  fallback turns a mistyped group name into a machine name nobody has, and the call silently evaporates.
+  Braces make it a compile error.
+
+Cost: `unwrap` learns a second bracket pair, `readList` and the call parser track which one they were
+given, and both editor headers change. It breaks the readme's "all identifiers are bracketed" rule and
+replaces it with a better one, which is the developer's line to rewrite.
+
+### Macros
+
+The gap: a group broadcasts **one function to many machines**. Nothing says **one input, many different
+functions**. Today that is N `set` lines sharing a left-hand side — the trigger duplicated N times, each
+copy separately evaluated and separately charged, and all N to be edited when the trigger changes.
+
+```dclang
+def_macro {launch}
+set [engine_1:start] and [gear_1:retract] and [lights_1:dim] in {launch}
+```
+
+**In `groups.dcprgm`, not a new file.** A group and a macro are the same kind of declaration: a name
+standing for a set of call targets, where a group is the special case of every entry sharing a function.
+A separate file would cost a `DcStore` field, a `sourcesForSave` entry, a console list entry, an editor
+path, a compile-on-save path, and a second place for a name collision to hide — for a three-line
+declaration. The file becomes "the mainframe's declarations" rather than "its groups", which is a rename
+in the readme and not an architecture change.
+
+**It is compile-time expansion, so the runtime does not change at all.** A macro expands to N
+`DcBinding`s sharing one `DcExpr`. `DcRuntime` already groups by `StateKey(machine, source, mode)`, so
+those bindings share a latch and a single evaluation for free — a macro is *cheaper* than the N lines it
+replaces, not merely tidier.
+
+Three things to settle when building it:
+
+- **A macro is simultaneous, not sequential.** Everything fires the same tick, in declaration order.
+  Anyone wanting the gear up before the engine starts wants §3's `on … do`, not this.
+- **One value reaches every entry**, since `invoke` carries the driving value. Fine for `start`/`stop`,
+  useless for a display. A per-entry override — `[display_1:line_0] with ["LAUNCHING"]` — is a small
+  parser addition and the difference between half-useful and useful.
+- **Resolution order** for a `{}` name: macro, then group. Colliding the two is a compile error.
+
 ---
 
 ## 7. Cross-machine input reads
@@ -221,7 +309,49 @@ effect is already reachable by having the emitting machine's own file `call` int
 
 ---
 
-## 8. Worked example
+## 8. Worked examples
+
+### 8.0 Compacting a screen to only what is active
+
+The job v0.3 cannot do. A `set` binding writes a fixed row, and which row an active input belongs on
+depends on how many inputs *above* it are also active — something no expression can ask, because an
+expression sees the inputs it names and nothing about what any other binding did.
+
+Line one is expressible with a coalescing operator. Line two needs "the second active input", which means
+enumerating which earlier ones are on, and by line six that is every subset of the first five. It is
+combinatorial in the declarative form and trivial in a procedural one:
+
+```dclang
+--- editing [main.dcprgm] for [ctrl_seat_1] ---
+
+every do
+
+	call [display_1:clear]
+
+	if [w] then call [display_1:write] with ["W"]
+	if [a] then call [display_1:write] with ["A"]
+	if [s] then call [display_1:write] with ["S"]
+	if [d] then call [display_1:write] with ["D"]
+	if [sp] then call [display_1:write] with ["JUMP"]
+	if [sh] then call [display_1:write] with ["DOWN"]
+	if [lc] then call [display_1:write] with ["FIRE"]
+
+end
+```
+
+`write` appends, so the rows pack themselves and releasing a key closes the gap on the next tick. No
+per-row addressing and no mirrored off-state binding, which is what the same program costs in v0.3.
+
+A packing API on the display was tried and removed. `DebugDisplayMachine` briefly grew `slot_0`..`slot_7`,
+which drew packed and cleared on a false-y value, purely because the packing had to live *somewhere* and
+the declarative form could not hold it. It is the wrong place: a display that keeps a parallel set of rows
+alongside its lines has two things deciding what row three is, and every machine that ever wants a
+compacted readout would need its own copy. `clear` plus `write` in a routine says the same thing with the
+display staying dumb.
+
+Note this is the case that `on` cannot serve, and §6.1 is why.
+
+### 8.1 Factory gating
 
 ```dclang
 --- editing [main.dcprgm] for [asm_1] ---
@@ -240,7 +370,7 @@ on [batch_button:pressed] do
 
 	for each [slot] in [input_buffer:contents] do
 
-		if [made] >= [20] then [asm_1:halt]
+		if [made] >= [20] then call [asm_1:halt]
 		call [asm_1:start]
 		let [made] = [made] + [1]
 
@@ -263,6 +393,8 @@ stage once, not every tick it stays true.
 
 | file | change |
 | --- | --- |
+| `DcParser.kt` | `{}` as a second bracket pair; `def_macro`; macro expansion at compile (§6.5) |
+| `DcProgram.kt` | `DcGroups` gains macros, and loses the "stands for itself" fallback |
 | `DcStatement.kt` (new) | statement AST, `DcStatements` table |
 | `DcRoutine.kt` (new) | activation record, `step()`, locals |
 | `DcParser.kt` | block parsing, `end` matching, statement dispatch off the table |
