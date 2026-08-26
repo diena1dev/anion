@@ -302,15 +302,30 @@ fun Block.placeAsPlayer(
 
 }
 
-/** The item a player would be holding to place [this] state. Falls back to the plain material. */
+/** The item a player would be holding to place [this] state. */
 private fun BlockData.asPlacementItem(): ItemStack {
 
-	val noteBlock = this as? NoteBlock ?: return ItemStack(material)
+	val noteBlock = this as? NoteBlock ?: return material.placementItem()
+
 	val anionBlock = AnionBlocks.fromState(noteBlock.instrument, noteBlock.note.id.toInt())
-		?: return ItemStack(material)
+		?: return material.placementItem()
 
 	return AnionRegistries.ITEM_REGISTRY.getValue(AnionRegistryKey(anionBlock.namespacedKey.key))?.asItemStack()
-		?: ItemStack(material)
+		?: material.placementItem()
+
+}
+
+/** The item that places this material, or an empty stack when nothing does. */
+private fun Material.placementItem(): ItemStack {
+
+	if (isItem) return ItemStack(this)
+
+	// should fix all wall variants
+	val standing = Material.matchMaterial(name.replace("_WALL_", "_").removePrefix("WALL_"))
+	if (standing != null && standing.isItem) return ItemStack(standing)
+
+	// anything not supported gets set to air because the player cannot place them
+	return ItemStack(Material.AIR)
 
 }
 
