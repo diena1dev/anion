@@ -171,8 +171,10 @@ def_group [name]
 set [a] and [b] in [group1] and [group2]        // cross product, per the readme
 set <expression> to [target:function] mode [toggle|hold]
 
-expression := [input] | <prefix> expression | expression <infix> expression
+expression := [input] | ( expression ) | <prefix> expression | expression <infix> expression
 ```
+
+Parentheses need no surrounding spaces — the lexer splits them off before words are read.
 
 `target` is a group name or a machine name. All identifiers are bracketed. Statement per line.
 

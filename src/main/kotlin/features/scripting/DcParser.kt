@@ -7,12 +7,12 @@ package dev.diena.anion.features.scripting
  * // comment
  * def_group [name]
  * set [machine] and [machine] in [group] and [group]
- * set [input] and not [input] to [target:function] and [target:function] mode [toggle|hold]
+ * set ([input] or [input]) and not [input] to [target:function] mode [toggle|hold]
  * ```
  *
- * The input side of a program's `set` is a boolean expression over [DcOperators]; `and` there means
- * both at once, not both separately. In `groups.dcprgm` and on the target side of `to`, `and` is still
- * a list separator chaining a cross product, because names are not booleans.
+ * The input side of a program's `set` is a boolean expression over [DcOperators], grouped with
+ * parentheses; `and` there means both at once, not both separately. In `groups.dcprgm` and on the target
+ * side of `to`, `and` is still a list separator chaining a cross product, because names are not booleans.
  *
  * The editor draws a header above the program (`--- editing ... ---`, `| available inputs: ...`).
  * Those lines are skipped rather than rejected, so handing the whole buffer back still compiles.
@@ -134,7 +134,7 @@ object DcParser {
 
 			val inputs = readExpr(words, 1)
 			if (inputs == null) {
-				errors += DcIssue(line, "expected an input expression after `set`, e.g. `set [w] and not [sh]`")
+				errors += DcIssue(line, "expected an input expression after `set`, e.g. `set ([w] or [a]) and not [sh]` | check your brackets and parentheses")
 				continue
 			}
 
@@ -220,7 +220,14 @@ object DcParser {
 		source.lines()
 			.mapIndexed { index, raw -> (index + 1) to strip(raw) }
 			.filter { it.second.isNotEmpty() }
-			.map { (line, text) -> line to text.split(WHITESPACE) }
+			.map { (line, text) -> line to words(text) }
+
+	/** Splits a line into words. Brackets are one word; parentheses are their own, spaced or not. */
+	private fun words(text: String): List<String> =
+		text.replace(OPEN, " $OPEN ")
+			.replace(CLOSE, " $CLOSE ")
+			.trim()
+			.split(WHITESPACE)
 
 	/** Drops comments, indentation, and the editor's header block. */
 	private fun strip(raw: String): String {
@@ -269,10 +276,20 @@ object DcParser {
 
 	}
 
-	/** A prefix operator applied to whatever follows it, or a bare `[input]`. */
+	/** A parenthesised expression, a prefix operator applied to whatever follows it, or a bare `[input]`. */
 	private fun readUnary(words: List<String>, start: Int): Pair<DcExpr, Int>? {
 
 		val word = words.getOrNull(start) ?: return null
+
+		// a group starts precedence over again, which is the whole point of writing one
+		if (word == OPEN) {
+
+			val (inner, cursor) = readExpr(words, start + 1) ?: return null
+			if (words.getOrNull(cursor) != CLOSE) return null
+
+			return inner to cursor + 1
+
+		}
 
 		val operator = DcOperators.prefixFor(word)
 		if (operator != null) {
@@ -310,5 +327,8 @@ object DcParser {
 	}
 
 	private val WHITESPACE = Regex("\\s+")
+
+	private const val OPEN = "("
+	private const val CLOSE = ")"
 
 }
