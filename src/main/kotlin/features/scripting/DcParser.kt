@@ -232,20 +232,97 @@ object DcParser {
 			.filter { it.second.isNotEmpty() }
 			.map { (line, text) -> line to words(text) }
 
-	/** Splits a line into words. Brackets are one word; parentheses are their own, spaced or not. */
-	private fun words(text: String): List<String> =
-		text.replace(OPEN, " $OPEN ")
-			.replace(CLOSE, " $CLOSE ")
-			.trim()
-			.split(WHITESPACE)
+	/**
+	 * Splits a line into words. Brackets are one word; parentheses are their own, spaced or not.
+	 *
+	 * Anything between quotes is held together, so `["hangar bay"]` is one word rather than two. A text
+	 * literal that could not hold a space would be no use for the thing text is for.
+	 */
+	private fun words(text: String): List<String> {
+
+		val words = mutableListOf<String>()
+		val word = StringBuilder()
+		var quoted = false
+
+		fun flush() {
+
+			if (word.isEmpty()) return
+
+			words += word.toString()
+			word.clear()
+
+		}
+
+		for (character in text) {
+
+			if (character == QUOTE) {
+
+				quoted = !quoted
+				word.append(character)
+
+				continue
+
+			}
+
+			// inside quotes nothing is a separator: the whole point is that the text survives verbatim
+			if (quoted) {
+
+				word.append(character)
+				continue
+
+			}
+
+			when {
+
+				character.isWhitespace() -> flush()
+
+				character == OPEN_CHAR || character == CLOSE_CHAR -> {
+
+					flush()
+					words += character.toString()
+
+				}
+
+				else -> word.append(character)
+
+			}
+
+		}
+
+		flush()
+
+		return words
+
+	}
 
 	/** Drops comments, indentation, and the editor's header block. */
 	private fun strip(raw: String): String {
 
-		val text = raw.substringBefore("//").trim()
+		val text = uncommented(raw).trim()
 		if (text.startsWith("---") || text.startsWith("|")) return ""
 
 		return text
+
+	}
+
+	/** Everything up to the first `//` that is not inside quotes. */
+	// a display line is allowed to say "n/a" or hold a path, and a comment marker inside quotes is text
+	private fun uncommented(raw: String): String {
+
+		var quoted = false
+
+		for (index in raw.indices) {
+
+			val character = raw[index]
+
+			if (character == QUOTE) { quoted = !quoted; continue }
+			if (quoted) continue
+
+			if (character == '/' && raw.getOrNull(index + 1) == '/') return raw.substring(0, index)
+
+		}
+
+		return raw
 
 	}
 
@@ -389,9 +466,11 @@ object DcParser {
 
 	}
 
-	private val WHITESPACE = Regex("\\s+")
-
 	private const val OPEN = "("
 	private const val CLOSE = ")"
+
+	private const val OPEN_CHAR = '('
+	private const val CLOSE_CHAR = ')'
+	private const val QUOTE = '"'
 
 }
