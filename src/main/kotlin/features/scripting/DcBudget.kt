@@ -17,15 +17,19 @@ class DcBudget private constructor(val limit: Int) {
 		/** ticks a tripped mainframe stays dead before it comes back clean */
 		const val REBOOT_TICKS = 200
 
+		/** ticks a peak reading survives before it falls back. long enough to read off a sign. */
+		const val PEAK_WINDOW = 100
+
 	}
 
 	private var chargedOnTick = -1
 	private var trippedUntil = 0
+	private var peakOnTick = 0
 
 	/** operations spent this tick */
 	var spent: Int = 0; private set
 
-	/** highest spend any one tick has reached since the last reset */
+	/** highest spend any one tick reached in the last [PEAK_WINDOW] ticks */
 	var peak: Int = 0; private set
 
 	/** true while the mainframe is rebooting and dispatching nothing */
@@ -48,9 +52,27 @@ class DcBudget private constructor(val limit: Int) {
 		}
 
 		spent += operations
-		if (spent > peak) peak = spent
+
+		if (spent > peak) {
+
+			peak = spent
+			peakOnTick = tick
+
+		}
 
 		return spent <= limit
+
+	}
+
+	/** Lets the peak reading fall once it is older than [PEAK_WINDOW]. Driven from the mainframe's tick,
+	 *  so an idle mainframe's readout drops back to zero instead of sitting on an old high. */
+	fun agePeak() {
+
+		val tick = Bukkit.getCurrentTick()
+		if (tick - peakOnTick < PEAK_WINDOW) return
+
+		peak = 0
+		peakOnTick = tick
 
 	}
 
@@ -66,6 +88,7 @@ class DcBudget private constructor(val limit: Int) {
 
 		trippedUntil = 0
 		chargedOnTick = -1
+		peakOnTick = 0
 		spent = 0
 		peak = 0
 

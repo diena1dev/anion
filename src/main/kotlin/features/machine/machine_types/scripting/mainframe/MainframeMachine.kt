@@ -4,6 +4,7 @@ import dev.diena.anion.Anion
 import dev.diena.anion.features.custom.blocks.AnionBlocks
 import dev.diena.anion.features.machine.BlockSet
 import dev.diena.anion.features.machine.Machine
+import dev.diena.anion.features.machine.StructureResult
 import dev.diena.anion.features.machine.component.MachineSign
 import dev.diena.anion.features.machine.machine_types.PortedMachine
 import dev.diena.anion.features.scripting.DcBudget
@@ -117,10 +118,16 @@ class MainframeMachine : PortedMachine("Mainframe", MAINFRAME_STRUCTURE) {
 			"rebooting for ${DcBudget.REBOOT_TICKS} ticks"
 		)
 
+		console.render() // the trip has to land on the signs the same tick it happens
+
 	}
 
-	// dispatch happens on the emitting machine's tick, so a mainframe with nothing to walk does nothing
+	// dispatch happens on the emitting machine's tick, so all this does is keep the console honest
 	override fun tick() {
+
+		budget.agePeak()
+		console.refreshStatus()
+
 	}
 
 	override fun slowTick() {
@@ -136,6 +143,29 @@ class MainframeMachine : PortedMachine("Mainframe", MAINFRAME_STRUCTURE) {
 		MachineSign.seal(this)
 		budget.reset() // a freshly assembled mainframe is not still rebooting from its last life
 		store.recompile()
+		console.render()
+
+	}
+
+	/** true while the console is showing whatever it had before the structure broke */
+	private var signsStale = false
+
+	// MachineSign refuses to write to a broken machine, so the console has to be redrawn once the
+	// structure comes back — including a re-seal, since the replaced signs are new and unwaxed
+	override fun onStructureChanged(result: StructureResult) {
+
+		if (!result.intact) {
+
+			signsStale = true
+			return
+
+		}
+
+		if (!signsStale) return
+
+		signsStale = false
+
+		MachineSign.seal(this)
 		console.render()
 
 	}

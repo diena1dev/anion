@@ -29,8 +29,11 @@ class MainframeConsole private constructor(private val mainframe: MainframeMachi
 		/** the mainframe's own file. it belongs to no machine, so it rides the list as its own entry */
 		private const val GROUPS_ENTRY = "groups.dcprgm"
 
-		/** characters of a machine name that fit on one line of a sign */
+		/** characters that fit on one line of a sign */
 		private const val LINE_WIDTH = 15
+
+		/** what `>_ ` and `.sh` cost a name on a prompt line */
+		private const val PROMPT_FRAME = 6
 
 	}
 
@@ -43,6 +46,9 @@ class MainframeConsole private constructor(private val mainframe: MainframeMachi
 
 	/** the machine the selector page is showing */
 	private var selected: String? = null
+
+	/** the compute lines as last written, so the sign is only rewritten when a reading moves */
+	private var lastStatus: List<String> = emptyList()
 
 	/** Handles a click on the sign at [offset]. Anything that is not a console sign is ignored. */
 	fun click(offset: Vec3i, player: Player) {
@@ -82,8 +88,20 @@ class MainframeConsole private constructor(private val mainframe: MainframeMachi
 
 			Page.MAIN -> {
 
-				write(SIGN_CENTER, green(">_ mainframe.sh   "), green("machines_${mainframe.onlineNames.size}      "), green("servers_NaN     "), blank())
-				write(SIGN_LEFT, green(">_ machine_list    "), blank(), blank(), blank())
+				lastStatus = statusLines()
+
+				val tripped = mainframe.budget.tripped
+				val overCommitted = mainframe.store.totalCost > mainframe.budget.limit
+
+				write(
+					SIGN_CENTER,
+					green(prompt("mainframe")),
+					green("machines_${mainframe.onlineNames.size}"),
+					if (tripped) red(lastStatus[0]) else green(lastStatus[0]),
+					if (tripped || overCommitted) red(lastStatus[1]) else green(lastStatus[1]),
+				)
+
+				write(SIGN_LEFT, green(">_ machine_list"), blank(), blank(), blank())
 				write(SIGN_RIGHT, blank(), blank(), blank(), blank())
 
 			}
@@ -97,15 +115,15 @@ class MainframeConsole private constructor(private val mainframe: MainframeMachi
 
 				val entry = entries.getOrNull(cursor)
 
-				write(SIGN_LEFT, green(">_ left              "), blank(), blank(), blank())
-				write(SIGN_RIGHT, green(">_ right            "), blank(), blank(), blank())
+				write(SIGN_LEFT, green(">_ left"), blank(), blank(), blank())
+				write(SIGN_RIGHT, green(">_ right"), blank(), blank(), blank())
 
 				val position = value("[${cursor + 1}/${entries.size}]")
 
 				when (entry) {
 
-					BACK_ENTRY -> write(SIGN_CENTER, green(">_ machine.sh     "), blank(), blank(), green("back                "))
-					GROUPS_ENTRY -> write(SIGN_CENTER, green(">_ groups.dcprgm"), position, blank(), green("edit                  "))
+					BACK_ENTRY -> write(SIGN_CENTER, green(prompt("machine")), blank(), blank(), green("back"))
+					GROUPS_ENTRY -> write(SIGN_CENTER, green(">_ groups.dcprgm"), position, blank(), green("edit"))
 
 					else -> {
 
@@ -113,10 +131,10 @@ class MainframeConsole private constructor(private val mainframe: MainframeMachi
 
 						write(
 							SIGN_CENTER,
-							green(">_ ${name.take(10)}.sh"),
+							green(prompt(name)),
 							position,
 							blank(),
-							green("select              "),
+							green("select"),
 						)
 
 					}
@@ -139,22 +157,68 @@ class MainframeConsole private constructor(private val mainframe: MainframeMachi
 
 				}
 
+				val program = mainframe.store.programOf(name)
 				val hasFile = name in mainframe.store.fileNames
 
-				write(SIGN_LEFT, green(">_ rename         "), blank(), blank(), blank())
-				write(SIGN_RIGHT, green(">_ edit              "), blank(), blank(), blank())
+				write(SIGN_LEFT, green(">_ rename"), blank(), blank(), blank())
+				write(SIGN_RIGHT, green(">_ edit"), blank(), blank(), blank())
+
+				// a file with no compiled program behind it stopped compiling — say so rather than
+				// showing a cost of nothing, which reads as a program that does nothing
+				val fileLine = when {
+
+					program != null -> green("main.dcprgm_${program.cost}")
+					hasFile -> red("main.dcprgm ERR")
+					else -> blank()
+
+				}
 
 				write(
 					SIGN_CENTER,
-					green(">_ ${name.take(10)}.sh"),
-					green("ls                    "),
-					green(if (hasFile) "main.dcprgm        " else ""),
-					green("back                "),
+					green(prompt(name)),
+					green("ls"),
+					fileLine,
+					green("back"),
 				)
 
 			}
 
 		}
+
+	}
+
+	/** Redraws the main page when a compute reading has moved. Cheap enough to call every tick. */
+	fun refreshStatus() {
+
+		if (page != Page.MAIN) return
+		if (statusLines() == lastStatus) return
+
+		render()
+
+	}
+
+	/**
+	 * The two compute lines.
+	 *
+	 * `load` is what the mainframe is actually spending: the recent peak, not this tick's figure, because
+	 * a render lands at an arbitrary point in a tick and `spent` reads as noise. [DcBudget.agePeak] lets
+	 * it fall again.
+	 *
+	 * `demand` is what every compiled program would spend if it all fired on one tick. Over the limit is
+	 * not a fault — it means this ship trips if enough of it happens at once, which is a fitting decision,
+	 * not an error.
+	 */
+	private fun statusLines(): List<String> {
+
+		val budget = mainframe.budget
+
+		// seconds, so the sign is rewritten ten times over a reboot rather than two hundred
+		if (budget.tripped) return listOf("!! OVERRUN ${budget.rebootRemaining / 20 + 1}s", "rebooting...")
+
+		return listOf(
+			"load_${budget.peak}/${budget.limit}",
+			"demand_${mainframe.store.totalCost}/${budget.limit}",
+		)
 
 	}
 
@@ -208,11 +272,26 @@ class MainframeConsole private constructor(private val mainframe: MainframeMachi
 	private fun write(offset: Vec3i, vararg lines: Component) =
 		MachineSign.write(mainframe, offset, lines.toList())
 
-	private fun title(text: String) = Component.text(text).color(NamedTextColor.AQUA)
-	private fun button(text: String) = Component.text(text).color(NamedTextColor.GOLD)
-	private fun value(text: String) = Component.text(text).color(NamedTextColor.WHITE)
-	private fun plain(text: String) = Component.text(text).color(NamedTextColor.GRAY)
-	private fun green(text: String) = Component.text(text).color(NamedTextColor.GREEN)
+	/**
+	 * Pads [text] out to a whole line so the sign's own centring lands it against the left edge, and clips
+	 * anything that will not fit.
+	 *
+	 * The padding is derived from the text rather than typed out at the call site, so a value going from
+	 * one digit to two eats a space instead of shoving the line right. Signs use a proportional font, so
+	 * this is aligned by character count and not by pixel — close enough, and the alternative is a font
+	 * metrics table.
+	 */
+	private fun flush(text: String): String = text.take(LINE_WIDTH).padEnd(LINE_WIDTH)
+
+	/** A line of a name framed as a shell prompt, truncated to leave room for the frame. */
+	private fun prompt(name: String): String = ">_ ${name.take(LINE_WIDTH - PROMPT_FRAME)}.sh"
+
+	private fun title(text: String) = Component.text(flush(text)).color(NamedTextColor.AQUA)
+	private fun button(text: String) = Component.text(flush(text)).color(NamedTextColor.GOLD)
+	private fun value(text: String) = Component.text(flush(text)).color(NamedTextColor.WHITE)
+	private fun plain(text: String) = Component.text(flush(text)).color(NamedTextColor.GRAY)
+	private fun green(text: String) = Component.text(flush(text)).color(NamedTextColor.GREEN)
+	private fun red(text: String) = Component.text(flush(text)).color(NamedTextColor.RED)
 	private fun blank() = Component.empty()
 
 	private fun state(text: String, good: Boolean) =

@@ -30,10 +30,14 @@ object MachineSign {
 
 	}
 
-	/** Writes [lines] onto the sign at [offset]. Run sync. */
+	/** Writes [lines] onto the sign at [offset]. No-op while [machine] is broken. Run sync. */
 	fun write(machine: Machine, offset: Vec3i, lines: List<Component>, glow: Boolean = false, front: Boolean = true) {
 
 		Tasks.runSync {
+
+			// checked in here rather than at the call: the write is deferred, so a machine that was intact
+			// when it was queued can be rubble by the time it lands
+			if (!machine.intact) return@runSync
 
 			val cell = machine.localToWorld(offset)
 			val block = machine.level.world.getBlockAt(cell.x, cell.y, cell.z)
@@ -55,6 +59,8 @@ object MachineSign {
 	fun seal(machine: Machine) {
 
 		Tasks.runSync {
+
+			if (!machine.intact) return@runSync
 
 			for (offset in machine.resolvedStructure.keys) {
 

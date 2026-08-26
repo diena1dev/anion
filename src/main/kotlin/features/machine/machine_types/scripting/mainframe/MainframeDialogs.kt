@@ -51,9 +51,12 @@ object MainframeDialogs {
 		val emitter = mainframe.machineNamed(machineName) as? DcProgrammable
 
 		val header = mutableListOf<String>()
-		header += "dclang v0.1"
+		header += "dclang v0.3"
 
-		emitter?.dataInputs?.takeIf { it.isNotEmpty() }?.let { header += "available inputs: [${it.joinToString(" | ")}]" }
+		// inputs carry their type, because a program that compares the wrong shape is now a compile error
+		emitter?.dataInputs?.takeIf { it.isNotEmpty() }?.let { inputs ->
+			header += "available inputs: [${inputs.entries.joinToString(" | ") { (name, type) -> "$name:${type.name.lowercase()}" }}]"
+		}
 		emitter?.dataFunctions?.takeIf { it.isNotEmpty() }?.let { header += "available functions: [${it.joinToString(" | ")}]" }
 
 		header += "available modes: [${DcMode.entries.joinToString(" | ") { it.name.lowercase() }}]"
@@ -65,11 +68,13 @@ object MainframeDialogs {
 		if (emitter == null) header += "machine disconnected | inputs unavailable"
 
 		show(
+
 			player,
 			title = "editing [${DcStore.PROGRAM_FILE}] for [$machineName]",
 			header = header,
 			issues = issues,
 			initial = draft ?: mainframe.store.sourceOf(machineName),
+
 		) { source ->
 
 			when (val result = mainframe.store.saveProgram(machineName, source)) {
@@ -77,6 +82,15 @@ object MainframeDialogs {
 				is DcResult.Ok -> {
 
 					player.sendMessage(Component.text("saved [${DcStore.PROGRAM_FILE}] for [$machineName]").color(NamedTextColor.GREEN))
+
+					// what this one program costs, and what the mainframe now owes if everything fires at once
+					player.sendMessage(
+						Component.text(
+							"  compute ${result.value.cost} | mainframe demand " +
+							"${mainframe.store.totalCost}/${mainframe.budget.limit}"
+						).color(NamedTextColor.GRAY)
+					)
+
 					for (warning in result.warnings) player.sendMessage(Component.text("  warning $warning").color(NamedTextColor.YELLOW))
 
 					mainframe.console.render()
@@ -136,13 +150,13 @@ object MainframeDialogs {
 	/** Asks for a new name for [machineName]. */
 	fun openRename(mainframe: MainframeMachine, machineName: String, player: Player) {
 
-		val input = DialogInput.text(NAME_INPUT, Component.text("new_name"))
+		val input = DialogInput.text(NAME_INPUT, Component.text("renaming [$machineName]"))
 			.initial(machineName)
 			.maxLength(48)
 			.width(300)
 			.build()
 
-		val base = DialogBase.builder(Component.text("renaming [$machineName]"))
+		val base = DialogBase.builder(Component.text(""))
 			.body(listOf(DialogBody.plainMessage(Component.text("lowercase letters, digits and underscores"))))
 			.inputs(listOf(input))
 			.build()
