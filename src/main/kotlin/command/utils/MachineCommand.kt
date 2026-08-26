@@ -1,23 +1,100 @@
 package dev.diena.anion.command.utils
 
+import com.mojang.brigadier.StringReader
+import com.mojang.brigadier.context.CommandContext
+import com.mojang.brigadier.exceptions.DynamicCommandExceptionType
+import com.mojang.brigadier.suggestion.Suggestions
+import com.mojang.brigadier.suggestion.SuggestionsBuilder
 import dev.astralchroma.processor.annotations.Command
+import dev.astralchroma.processor.annotations.CustomType
 import dev.astralchroma.processor.annotations.Name
 import dev.astralchroma.processor.annotations.Permission
 import dev.astralchroma.processor.annotations.Sender
 import dev.astralchroma.processor.annotations.Subcommand
 import dev.diena.anion.Keys
+import dev.diena.anion.data.registry.AnionRegistryKey
+import dev.diena.anion.data.registry.registries.AnionRegistries
+import dev.diena.anion.extensions.placeAsPlayer
+import dev.diena.anion.extensions.plus
+import dev.diena.anion.extensions.times
+import dev.diena.anion.extensions.toBlockPos
 import dev.diena.anion.extensions.vec3i
 import dev.diena.anion.features.machine.Machine
+import io.papermc.paper.command.brigadier.MessageComponentSerializer
+import io.papermc.paper.command.brigadier.argument.ArgumentTypes
+import io.papermc.paper.command.brigadier.argument.CustomArgumentType
+import net.kyori.adventure.key.Key
+import net.kyori.adventure.key.Key.key
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.TextColor
 import org.bukkit.Color
 import org.bukkit.craftbukkit.CraftWorld
 import org.bukkit.entity.Player
+import java.util.concurrent.CompletableFuture
 
 @Command
 @Name("machine")
 @Permission("${Keys.COMMAND_PERMISSION_TREE}.machine")
 object MachineCommand {
+
+	/** how far in front of the sender a placed structure's core lands. */
+	private const val PLACEMENT_DISTANCE = 2
+
+	/** Stamps a machine type's structure into the world in front of the sender. Does not assemble it. */
+	@Subcommand
+	@Permission("${Keys.COMMAND_PERMISSION_TREE}.machine.place")
+	fun place(
+
+		@Sender sender: Player,
+		@CustomType(MachineType::class) machineKey: Key
+
+	) {
+
+		val blockSet = AnionRegistries.MACHINE_TYPE_REGISTRY.getValue(AnionRegistryKey(machineKey.value()))?.invoke()?.blockSet
+		if (blockSet == null) {
+
+			sender.info("No machine type registered under \"${machineKey.value()}\".")
+			return
+
+		}
+
+		// horizontal facing only, so looking at your feet does not bury the structure in the floor
+		val anchor = sender.location.toBlockPos() + (sender.facing.vec3i * PLACEMENT_DISTANCE)
+
+		// multiple variants can be valid at a cell — the first is placed as a representative
+		val placements = blockSet.blockMap.map { (offset, variants) ->
+
+			val target = anchor + offset
+			sender.world.getBlockAt(target.x, target.y, target.z) to variants.first().representative()
+
+		}
+
+		val occupied = placements.count { (block, _) -> !block.isReplaceable }
+		if (occupied > 0) {
+
+			sender.info("$occupied of ${placements.size} cells are already occupied. Clear the area first.")
+			return
+
+		}
+
+		// snapshots first: a protection plugin can deny a cell halfway through, and half a machine
+		// stamped into someone else's claim is worse than none of it.
+		val replaced = placements.map { (block, _) -> block.state }
+
+		for ((block, blockData) in placements) {
+
+			if (block.placeAsPlayer(sender, blockData)) continue
+
+			for (state in replaced) state.update(true, false)
+
+			sender.info("Placement denied at ${block.x}, ${block.y}, ${block.z}. Nothing was placed.")
+			return
+
+		}
+
+		sender.info("Placed \"${blockSet.name}\" (${placements.size} blocks) at $anchor. Not assembled.")
+
+	}
 
 	/** Assembles whatever machine the clicked block belongs to, at any offset and rotation. */
 	@Subcommand
@@ -169,4 +246,55 @@ object MachineCommand {
 
 	}
 
+}
+
+object MachineType : CustomArgumentType<Key, Key> {
+	private val MACHINE_TYPE_DOES_NOT_EXIST_ERROR = DynamicCommandExceptionType { key ->
+		MessageComponentSerializer.message().serialize(Component.text("\"$key\" does not exist!"))
+	}
+
+	override fun parse(reader: StringReader): Key {
+		var argument = ""
+
+		while (reader.canRead()) {
+			if (reader.peek().isWhitespace()) break
+			argument += reader.read()
+		}
+
+		val parts = argument.split(':', limit = 2)
+
+		val namespace = if (parts.size == 2) parts.first() else ""
+		val value = parts.last()
+
+		val key = key(namespace, value)
+
+		if (AnionRegistries.MACHINE_TYPE_REGISTRY.all[AnionRegistryKey(key.value())] != null) return key
+
+		// if we cannot find the machine, throw this
+		throw MACHINE_TYPE_DOES_NOT_EXIST_ERROR.create(key)
+	}
+
+	override fun getNativeType() = ArgumentTypes.key()
+
+	// Lazily loaded to avoid burning a second on startup
+	private val suggestions: List<String> by lazy {
+		val suggestions = mutableListOf<String>()
+
+		for (item in AnionRegistries.MACHINE_TYPE_REGISTRY.all) suggestions.add(item.key.toString())
+
+		suggestions
+	}
+
+	override fun <S : Any> listSuggestions(
+		context: CommandContext<S>,
+		builder: SuggestionsBuilder
+	): CompletableFuture<Suggestions> {
+		val start = builder.remainingLowerCase
+
+		suggestions
+			.filter { it.startsWith(start) }
+			.forEach { builder.suggest(it) }
+
+		return builder.buildFuture()
+	}
 }

@@ -5,7 +5,7 @@ import dev.diena.anion.data.registry.registries.AnionRegistries
 import dev.diena.anion.features.machine.machine_types.debug.BlinkerMachine
 import dev.diena.anion.features.machine.machine_types.debug.industry.DebugCargoContainer
 import dev.diena.anion.features.machine.machine_types.debug.transport.DebugGyroWheel
-import dev.diena.anion.features.machine.machine_types.MEDIUM_CARGO_CONTAINER_STRUCTURE
+import dev.diena.anion.features.machine.machine_types.debug.industry.DEBUG_CARGO_CONTAINER_STRUCTURE
 import dev.diena.anion.features.machine.machine_types.debug.industry.DebugFurnaceMachine
 import dev.diena.anion.features.machine.machine_types.scripting.ControlSeatMachine
 import dev.diena.anion.features.machine.machine_types.scripting.mainframe.MainframeMachine
@@ -27,12 +27,12 @@ object AnionMachines {
 	val MAINFRAME = registerMachine { MainframeMachine() }
 	val CONTROL_SEAT = registerMachine { ControlSeatMachine() }
 
-	val MEDIUM_CARGO_CONTAINER = registerMachine {
+	val DEBUG_CARGO_CONTAINER = registerMachine {
 		DebugCargoContainer(
-			displayName = "Medium Cargo Container",
-			blockSet = MEDIUM_CARGO_CONTAINER_STRUCTURE,
-			typeLimit = 10,
-			totalCapacity = 24_000,
+			displayName = "DEBUG Cargo Container",
+			blockSet = DEBUG_CARGO_CONTAINER_STRUCTURE,
+			typeLimit = 67,
+			totalCapacity = 69_420,
 		)
 	}
 

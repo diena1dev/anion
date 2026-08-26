@@ -5,40 +5,43 @@ import dev.diena.anion.features.machine.BlockSet
 import dev.diena.anion.features.machine.component.BulkItemBuffer
 import dev.diena.anion.features.machine.component.MachinePort
 import dev.diena.anion.features.machine.machine_types.PortedMachine
+import org.bukkit.block.BlockType
 
-val DEBUG_CARGO_CONTAINER =
+val DEBUG_CARGO_CONTAINER_STRUCTURE =
 	BlockSet.new("medium_cargo_container")
-		.core('C', AnionBlocks.TEST_BLOCK)
+		.core('C', AnionBlocks.COPPER_MACHINE_CASING)
 
 		.assign('I', AnionBlocks.COPPER_MACHINE_CASING)
 		.assign('I', AnionBlocks.COPPER_MACHINE_BUS)
 		.assign('I', AnionBlocks.COPPER_MACHINE_DISPLAY)
 
+		.assign('c', BlockType.WAXED_COPPER_BLOCK)
+
 		// floor. the origin is this slice's first cell, so local offsets run 0..5 x, 0..2 y, 0..2 z
 		.slice(
 			"III",
+			"ccc",
 			"III",
 			"III",
-			"III",
-			"III",
+			"ccc",
 			"ICI",
 		)
 		// walls. the blanks are the cargo void — unchecked, so anything may sit in there
 		.slice(
 			"III",
+			"c c",
 			"I I",
 			"I I",
-			"I I",
-			"I I",
+			"c c",
 			"III",
 		)
 		// roof
 		.slice(
 			"III",
+			"ccc",
 			"III",
 			"III",
-			"III",
-			"III",
+			"ccc",
 			"III",
 		)
 

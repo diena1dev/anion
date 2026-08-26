@@ -24,16 +24,21 @@ import net.minecraft.world.level.block.state.BlockState
 import net.minecraft.world.phys.Vec3
 import net.minecraft.world.level.block.NoteBlock as NmsNoteBlock
 import org.bukkit.Axis
+import org.bukkit.Bukkit
 import org.bukkit.Location
 import org.bukkit.Material
 import org.bukkit.RegionAccessor
 import org.bukkit.block.Block
 import org.bukkit.block.BlockFace
+import org.bukkit.block.data.BlockData
 import org.bukkit.block.data.type.NoteBlock
 import org.bukkit.craftbukkit.block.data.CraftBlockData
 import org.bukkit.entity.Entity
+import org.bukkit.entity.Player
+import org.bukkit.event.block.BlockPlaceEvent
 import org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason
 import org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason.CUSTOM
+import org.bukkit.inventory.EquipmentSlot
 import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.ItemStack
 import org.bukkit.util.Vector
@@ -257,6 +262,57 @@ inline val Block.adjacentBlocks get() = run {
 }
 
 inline val Location.blockPos get() = BlockPos(x.toInt(), y.toInt(), z.toInt())
+
+/**
+ * Sets this block to [blockData] as if [player] had placed it: a [BlockPlaceEvent] is fired, so
+ * protection plugins get their veto and place listeners run. Returns false and leaves the world
+ * untouched when the placement is denied.
+ *
+ * [placedAgainst] is what the placement is reported to lean on, and defaults to the block below.
+ */
+fun Block.placeAsPlayer(
+
+	player: Player,
+	blockData: BlockData,
+	placedAgainst: Block = getRelative(BlockFace.DOWN),
+	hand: EquipmentSlot = EquipmentSlot.HAND,
+
+): Boolean {
+
+	val replacedState = state
+	val previousData = blockData.clone()
+
+	setBlockData(blockData, false)
+
+	val event = BlockPlaceEvent(this, replacedState, placedAgainst, blockData.asPlacementItem(), player, true, hand)
+	Bukkit.getPluginManager().callEvent(event)
+
+	if (event.isCancelled || !event.canBuild()) {
+
+		replacedState.update(true, false)
+		return false
+
+	}
+
+	// listeners are free to restate the block;a pillar lays itself along the face it was placed
+	// against. the caller asked for an exact state, so put it back.
+	if (this.blockData != previousData) setBlockData(previousData, false)
+
+	return true
+
+}
+
+/** The item a player would be holding to place [this] state. Falls back to the plain material. */
+private fun BlockData.asPlacementItem(): ItemStack {
+
+	val noteBlock = this as? NoteBlock ?: return ItemStack(material)
+	val anionBlock = AnionBlocks.fromState(noteBlock.instrument, noteBlock.note.id.toInt())
+		?: return ItemStack(material)
+
+	return AnionRegistries.ITEM_REGISTRY.getValue(AnionRegistryKey(anionBlock.namespacedKey.key))?.asItemStack()
+		?: ItemStack(material)
+
+}
 
 /** Colors each character of this component's content as a gradient between [from] and [to]. Children are kept as-is. */
 fun TextComponent.gradient(from: TextColor, to: TextColor): TextComponent {
