@@ -175,6 +175,11 @@ object DcOperators {
 
 	val infix: List<Infix> = listOf(
 
+		// binds loosest of all, so everything to the right of it is the gate: `["x"] when [a] and [b]`
+		// asks for both keys. the value is on the left because that is what gets delivered — and a
+		// literal alone reads no inputs, so without a gate it would sit in no index and never fire.
+		Infix("when", 0, 1, null, apply = { left, right -> if (right.truthy) left else DcValue.FALSE }),
+
 		Infix("or", 1, 1, DcType.NUM, apply = { left, right -> DcValue.of(left.truthy || right.truthy) }),
 		Infix("and", 2, 1, DcType.NUM, apply = { left, right -> DcValue.of(left.truthy && right.truthy) }),
 
@@ -379,6 +384,8 @@ sealed interface DcExpr {
 
 		}
 
+		// an operator with no fixed result is whatever its operands are, and the left one leads: `when`
+		// hands its left side through, so a gated string is still a string
 		override fun typeOf(declared: Map<String, DcType>?): DcType? =
 			operator.result ?: left.typeOf(declared) ?: right.typeOf(declared)
 

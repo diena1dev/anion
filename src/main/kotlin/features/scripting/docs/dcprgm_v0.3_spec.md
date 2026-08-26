@@ -112,9 +112,11 @@ The `def_group` check belongs next to the existing "is a machine, so it cannot a
 `DcParser.parseGroups`, and applies to group names only — machine names are generated as
 `${type}_${index}` and always contain letters.
 
-Text literals are **quoted inside the brackets**: `["ready"]`. Words are split on whitespace before
-anything is parsed, so a text literal cannot contain a space. Good enough for labels and status names,
-which is what they are for.
+Text literals are **quoted inside the brackets**: `["ready"]`, `["hangar bay"]`.
+
+The lexer is quote-aware: a quoted span is held together as one word, and a `//` inside quotes is text
+rather than the start of a comment. Text that could not hold a space would be no use for the thing text
+is for — which is putting a line on a screen.
 
 No list or position literals in v0.3. Both only ever come from a machine.
 
@@ -128,12 +130,18 @@ Precedence, loosest to tightest. v0.2 shipped 1 and 2.
 
 | precedence | operators | kind |
 | --- | --- | --- |
+| 0 | `when` | infix |
 | 1 | `or` | infix |
 | 2 | `and` | infix |
 | 3 | `=` `!=` `>` `<` `>=` `<=` | infix |
 | 4 | `+` `-` | infix |
 | 5 | `*` `/` | infix |
 | — | `not` `count` `any` `all` `text` | prefix |
+
+`when` gates a value: it hands its left side through when the right side is true, and a false-y number
+otherwise. It binds loosest of everything, so all of `["x"] when [a] and [b]` to the right of `when` is
+the gate. It is what makes a literal reachable at all — an expression that reads no inputs sits in no
+index and never fires.
 
 `=` and `!=` work across every type, and compare false between two different ones. The ordering
 comparisons are numbers only.

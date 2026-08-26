@@ -198,7 +198,8 @@ literal    := [12.5] | ["some text"]
 
 Parentheses need no surrounding spaces — the lexer splits them off before words are read. A bracketed
 word that parses as a number is a number literal and one wrapped in quotes is text, so `def_group`
-rejects a numeric group name. Text literals hold no whitespace: words are split on it.
+rejects a numeric group name. A quoted span survives the lexer whole, so `["hangar bay"]` is one word
+and a `//` inside quotes is text rather than the start of a comment.
 
 `target` is a group name or a machine name. All identifiers are bracketed. Statement per line.
 
@@ -207,6 +208,7 @@ the evaluator, the type checker and the cost model all read it from there.
 
 | precedence | operators                        |
 |------------|----------------------------------|
+| 0          | `when`                           |
 | 1          | `or`                             |
 | 2          | `and`                            |
 | 3          | `=` `!=` `<` `>` `<=` `>=`       |
