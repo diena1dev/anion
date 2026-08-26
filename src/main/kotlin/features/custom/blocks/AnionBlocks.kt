@@ -14,6 +14,7 @@ import net.kyori.adventure.text.format.TextColor
 import org.bukkit.Axis
 import org.bukkit.Color
 import org.bukkit.Instrument
+import org.bukkit.block.BlockFace
 
 object AnionBlocks {
 
@@ -66,12 +67,18 @@ object AnionBlocks {
 		)
 	)
 
-	// TODO: AnionPillarBlock
-	val COPPER_MACHINE_DISPLAY = registerBlock(
-		AnionBlock(
+	// horizontal facings only: a screen you read from above or below is not a screen. note 5 stays north
+	// so displays already placed in a world keep working.
+	val COPPER_MACHINE_DISPLAY = registerDirectionalBlock(
+		AnionDisplayBlock(
 			"Copper Machine Display",
 			Instrument.ZOMBIE,
-			5,
+			mapOf(
+				BlockFace.NORTH to 5,
+				BlockFace.EAST to 13,
+				BlockFace.SOUTH to 14,
+				BlockFace.WEST to 15,
+			),
 			styledDisplayName = Component.text("Copper Machine ")
 				.gradient(COPPER_TEXT_START, COPPER_TEXT_END)
 				.append(Component.text("Display").color(TextColor.color(Color.LIME.asARGB()))),
@@ -183,6 +190,18 @@ object AnionBlocks {
 	/** every axis's note resolves back to the same block, so structure checks ignore orientation */
 	private fun registerPillarBlock(block: AnionPillarBlock): AnionPillarBlock {
 		for (note in block.notesByAxis.values) byState[block.instrument to note] = block
+
+		AnionRegistries.BLOCK_REGISTRY.register(
+			AnionRegistryKey(block.namespacedKey.key),
+			block
+		)
+
+		return block
+	}
+
+	/** every facing's note resolves back to the same block, so structure checks ignore orientation */
+	private fun registerDirectionalBlock(block: AnionDirectionalBlock): AnionDirectionalBlock {
+		for (note in block.notesByFace.values) byState[block.instrument to note] = block
 
 		AnionRegistries.BLOCK_REGISTRY.register(
 			AnionRegistryKey(block.namespacedKey.key),

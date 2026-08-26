@@ -7,6 +7,7 @@ import dev.diena.anion.data.registry.registries.AnionRegistries
 import dev.diena.anion.features.custom.ItemKey
 import dev.diena.anion.features.custom.blocks.AnionBlock
 import dev.diena.anion.features.custom.blocks.AnionBlocks
+import dev.diena.anion.features.custom.blocks.AnionDirectionalBlock
 import dev.diena.anion.features.custom.blocks.AnionPillarBlock
 import dev.diena.anion.features.custom.items.AnionItem
 import io.papermc.paper.datacomponent.DataComponentType
@@ -498,6 +499,18 @@ fun Axis.rotated(rotation: Rotation): Axis = when (rotation) {
 
 }
 
+/** This face after [rotation]. Vertical faces are unmoved — a yaw turn cannot tip anything over. */
+fun BlockFace.rotated(rotation: Rotation): BlockFace {
+
+	if (this == BlockFace.UP || this == BlockFace.DOWN) return this
+
+	var face = this
+	repeat(rotation.quarterTurns) { face = face.rotateRight() }
+
+	return face
+
+}
+
 /** Rotates this block state, including the part vanilla cannot do for us. */
 fun BlockState.rotateWithAnion(rotation: Rotation): BlockState {
 
@@ -522,6 +535,15 @@ val Block.anionBlock: AnionBlock?
 		val noteBlock = blockData as? NoteBlock ?: return null
 
 		return AnionBlocks.fromState(noteBlock.instrument, noteBlock.note.id.toInt())
+	}
+
+/** Which way this block points, or null when it is not a placed [AnionDirectionalBlock]. */
+val Block.anionFace: BlockFace?
+	get() {
+		val directional = anionBlock as? AnionDirectionalBlock ?: return null
+		val noteBlock = blockData as? NoteBlock ?: return null
+
+		return directional.faceOf(noteBlock.note.id.toInt())
 	}
 
 /** Which way this block runs, or null when it is not a placed [AnionPillarBlock]. */
