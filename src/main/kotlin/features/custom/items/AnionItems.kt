@@ -28,19 +28,6 @@ object AnionItems {
 		)
 	)
 
-	// projectile weapons
-	val ANION_BLASTER_PISTOL = registerItem(
-		AnionBlasterPistolItem()
-	)
-
-	val ANION_TOOL_GUN = registerItem(
-		AnionToolGunItem()
-	)
-
-	// machine tools
-	val WRENCH = registerItem(AnionWrenchItem())
-	val SCREWDRIVER = registerItem(AnionScrewdriverItem())
-
 	val RAW_URANIUM_ORE = registerItem(
 		AnionItem(
 			displayName = "Raw Uranium Ore",
@@ -54,6 +41,19 @@ object AnionItems {
 			itemRepresentation = ItemType.AMETHYST_SHARD
 		)
 	)
+
+	// projectile weapons
+	val ANION_BLASTER_PISTOL = registerItem(
+		AnionBlasterPistolItem()
+	)
+
+	val ANION_TOOL_GUN = registerItem(
+		AnionToolGunItem()
+	)
+
+	// machine tools
+	val WRENCH = registerItem(AnionWrenchItem())
+	val SCREWDRIVER = registerItem(AnionScrewdriverItem())
 
 	// blocks
 	val TEST_BLOCK        = registerBlock(AnionBlocks.TEST_BLOCK)
@@ -78,7 +78,6 @@ object AnionItems {
 		AnionRegistries.ITEM_REGISTRY.register(AnionRegistryKey(it.namespacedKey.key), it)
 	}
 
-	// placeholder, see the 26.1 vanilla jar's Item class for the planned structure.
 	private fun registerBlock(block: AnionBlock): AnionItem {
 		val blockItem = AnionBlockItem(block)
 

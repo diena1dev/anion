@@ -137,7 +137,7 @@ class Starship {
 		this.yaw = 1.0
 		this.size = blockPosSet.size
 
-		this.machines.rebuild() // claim any machine already assembled inside the detected blocks
+		this.machines.rebuild()  // claim any machine already assembled inside the detected blocks
 		this.transport.rebuild() // and any pipe, junction or chute among the detected blocks
 
 		this.simulator.calculateTotalStarshipMass() // calculate initial starship mass
@@ -209,11 +209,11 @@ class Starship {
 
 		}
 
-		this.origin += vectorToMoveIn                  // translate origin
+		this.origin += vectorToMoveIn                           // translate origin
 		this.blockHashMap = writingToWorld { StarshipMovement.move(vectorToMoveIn, this) }
-		this.machines.translate(vectorToMoveIn) // carry machines along, after the world is rewritten
+		this.machines.translate(vectorToMoveIn)  // carry machines along, after the world is rewritten
 		this.transport.translate(vectorToMoveIn) // and the component cells, which are pure positions
-		this.hitbox.moveHitbox(vectorToMoveIn) // translate hitbox
+		this.hitbox.moveHitbox(vectorToMoveIn)           // translate hitbox
 		this.dirty = true
 		this.moving = false
 
@@ -223,7 +223,7 @@ class Starship {
 
 	}
 
-	/** increments yaw by given amount, rotates if */
+	/** increments yaw by given amount, rotates if yaw passes past a 90 degree threshold. */
 	fun rotate(
 
 		byAmount: Double // can be negative
@@ -243,8 +243,7 @@ class Starship {
 
 		}
 
-		// yaw lives here, not in StarshipMovement — that class only rewrites blocks, and the machine
-		// transform has to be driven off the exact same step count the blocks were rotated by.
+		// yaw lives here
 		val oldYaw = this.yaw
 		this.yaw = ((oldYaw + byAngle % 360) + 360) % 360 // modulo to wraparound whatever angle we get
 		val steps = stepsFromTo(oldYaw.toFace(), this.yaw.toFace())
@@ -260,9 +259,9 @@ class Starship {
 
 		// origin is unchanged
 		this.blockHashMap = writingToWorld { StarshipMovement.rotate(steps, this) }
-		this.machines.rotate(rotationOf(steps)) // same steps as the blocks, so machines land with them
+		this.machines.rotate(rotationOf(steps))  // same steps as the blocks, so machines land with them
 		this.transport.rotate(rotationOf(steps))
-		this.hitbox.rebuildHitbox() // recompute hitbox
+		this.hitbox.rebuildHitbox()                            // recompute hitbox
 		this.dirty = true
 		this.moving = false
 
@@ -272,7 +271,7 @@ class Starship {
 
 	}
 
-	// TODO: call machines.reassignLevel(newLevel) alongside the block rewrite — relocate() only moves
+	// TODO: call machines.reassignLevel(newLevel) alongside the block rewrite- relocate() only moves
 	//       carried machines within a level.
 	fun changeWorld(
 

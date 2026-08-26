@@ -1,4 +1,4 @@
-package dev.diena.anion.features.machine.machine_types.thrusters
+package dev.diena.anion.features.machine.machine_types.debug.transport
 
 import dev.diena.anion.extensions.div
 import dev.diena.anion.extensions.rotate
@@ -6,6 +6,7 @@ import dev.diena.anion.extensions.times
 import dev.diena.anion.features.custom.blocks.AnionBlocks
 import dev.diena.anion.features.machine.BlockSet
 import dev.diena.anion.features.machine.Machine
+import dev.diena.anion.features.machine.machine_types.thrusters.ThrusterThrottle
 import dev.diena.anion.features.scripting.DcProgrammable
 import net.minecraft.core.Vec3i
 import net.minecraft.nbt.CompoundTag
@@ -43,12 +44,7 @@ val DEBUG_THRUSTER_HORIZONTAL = BlockSet.new("debug_thruster_horizontal")
 	.build()
 
 // TODO: make generalized thruster class
-/**
- * Debug Thruster that outputs differing levels of thrust based on the strength of the redstone signal being input.
- *
- * Also takes a throttle over a datachannel. Redstone and datachannel run alongside each other and the
- * stronger of the two wins, so wiring a mainframe to one never takes the lever away.
- */
+/** Debug Thruster that moves the starship it's attached to. if no ship is attached, it emits smoke. */
 class DebugThrusterHorizontal() : Machine("debug_thruster_horizontal", DEBUG_THRUSTER_HORIZONTAL), DcProgrammable {
 
 	companion object {
@@ -61,11 +57,11 @@ class DebugThrusterHorizontal() : Machine("debug_thruster_horizontal", DEBUG_THR
 
 	}
 
-	private val controls = ThrusterThrottle.new()
+	private val controls = ThrusterThrottle.Companion.new()
 
 	// no hover: this one pushes sideways, so there is no altitude for it to hold
 	override val dataInputs: List<String> = listOf("currnt_throttle", "toggled_state")
-	override val dataFunctions: List<String> = ThrusterThrottle.FUNCTIONS
+	override val dataFunctions: List<String> = ThrusterThrottle.Companion.FUNCTIONS
 
 	override fun invoke(function: String, active: Boolean) {
 

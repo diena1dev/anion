@@ -6,8 +6,7 @@ import net.minecraft.nbt.CompoundTag
 import net.minecraft.world.phys.Vec3
 
 /**
- * The datachannel throttle behind every thruster. Redstone is read off the ports and is not this class's
- * business — a thruster takes whichever of the two is asking for more.
+ * The datachannel throttle behind every thruster. Redstone is read off the ports.
  *
  * Latching lives on the calling side, so [toggled] follows whatever the mainframe latched rather than
  * keeping a second latch of its own.
@@ -21,7 +20,7 @@ class ThrusterThrottle private constructor() {
 		/** the throttle runs on the same 0-15 scale redstone does */
 		const val MAX_THROTTLE = 15
 
-		/** what a thruster answers to, before any hover its variant may add */
+		/** what a thruster answers to, before any other functions its variants may add */
 		val FUNCTIONS = listOf("increase_throttle", "decrease_throttle", "toggle", "reset")
 
 	}
@@ -78,13 +77,6 @@ class ThrusterThrottle private constructor() {
 /**
  * Altitude hold for a thruster that points along y. Pins the ship to the altitude its thruster carried it
  * to and pushes back against any drift the other way.
- *
- * Authority is finite: a fast fall is bled off over several ticks rather than stopped dead. It works
- * against the drift rather than the cause of it, because gravity and the whole-block latch happen
- * together inside one simulator pass, so no machine tick can land between them to prevent the step.
- *
- * [sign] is which way the thruster pushes, so an up thruster's pin only ever rises and a down thruster's
- * only ever falls. Everything else about the two is identical.
  */
 class ThrusterHover private constructor(private val thruster: Machine, private val sign: Int) {
 
@@ -106,7 +98,7 @@ class ThrusterHover private constructor(private val thruster: Machine, private v
 	/** y the hold is pinned to, null while nothing is holding. */
 	private var heldAltitude: Int? = null
 
-	/** true while the hold is travelling back to its pin, so that move cannot be mistaken for a real one. */
+	/** true while the hold is traveling back to its pin, so that move cannot be mistaken for a real one. */
 	private var recovering = false
 
 	/** whether the datachannel has asked for a hover. redstone is asked for separately by the thruster. */

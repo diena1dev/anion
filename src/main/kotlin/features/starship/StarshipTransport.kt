@@ -10,14 +10,7 @@ import org.bukkit.block.Block
 import org.bukkit.craftbukkit.block.data.CraftBlockData
 import java.util.concurrent.ConcurrentHashMap
 
-/**
- * Every transport component cell carried by a [Starship].
- *
- * A component is a cell rather than an instance, so unlike [StarshipMachines] there is nothing here to
- * attach or detach — only a set of world positions that has to follow the ship. Carried cells stay out
- * of the persisted AnionTransportIndex the same way carried machines stay out of MachineIndex: they
- * move every tick, and the ship's own save already carries the blocks.
- */
+/** Every transport component cell carried by a [Starship]. */
 class StarshipTransport private constructor() {
 
 	private lateinit var starship: Starship
@@ -49,7 +42,7 @@ class StarshipTransport private constructor() {
 
 	/** re-derives the whole set from the ship's blocks. call after blockHashMap is (re)built. */
 	// classifies the stored BlockStates rather than reading the world, so loading a ship cannot pull in
-	// every chunk it spans just to find out where its pipes are
+	// every chunk it spans just to find out where its pipes are.
 	fun rebuild() {
 
 		this.carried.clear()

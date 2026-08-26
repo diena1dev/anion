@@ -13,13 +13,10 @@ interface AnionResource {
 }
 
 /**
- * Identity of one item *variant*. Two stacks of the same item with different data components are
+ * Identity of one item variant. Two stacks of the same item with different data components are
  * different keys, so damaged tools, enchanted gear and custom item states each count on their own.
- *
- * Gases, fluids and energy are registry singletons and are their own identity — this exists only
- * because items are not.
- */
-// equality is the ItemStack's own, which compares data components but not amount. normalising to a
+*/
+// equality is the ItemStack's own, which compares data components but not amount. normalizing to a
 // single item on the way in is what makes it usable as a map key.
 class ItemKey private constructor(
 
@@ -31,8 +28,7 @@ class ItemKey private constructor(
 	/** the registered AnionItem this is a variant of, or null for a plain vanilla item */
 	val anionItem get() = stack.toAnionItem()
 
-	// vanilla items have no Anion registry entry, so they fall back to their material key. this is a
-	// label, NOT the identity — two variants of one item share it. compare ItemKeys, never their keys.
+	// vanilla items have no Anion registry entry, so they fall back to their material key.
 	override val namespacedKey: NamespacedKey
 		get() = anionItem?.namespacedKey ?: stack.type.key
 

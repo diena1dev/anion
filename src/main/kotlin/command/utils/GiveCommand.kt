@@ -35,7 +35,7 @@ object GiveCommand {
 
 		@Sender sender: Player, // require player
 		@CustomType(Item::class) itemKey: Key,
-		amount: Int,
+		amount: Int = 1,
 
 	) = give(sender, itemKey, amount)
 
@@ -45,8 +45,8 @@ object GiveCommand {
 
 		@Sender sender: Player, // require player
 		@CustomType(Item::class) itemKey: Key,
-		target: Player,
-		amount: Int,
+		target: Player = sender,
+		amount: Int = 1,
 
 		) = give(sender, itemKey, amount, target)
 

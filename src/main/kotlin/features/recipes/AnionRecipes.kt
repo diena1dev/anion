@@ -13,6 +13,7 @@ import dev.diena.anion.features.recipes.adapters.ShapedCraftingTableAdapter
 import dev.diena.anion.features.recipes.adapters.ShapelessCraftingTableAdapter
 import org.bukkit.inventory.ItemType
 
+// TODO: JEI-Style chest GUI to view all craftable AnionItems and how to create them.
 /**
  * Declarative recipe registrations. Mirrors [AnionItems] / [AnionBlocks]:
  * define adapter instances as `val`s and the [registerRecipe] helper
@@ -279,8 +280,6 @@ object AnionRecipes {
 	// MACHINE RECIPES
 
 	// the debug furnace's only recipe: one test item and one test fuel, five seconds, one test block.
-	// both ingredients are drawn in full on the first tick that has them, and the remaining ticks are
-	// pure processing time — a starved run never starts, and a run that started always finishes.
 	val DEBUG_FURNACE_SMELT = registerRecipe(
 		MachineRecipeAdapter(
 			recipe = AnionRecipe(

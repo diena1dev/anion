@@ -20,11 +20,10 @@ import org.bukkit.inventory.EquipmentSlot
 import org.bukkit.inventory.ItemStack
 
 /**
- * An access point punched into a machine's casing. A port only exposes the buffer behind it — it
- * takes no part in any transport loop, which attaches its own adapter blocks on the outside.
+ * An access point punched into a machine's casing. Ports intentionally have no role in a transport network.
  *
  * Ports are resolved once, at assembly, from the variants that actually filled the casing cells.
- * Swapping a casing block for a port block afterwards breaks the structure instead of adding a port.
+ * Swapping a casing block for a port block afterward breaks the structure instead of adding a port.
  */
 class MachinePort(
 
@@ -50,9 +49,6 @@ class MachinePort(
 	/**
 	 * Moves this port to the machine's next buffer, then round to unbound. Returns the key it landed
 	 * on, or null for unbound.
-	 *
-	 * A machine with one buffer can bind every port to it at assembly and never think about this. A
-	 * machine with three cannot, so which port feeds which is the player's to say.
 	 */
 	// TODO: a bus has no business bridging a gas buffer. gating the cycle by port kind needs the
 	//       resource family each kind maps to to be settled first, and it is not. until then the
@@ -64,7 +60,7 @@ class MachinePort(
 
 		val index = keys.indexOf(bufferKey)
 		val next = when {
-			bufferKey == null -> keys.first() // unbound, so start at the top
+			bufferKey == null -> keys.first()  // unbound, so start at the top
 			index < 0 -> keys.first()          // bound to something that no longer exists
 			index == keys.lastIndex -> null    // round back off the end
 			else -> keys[index + 1]
@@ -92,17 +88,7 @@ class MachinePort(
 
 	companion object {
 
-		/**
-		 * Puts what the player is holding into the buffer behind the port they clicked.
-		 *
-		 * The hand-loading path, so a machine can be fed without building a transport network to it.
-		 * What actually fits is decided by the buffer, not here: the wrong resource for it, or no room,
-		 * takes nothing and says so.
-		 *
-		 * Returns whether the click was spent. Only a load that actually moved something spends it —
-		 * anything else leaves the click to the placement path, so a port stays a block you can build
-		 * against. Sneaking skips the whole thing, which is the reliable way to build against one.
-		 */
+		/** Puts what the player is holding into the buffer behind the port they clicked. Returns whether the click was spent. */
 		fun insertHeld(event: PlayerInteractEvent): Boolean {
 
 			if (event.action != Action.RIGHT_CLICK_BLOCK) return false

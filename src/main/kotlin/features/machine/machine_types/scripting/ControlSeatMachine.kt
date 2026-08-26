@@ -4,6 +4,7 @@ import dev.diena.anion.features.custom.blocks.AnionBlocks
 import dev.diena.anion.features.machine.BlockSet
 import dev.diena.anion.features.machine.Machine
 import dev.diena.anion.features.machine.machine_types.PortedMachine
+import dev.diena.anion.features.machine.machine_types.scripting.mainframe.MainframeMachine
 import dev.diena.anion.features.scripting.DcProgrammable
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor

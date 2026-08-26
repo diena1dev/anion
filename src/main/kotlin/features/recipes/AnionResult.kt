@@ -5,9 +5,7 @@ import dev.diena.anion.features.custom.fluids.AnionFluid
 import dev.diena.anion.features.custom.gasses.AnionGas
 import dev.diena.anion.features.custom.items.AnionItem
 
-/**
- * The output side of an [AnionRecipe].
- */
+/** The output side of an [AnionRecipe]. */
 sealed interface AnionResult {
 
 	/** singleton results */

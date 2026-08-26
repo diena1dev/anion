@@ -53,6 +53,7 @@ import org.bukkit.inventory.EquipmentSlot
 import java.util.WeakHashMap
 
 // FIXME: cleanup and explain more of the listeners.
+// FIXME: update comment structure- e.g. needs the five '/' prefix before section changes
 @Register
 @Suppress("UnstableApiUsage")
 object AnionBlockListeners : Listener {
@@ -114,9 +115,9 @@ object AnionBlockListeners : Listener {
 	}
 
 	/** Plays [anionBlock]'s place sound to [player], who would otherwise not hear it. */
-	// BlockItem.place() plays the sound with the placer excluded, because vanilla expects their client
-	// to have predicted it. this placement is driven server-side, so without this it is silent for the
-	// one person who should definitely hear it.
+	// FIXME: handle shift-click placing, look into making the note block place sound silent by default
+	//        so that custom blocks can properly have custom sounds.
+	// FIXME: normal (non-custom) blocks placed against custom blocks do not make sound. fix.
 	private fun playPlaceSound(block: Block, anionBlock: AnionBlock, player: Player) {
 
 		val group = anionBlock.soundGroup ?: block.blockData.soundGroup
@@ -143,19 +144,12 @@ object AnionBlockListeners : Listener {
 	}
 
 	/** The face each player last clicked, since [BlockPlaceEvent] does not carry one. */
-	// weak keys so a player who logs out drops out on their own, without a quit handler to remember
 	private val lastClickedFace = WeakHashMap<Player, BlockFace>()
 
 	/** The axis a pillar lands on: the one running out of the face that was clicked. */
-	// this also extends a run for free. clicking the end of a pipe gives the same axis, clicking its
-	// side gives the perpendicular one, so branching and continuing are the same gesture.
 	private fun placementAxis(pillar: AnionPillarBlock, event: BlockPlaceEvent): Axis {
 
-		// the delta only agrees with the clicked face when the placement landed in a cell of its own.
-		// a placement that replaces grass or water lands *in* the block it was placed against, making
-		// the delta SELF, so the remembered face is what carries those.
 		val clickedFace = lastClickedFace[event.player] ?: event.blockAgainst.getFace(event.blockPlaced)
-
 		return pillar.axisFor(clickedFace)
 
 	}

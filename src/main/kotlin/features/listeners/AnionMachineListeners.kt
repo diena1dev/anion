@@ -18,22 +18,29 @@ object AnionMachineListeners: Listener {
 
 	@EventHandler
 	fun onChunkLoad(event: ChunkLoadEvent) {
+
 		val chunk = event.chunk
 		val world = (chunk.world as CraftWorld).handle
 		AnionPersistence.loadMachinesForChunk(world, chunk.x, chunk.z)
+
 	}
 
 	@EventHandler
 	fun onChunkUnload(event: ChunkUnloadEvent) {
+
 		val chunk = event.chunk
 		val world = (chunk.world as CraftWorld).handle
+
 		for ((uuid, machine) in Machine.activeMachines.entries.toList()) {
+
 			if (machine.level != world) continue
 			if ((machine.origin.x shr 4) == chunk.x && (machine.origin.z shr 4) == chunk.z) {
 				// carried machines remain loaded until the starship detaches them
 				AnionPersistence.unloadMachine(uuid)
 			}
+
 		}
+
 	}
 
 }

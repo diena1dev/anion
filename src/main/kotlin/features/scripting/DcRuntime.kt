@@ -1,7 +1,7 @@
 package dev.diena.anion.features.scripting
 
 import dev.diena.anion.Anion
-import dev.diena.anion.features.machine.machine_types.scripting.MainframeMachine
+import dev.diena.anion.features.machine.machine_types.scripting.mainframe.MainframeMachine
 import org.bukkit.Bukkit
 
 /**
@@ -62,14 +62,7 @@ class DcRuntime private constructor(private val mainframe: MainframeMachine) {
 
 	}
 
-	/**
-	 * Lets go of everything [machineName] was holding down, and leaves everything it latched.
-	 *
-	 * Standing up is letting go of the keys, not switching the ship off. Anything on `hold` goes off with
-	 * the pilot; anything on `toggle` stays exactly where it was put until somebody presses it again. The
-	 * receiving machine is the one holding that value, so it keeps running with the seat empty — a hover
-	 * left on is still on when you get up to look out of the window.
-	 */
+	/** Lets go of everything [machineName] was holding down, and leaves everything it latched. */
 	fun release(machineName: String) {
 
 		val program = mainframe.programOf(machineName) ?: return
@@ -151,7 +144,7 @@ class DcRuntime private constructor(private val mainframe: MainframeMachine) {
 
 		if (!warned.add("$machineName:$function")) return
 
-		Anion.plugin.logger.warning("[dcprgm] '$machineName' has no function '$function' — call ignored")
+		Anion.plugin.logger.warning("[dcprgm] '$machineName' has no function '$function'")
 
 	}
 

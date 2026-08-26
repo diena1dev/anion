@@ -8,11 +8,7 @@ import net.minecraft.core.Vec3i
 import net.minecraft.nbt.CompoundTag
 import net.minecraft.nbt.ListTag
 
-/**
- * A machine whose casing accepts port blocks. Ports are resolved once, at assembly, from the variants
- * that actually filled the structure — swapping a casing block for a port block afterwards breaks the
- * structure instead of adding a port.
- */
+/** A machine whose casing accepts port blocks. */
 abstract class PortedMachine(
 
 	displayName: String,

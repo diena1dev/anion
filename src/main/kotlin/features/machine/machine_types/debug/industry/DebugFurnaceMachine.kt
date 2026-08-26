@@ -1,4 +1,4 @@
-package dev.diena.anion.features.machine.machine_types.debug_furnace
+package dev.diena.anion.features.machine.machine_types.debug.industry
 
 import dev.diena.anion.features.custom.AnionResource
 import dev.diena.anion.features.custom.ItemKey
@@ -12,16 +12,11 @@ import dev.diena.anion.features.recipes.AnionRecipes
 import dev.diena.anion.features.recipes.AnionResult
 import dev.diena.anion.features.recipes.adapters.MachineRecipeAdapter
 import net.minecraft.core.Vec3i
-import net.minecraft.world.level.block.SoundType
 import org.bukkit.Location
 import org.bukkit.Particle
 import org.bukkit.Sound
 import org.bukkit.block.BlockType
 
-/**
- * Three courses of casing around a single magma cell, cored on the floor. Rows run along x,
- * characters along z, and each slice() is one course up.
- */
 val DEBUG_FURNACE_STRUCTURE =
 	BlockSet.new("debug_furnace")
 		.core('C', BlockType.IRON_BLOCK)
@@ -66,17 +61,7 @@ val DEBUG_FURNACE_STRUCTURE =
 		.build()
 
 /**
- * The first machine that actually runs a recipe. Debug: one hardcoded recipe, no fuel value maths,
- * no byproducts, no power.
- *
- * Three buffers, and which port feeds which is the player's to decide — a screwdriver cycles a port,
- * `/machine debug` reads the bindings back, and a sneak-click with the screwdriver dumps a buffer that
- * got loaded with the wrong thing. That is the whole point of the machine: a single buffer can be
- * auto-bound at assembly and never thought about, three cannot.
- *
- * Capacity is fixed, so it runs with no ports at all if you hand-load it. Ports are what let transport
- * feed it, and how fast: each one raises the rate of the buffer it is bound to, up to the machine's
- * own [transferCeiling].
+ * The first machine that actually runs a recipe. Debug: one hardcoded recipe, no fuel value maths, no byproducts, no power.
  */
 class DebugFurnaceMachine : PortedMachine("Debug Furnace", DEBUG_FURNACE_STRUCTURE) {
 
@@ -89,34 +74,20 @@ class DebugFurnaceMachine : PortedMachine("Debug Furnace", DEBUG_FURNACE_STRUCTU
 		/** one course above the roof */
 		private val SMOKE_OFFSET = Vec3i(0, 3, 0)
 
-		/** fixed, whatever is bound to it — ports move resources, they do not make room for them */
 		private const val BUFFER_CAPACITY = 16L
 
 	}
 
-	/**
-	 * Run-scoped, never the registered adapter.
-	 *
-	 * A registered recipe is one object shared by every machine that smelts it, and both the adapter's
-	 * op counter and the ingredients' progress are mutable — two furnaces sharing them would advance
-	 * each other. See [dev.diena.anion.features.recipes.AnionRecipe.newRun].
-	 */
+	/** run-scoped, never the registered adapter. */
 	private var currentRun: MachineRecipeAdapter? = null
 
-	/** true on any tick the run actually advanced. drives the smoke and nothing else. */
+	/** true on any tick the run actually advanced. */
 	var working: Boolean = false; private set
 
 	private var smokePoint: Location? = null
 
-	/**
-	 * Which buffer each ingredient is drawn from.
-	 *
-	 * Deliberately strict: fuel loaded into the input buffer is not quietly found and used, because a
-	 * machine that works whatever you do with it teaches nothing about which port is which. Being
-	 * stuck is the signal, and spill() is the way out.
-	 */
-	// lazy so the buffer map is not built while AnionItems is still initialising — AnionMachines
-	// constructs one of everything at registration purely to read its key
+	/** Which buffer each ingredient is drawn from. */
+	// lazy so the buffer map is not built while AnionItems is still initializing and so it doesn't explode on startup
 	private val bufferForIngredient: Map<AnionResource, String> by lazy {
 		mapOf(
 			ItemKey.of(AnionItems.TEST_FUEL) to FUEL_BUFFER,
@@ -126,8 +97,8 @@ class DebugFurnaceMachine : PortedMachine("Debug Furnace", DEBUG_FURNACE_STRUCTU
 
 	override fun onAssemble() {
 
-		// declared before super, which resolves the ports and replays their saved bindings — those
-		// bindings resolve against this map, so it has to be populated first
+		// declared before super, which resolves the ports and replays their saved bindings;
+		// those bindings resolve against this map, so it has to be populated first
 		buffers[FUEL_BUFFER] = MachineBuffer(FUEL_BUFFER, ItemKey::class, BUFFER_CAPACITY)
 		buffers[INPUT_BUFFER] = MachineBuffer(INPUT_BUFFER, ItemKey::class, BUFFER_CAPACITY)
 		buffers[OUTPUT_BUFFER] = MachineBuffer(OUTPUT_BUFFER, ItemKey::class, BUFFER_CAPACITY)
@@ -193,7 +164,7 @@ class DebugFurnaceMachine : PortedMachine("Debug Furnace", DEBUG_FURNACE_STRUCTU
 
 	}
 
-	// TODO: an in-flight run is lost on unload — the inputs were already drawn, so the smelt is paid
+	// TODO: an in-flight run is lost on unload- the inputs were already drawn, so the smelt is paid
 	//       for and thrown away. saving it needs MachineRecipeAdapter to serialise its op counter and
 	//       every ingredient's fed-in progress, which is the adapter's job rather than this machine's.
 

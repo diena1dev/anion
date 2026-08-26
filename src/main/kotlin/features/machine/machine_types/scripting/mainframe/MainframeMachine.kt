@@ -1,4 +1,4 @@
-package dev.diena.anion.features.machine.machine_types.scripting
+package dev.diena.anion.features.machine.machine_types.scripting.mainframe
 
 import dev.diena.anion.features.custom.blocks.AnionBlocks
 import dev.diena.anion.features.machine.BlockSet
@@ -16,6 +16,7 @@ import net.minecraft.nbt.ListTag
 import org.bukkit.block.BlockType
 import org.bukkit.entity.Player
 import java.util.UUID
+import kotlin.collections.iterator
 
 /**
  * Two courses of casing with a dataport up the back and a row of signs across the front. The signs are
@@ -90,7 +91,7 @@ class MainframeMachine : PortedMachine("Mainframe", MAINFRAME_STRUCTURE) {
 
 		val uuid = attached[machineName] ?: return null
 
-		return Machine.activeMachines[uuid]?.takeIf { it.intact }
+		return activeMachines[uuid]?.takeIf { it.intact }
 	}
 
 	/** What this mainframe calls [machine], or null if it has never been wired to it. */
@@ -173,7 +174,7 @@ class MainframeMachine : PortedMachine("Mainframe", MAINFRAME_STRUCTURE) {
 
 		for ((machineName, uuid) in attached) {
 
-			val machine = Machine.activeMachines[uuid]
+			val machine = activeMachines[uuid]
 			val state = if (machineName in online) "ONLINE" else "offline"
 
 			lines += "  $machineName $state ${machine?.namespacedKey?.key ?: "unloaded"}"

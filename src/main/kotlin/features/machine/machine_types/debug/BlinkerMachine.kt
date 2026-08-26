@@ -1,4 +1,4 @@
-package dev.diena.anion.features.machine.examples
+package dev.diena.anion.features.machine.machine_types.debug
 
 import dev.diena.anion.features.custom.blocks.AnionBlocks
 import dev.diena.anion.features.machine.BlockSet

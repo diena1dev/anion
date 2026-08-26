@@ -24,15 +24,25 @@ import org.bukkit.inventory.ItemType
 import org.bukkit.util.Vector
 
 open class AnionBlasterItem(
+
 	displayName: String,
 	itemRepresentation: ItemType = ItemType.CROSSBOW,
 	styledDisplayName: Component = Component.text(displayName)
-) : AnionItem(displayName, itemRepresentation, 1, styledDisplayName) {
+
+) : AnionItem(
+
+	displayName,
+	itemRepresentation,
+	1,
+	styledDisplayName
+
+) {
 
 	val RANGE = 1..100    // how many blocks to move across
 	val RESOLUTION = 1..5 // how many places within a block to move
 
 	init {
+
 		@Suppress("UnstableApiUsage")
 		internalItemStack[DataComponentTypes.CHARGED_PROJECTILES] = ChargedProjectiles.chargedProjectiles()
 			.add(ItemStack.of(Material.ARROW))
@@ -98,7 +108,7 @@ open class AnionBlasterItem(
 
 				val resolutionMax = RESOLUTION.last.toDouble()
 
-				val scaledDir = forward/resolutionMax                     // scale down our forward normal by the set resolution value
+				val scaledDir = forward/resolutionMax                        // scale down our forward normal by the set resolution value
 				val resolutionCheck = rangeVector+(scaledDir*resolutionStep) // this is what we check for entities in
 
 				val hitBlock = world.getBlockAt(resolutionCheck.toLocation(world))
@@ -131,6 +141,7 @@ open class AnionBlasterItem(
 				0.0, 0.0, 0.0, 0.0, null, true)
 
 		}
+
 	}
 
 }

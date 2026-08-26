@@ -9,13 +9,7 @@ import org.bukkit.DyeColor
 import org.bukkit.block.Sign
 import org.bukkit.block.sign.Side
 
-/**
- * A sign that is part of a machine's structure. The machine writes it and hears clicks on it; nobody
- * edits it by hand.
- *
- * There is no per-sign object — a sign is a cell of the structure and the world block is the state, the
- * same way a transport component is a block and nothing else.
- */
+/** A sign that is part of a machine's structure. */
 object MachineSign {
 
 	/** The machine whose structure holds the sign at [cell], and where that sign sits on it. */
@@ -36,7 +30,7 @@ object MachineSign {
 
 	}
 
-	/** Writes [lines] onto the sign at [offset]. Committed sync. */
+	/** Writes [lines] onto the sign at [offset]. Run sync. */
 	fun write(machine: Machine, offset: Vec3i, lines: List<Component>, glow: Boolean = false, front: Boolean = true) {
 
 		Tasks.runSync {

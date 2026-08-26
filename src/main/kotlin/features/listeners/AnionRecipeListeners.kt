@@ -20,6 +20,7 @@ import kotlin.math.roundToInt
  *    smelted by vanilla recipes unless Anion has explicitly whitelisted
  *    them.
  */
+// TODO: 26.3 gives data-driven furnace fuel sources, so we will need to update this system.
 @Register
 object AnionRecipeListeners : Listener {
 

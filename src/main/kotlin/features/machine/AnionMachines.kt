@@ -2,16 +2,16 @@ package dev.diena.anion.features.machine
 
 import dev.diena.anion.data.registry.AnionRegistryKey
 import dev.diena.anion.data.registry.registries.AnionRegistries
-import dev.diena.anion.features.machine.examples.BlinkerMachine
-import dev.diena.anion.features.machine.machine_types.CargoContainerMachine
-import dev.diena.anion.features.machine.machine_types.DebugGyroWheel
+import dev.diena.anion.features.machine.machine_types.debug.BlinkerMachine
+import dev.diena.anion.features.machine.machine_types.debug.industry.DebugCargoContainer
+import dev.diena.anion.features.machine.machine_types.debug.transport.DebugGyroWheel
 import dev.diena.anion.features.machine.machine_types.MEDIUM_CARGO_CONTAINER_STRUCTURE
-import dev.diena.anion.features.machine.machine_types.debug_furnace.DebugFurnaceMachine
+import dev.diena.anion.features.machine.machine_types.debug.industry.DebugFurnaceMachine
 import dev.diena.anion.features.machine.machine_types.scripting.ControlSeatMachine
-import dev.diena.anion.features.machine.machine_types.scripting.MainframeMachine
-import dev.diena.anion.features.machine.machine_types.thrusters.DebugThrusterDown
-import dev.diena.anion.features.machine.machine_types.thrusters.DebugThrusterHorizontal
-import dev.diena.anion.features.machine.machine_types.thrusters.DebugThrusterUp
+import dev.diena.anion.features.machine.machine_types.scripting.mainframe.MainframeMachine
+import dev.diena.anion.features.machine.machine_types.debug.transport.DebugThrusterDown
+import dev.diena.anion.features.machine.machine_types.debug.transport.DebugThrusterHorizontal
+import dev.diena.anion.features.machine.machine_types.debug.transport.DebugThrusterUp
 import features.machine.machine_types.basic_test_machine.BasicTestMachine
 
 object AnionMachines {
@@ -28,7 +28,7 @@ object AnionMachines {
 	val CONTROL_SEAT = registerMachine { ControlSeatMachine() }
 
 	val MEDIUM_CARGO_CONTAINER = registerMachine {
-		CargoContainerMachine(
+		DebugCargoContainer(
 			displayName = "Medium Cargo Container",
 			blockSet = MEDIUM_CARGO_CONTAINER_STRUCTURE,
 			typeLimit = 10,

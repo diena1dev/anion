@@ -81,20 +81,10 @@ open class AnionItem(
 	open fun onPlayerSwapHand(event: PlayerSwapHandItemsEvent) { swapHandler?.invoke(event) }
 	open fun onEntityShootBow(event: EntityShootBowEvent) {}
 
-	/**
-	 * Whether this item does its own thing with a right-clicked block, so the block should leave that
-	 * interaction alone.
-	 *
-	 * A tool clicked on a machine port is being used on it, not fed into it.
-	 */
+	/** Whether this item does its own thing with a right-clicked block, so the block should leave that interaction alone. */
 	open val handlesBlockInteraction: Boolean get() = false
 
-	/**
-	 * Called once a second for every player holding this item in their main hand, main thread.
-	 *
-	 * For readouts a tool wants to keep current without an interaction — what the crosshair is on,
-	 * what state the thing under it is in.
-	 */
+	/** Called once a second for every player holding this item in their main hand, main thread. */
 	open fun slowTick(player: Player) {}
 
 	/** [player] no longer holds this item in their main hand. */

@@ -16,7 +16,7 @@ import org.bukkit.event.world.ChunkUnloadEvent
 @Register
 object AnionStarshipListeners: Listener {
 
-	// chunk lifecycle — drives lazy load/unload
+	// chunk lifecycle, this drives lazy load/unload
 	@EventHandler
 	fun onChunkLoad(event: ChunkLoadEvent) {
 
@@ -71,7 +71,7 @@ object AnionStarshipListeners: Listener {
 	@EventHandler
 	fun onBlockPhysics(event: BlockPhysicsEvent) {
 
-		// starship movement writes blocks with UPDATE_NEIGHBORS, which fires this event for every neighbour of
+		// starship movement writes blocks with UPDATE_NEIGHBORS, which fires this event for every neighbor of
 		// every cell the ship lands on. handling those makes ships absorb each other's blocks — see
 		// [Starship.applyingWorldChanges].
 		if (Starship.applyingWorldChanges) return

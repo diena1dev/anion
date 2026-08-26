@@ -1,17 +1,12 @@
-package dev.diena.anion.features.machine.machine_types
+package dev.diena.anion.features.machine.machine_types.debug.industry
 
 import dev.diena.anion.features.custom.blocks.AnionBlocks
 import dev.diena.anion.features.machine.BlockSet
 import dev.diena.anion.features.machine.component.BulkItemBuffer
 import dev.diena.anion.features.machine.component.MachinePort
+import dev.diena.anion.features.machine.machine_types.PortedMachine
 
-/**
- * Six long, three wide, three tall. Floor and roof are solid, the middle course is walls only, so the
- * shell is 50 blocks around a 4x1x1 void.
- *
- * Rows run along x, characters along z, and each slice() is one course up.
- */
-val MEDIUM_CARGO_CONTAINER_STRUCTURE =
+val DEBUG_CARGO_CONTAINER =
 	BlockSet.new("medium_cargo_container")
 		.core('C', AnionBlocks.TEST_BLOCK)
 
@@ -49,18 +44,13 @@ val MEDIUM_CARGO_CONTAINER_STRUCTURE =
 
 		.build()
 
+// TODO: disassembly spills the whole buffer as dropped items, which for a full medium container is
+//       24000 items — roughly 375 stacks in one tick. Needs either a drop budget spread over several
+//       ticks or a packaged-container item that carries the contents with it.
 /**
- * Bulk item storage. Holds [typeLimit] distinct item variants totalling [totalCapacity] items, and
- * nothing else — no recipes, no processing.
- *
- * There is deliberately no way to browse the contents from the container itself; that is a storage
- * terminal's job. Items get in and out through its bus ports.
- *
- * TODO: disassembly spills the whole buffer as dropped items, which for a full medium container is
- *       24000 items — roughly 375 stacks in one tick. Needs either a drop budget spread over several
- *       ticks or a packaged-container item that carries the contents with it.
+ * Bulk item storage. Holds [typeLimit] distinct item variants totalling [totalCapacity] items.
  */
-class CargoContainerMachine(
+class DebugCargoContainer(
 
 	displayName: String,
 	blockSet: BlockSet,

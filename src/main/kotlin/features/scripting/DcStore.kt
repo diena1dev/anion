@@ -1,13 +1,10 @@
 package dev.diena.anion.features.scripting
 
 import dev.diena.anion.Anion
-import dev.diena.anion.features.machine.machine_types.scripting.MainframeMachine
+import dev.diena.anion.features.machine.machine_types.scripting.mainframe.MainframeMachine
 
 /**
  * The .dcprgm files a mainframe holds, and their compiled form.
- *
- * Programs live on the mainframe, not on the machines they drive — a machine's file is a reference to
- * it, so unplugging a thruster does not take its program with it.
  *
  * Source text is what gets saved to disk; compiled programs are rebuilt on load and never persisted.
  */
@@ -35,12 +32,7 @@ class DcStore private constructor(private val mainframe: MainframeMachine) {
 
 	fun programOf(machineName: String): DcProgram? = programs[machineName]
 
-	/**
-	 * Compiles [source] and, if it compiles, makes it this mainframe's groups.
-	 *
-	 * A failed save leaves the previous groups running — a typo must not disarm a ship that is already
-	 * flying. Programs are rebuilt on success, since they resolve targets through the groups.
-	 */
+	/** Compiles [source] and, if it compiles, makes it this mainframe's groups. */
 	fun saveGroups(source: String): DcResult<DcGroups> {
 
 		val result = DcParser.parseGroups(source, mainframe.machineNames)

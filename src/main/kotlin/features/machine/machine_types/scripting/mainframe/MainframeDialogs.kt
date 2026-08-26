@@ -1,4 +1,4 @@
-package dev.diena.anion.features.machine.machine_types.scripting
+package dev.diena.anion.features.machine.machine_types.scripting.mainframe
 
 import dev.diena.anion.Tasks
 import dev.diena.anion.features.scripting.DcIssue

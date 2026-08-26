@@ -3,9 +3,7 @@ package dev.diena.anion.features.starship
 import net.minecraft.core.Vec3i
 import java.util.ArrayDeque
 
-/**
- * Detects whether removing a block split a starship into disconnected sections.
- */
+/** Detects whether removing a block split a starship into disconnected sections. */
 object StarshipSplit {
 
 	private val FACE_OFFSETS = arrayOf(

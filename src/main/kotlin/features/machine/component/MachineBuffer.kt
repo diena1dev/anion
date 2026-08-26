@@ -9,13 +9,6 @@ import kotlin.reflect.KClass
  * A resource store on a Machine. The base holds **one** resource at a time — a gas buffer that took
  * oxygen refuses hydrogen until it is drained — which is what [accepts] encodes.
  *
- * Two gates stack: [resourceType] is the family gate (is this an AnionGas at all), [accepts] is the
- * instance gate (is it *this* gas). Subclasses that hold several resources at once, like a bulk
- * container, override [accepts] and the storage trio and leave the family gate alone.
- *
- * Capacity is fixed. Ports move resources in and out; they do not make room for them, so bolting more
- * onto the casing makes a machine faster and never bigger.
- *
  * @param key             name this buffer is addressed by within its machine
  * @param resourceType    resource family this buffer accepts (AnionItem, AnionGas, ...)
  * @param capacity        how much it holds, whatever is bound to it
@@ -27,29 +20,19 @@ open class MachineBuffer(
 	val resourceType: KClass<out AnionResource>,
 	val capacity: Long,
 	val transferPerPort: Long = DEFAULT_TRANSFER_PER_PORT,
-	/**
-	 * Whether a player may dump this buffer with a screwdriver.
-	 *
-	 * False for bulk storage, where emptying it is the opposite of the point and a full one is
-	 * thousands of items on the floor. Disassembly ignores this — the machine is going away either way.
-	 */
-	val spillable: Boolean = true,
-	/**
-	 * Whether clicking a port bound to this buffer with something in hand loads it.
-	 */
-	val handLoadable: Boolean = resourceType == ItemKey::class,
+	val spillable: Boolean = true, /** Whether a player may dump this buffer. */
+	val handLoadable: Boolean = resourceType == ItemKey::class, /** Whether clicking a port bound to this buffer with something in hand loads it. */
 
 ) {
 
 	companion object {
 
 		/** what one port is worth per pass when a buffer does not say otherwise */
-		const val DEFAULT_TRANSFER_PER_PORT = 64L
+		const val DEFAULT_TRANSFER_PER_PORT = 8L
 
 	}
 
-	// the base's own storage. a subclass overriding contents() holds its items elsewhere and leaves
-	// these untouched, so nothing outside should read them — go through contents()/amountOf().
+	// go through contents()/amountOf() to modify these variables
 	protected var resource: AnionResource? = null
 	protected var amount: Long = 0L
 
@@ -59,9 +42,6 @@ open class MachineBuffer(
 	/**
 	 * The machine that declared this buffer. Claimed by [Machine] once the type has declared its
 	 * buffers, so anything that changes what is held marks that machine for saving.
-	 *
-	 * Null until then, and deliberately null while [restore] runs — writing back what is already on
-	 * disk is not a change.
 	 */
 	internal var owner: Machine? = null
 
@@ -72,11 +52,10 @@ open class MachineBuffer(
 		owner?.dirty = true
 	}
 
-	/** What this buffer holds. Never more than one entry in the base — a subclass may hold more. */
+	/** Buffer contents, what it holds and how much. Subclasses may implement different setters and getters, by default this should only take one type. */
 	open fun contents(): Map<AnionResource, Long> {
 
 		val held = resource ?: return emptyMap()
-
 		return mapOf(held to amount)
 
 	}
@@ -91,20 +70,11 @@ open class MachineBuffer(
 		if (!resourceType.isInstance(resource)) return false
 
 		val held = this.resource
-
 		return held == null || held == resource
 
 	}
 
-	/**
-	 * Units this buffer will take in or give up across one transport pass, however many drivers are
-	 * pushing at it.
-	 *
-	 * Scales with bound ports because that is the whole point of ports — a machine fed through seven
-	 * of them should genuinely run seven times harder. What stops it scaling forever is the machine's
-	 * own [Machine.transferCeiling], not anything here: the ceiling is shared across every buffer, so
-	 * a wall of ports cannot be spread over several of them to dodge it.
-	 */
+	/** Units this buffer will take in or give up across one transport pass, however many drivers are pushing at it. */
 	open fun transferLimit(): Long = (transferPerPort * boundPorts.size).coerceAtLeast(0L)
 
 	/** Total units held across every resource. */
@@ -178,10 +148,10 @@ open class MachineBuffer(
 
 /**
  * Item store that holds several variants at once: up to [typeLimit] distinct ones, and [capacity]
- * items summed across all of them. Two caps, and they bite independently — a container with room by
- * count still refuses a variant it has no type slot for.
+ * items summed across all of them. Two caps, and they hit caps independently.
  *
- * Variants are [ItemKey]s, so a damaged tool and a pristine one occupy two type slots.
+ * Variants are [ItemKey]s, so a damaged tool and a pristine one occupy two type slots, while multiple undamaged tools
+ * (e.g. newly crafted iron swords) only take up one type assignment.
  */
 open class BulkItemBuffer(
 

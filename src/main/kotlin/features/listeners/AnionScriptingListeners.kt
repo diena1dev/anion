@@ -21,17 +21,13 @@ import org.bukkit.event.player.PlayerQuitEvent
 import org.bukkit.event.player.PlayerTeleportEvent
 import org.bukkit.inventory.EquipmentSlot
 
-/**
- * Where a player's clicks and keys meet the datachannel system: machine signs, and the control seat.
- *
- * Both are click-driven rather than block-driven, so neither can live on an AnionBlock handler — a
- * machine sign is a vanilla sign and a seat is a vanilla stair.
- */
+/** Where a player's clicks and keys meet the datachannel system: machine signs, and the control seat. */
+// TODO: un-screw listeners for scripting by making them more accessible as an interface and not as hardcoded centralized logic for all classes.
+//       e.g. better to handle listeners inside each machine that uses dclang than all right here.
 @Register
 object AnionScriptingListeners : Listener {
 
 	/** A sign in a machine is that machine's readout. Nobody types into one. */
-	// signs are waxed on assembly too; this catches one that had its wax taken off with an axe
 	@EventHandler
 	fun onSignOpen(event: PlayerOpenSignEvent) {
 
@@ -71,6 +67,9 @@ object AnionScriptingListeners : Listener {
 				event.isCancelled = true
 
 			}
+
+			// otherwise we need to normally cancel the event so the player cannot break blocks
+			if (event.action == Action.LEFT_CLICK_BLOCK) event.isCancelled = true
 
 			return
 
@@ -122,13 +121,7 @@ object AnionScriptingListeners : Listener {
 
 	}
 
-	/**
-	 * A pilot may look wherever they like, but they do not walk out of their seat.
-	 *
-	 * Refusing the move rather than teleporting them back: a teleport every tick fights the client's own
-	 * prediction, and fights the carrier, which teleports everything in its hitbox when the ship moves.
-	 * Two things writing a player's position in one tick is what makes a seat jitter.
-	 */
+	/** A pilot may look wherever they like, but they do not walk out of their seat. */
 	@EventHandler
 	fun onMove(event: PlayerMoveEvent) {
 

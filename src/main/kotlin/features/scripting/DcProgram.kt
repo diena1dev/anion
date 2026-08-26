@@ -20,7 +20,7 @@ enum class DcMode {
 /** One `set [input] to [target:function] mode [mode]` line, compiled. */
 data class DcBinding(
 
-	/** a group name or a machine name — which one it is gets resolved at dispatch */
+	/** a group name or a machine name */
 	val target: String,
 	val function: String,
 	val mode: DcMode,

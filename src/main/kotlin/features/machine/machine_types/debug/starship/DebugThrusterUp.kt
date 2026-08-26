@@ -1,4 +1,4 @@
-package dev.diena.anion.features.machine.machine_types.thrusters
+package dev.diena.anion.features.machine.machine_types.debug.transport
 
 import dev.diena.anion.extensions.div
 import dev.diena.anion.extensions.rotate
@@ -7,6 +7,8 @@ import dev.diena.anion.features.custom.blocks.AnionBlocks
 import dev.diena.anion.features.machine.BlockSet
 import dev.diena.anion.features.machine.Machine
 import dev.diena.anion.features.machine.component.MachinePort
+import dev.diena.anion.features.machine.machine_types.thrusters.ThrusterHover
+import dev.diena.anion.features.machine.machine_types.thrusters.ThrusterThrottle
 import dev.diena.anion.features.scripting.DcProgrammable
 import net.minecraft.core.Vec3i
 import net.minecraft.nbt.CompoundTag
@@ -14,13 +16,8 @@ import net.minecraft.world.phys.Vec3
 import org.bukkit.Location
 import org.bukkit.Particle
 import org.bukkit.block.BlockType
+import kotlin.collections.plus
 
-/**
- * The horizontal thruster stood on end. Rows run along x, characters along z, and each slice() is one
- * course up — so the barrel that ran along x there runs along y here, one cell per slice.
- *
- * Nozzle at the bottom: this one pushes a ship up, so its exhaust leaves downward.
- */
 val DEBUG_THRUSTER_UP = BlockSet.new("debug_thruster_up")
 
 	.core('C', BlockType.IRON_BLOCK)
@@ -56,22 +53,8 @@ val DEBUG_THRUSTER_UP = BlockSet.new("debug_thruster_up")
 
 	.build()
 
-// TODO: make generalized thruster class — three copies of this now, which is two more than the
-//       duplication was worth when there was only the horizontal one.
-/**
- * Debug Thruster that outputs differing levels of thrust based on the strength of the redstone signal
- * being input.
- *
- * A powered conduit pins the ship to the highest altitude it has reached since the conduit came on,
- * arresting downward motion at that altitude and climbing back to it after any sag. Its authority is
- * finite — a fast fall is bled off over several ticks rather than stopped dead.
- *
- * A powered dataport thrusts as normal and takes precedence on its own: the pin only ever rises, so
- * thrusting drags it up and releasing leaves the ship held wherever it coasted to.
- *
- * Datachannel throttle and hover run alongside both, and the stronger of redstone and datachannel wins —
- * wiring a mainframe to one never takes the lever away.
- */
+// TODO: make generalized thruster class
+/** Debug Thruster that moves the starship it's attached to. if no ship is attached, it emits smoke. */
 class DebugThrusterUp() : Machine("debug_thruster_up", DEBUG_THRUSTER_UP), DcProgrammable {
 
 	companion object {
@@ -87,15 +70,15 @@ class DebugThrusterUp() : Machine("debug_thruster_up", DEBUG_THRUSTER_UP), DcPro
 
 	}
 
-	private val controls = ThrusterThrottle.new()
-	private val hover = ThrusterHover.new(this, THRUST_SIGN)
+	private val controls = ThrusterThrottle.Companion.new()
+	private val hover = ThrusterHover.Companion.new(this, THRUST_SIGN)
 
 	override val dataInputs: List<String> = listOf("currnt_throttle", "toggled_state", "hover_state")
-	override val dataFunctions: List<String> = ThrusterThrottle.FUNCTIONS + ThrusterHover.FUNCTION
+	override val dataFunctions: List<String> = ThrusterThrottle.Companion.FUNCTIONS + ThrusterHover.Companion.FUNCTION
 
 	override fun invoke(function: String, active: Boolean) {
 
-		if (function == ThrusterHover.FUNCTION) hover.engage(active)
+		if (function == ThrusterHover.Companion.FUNCTION) hover.engage(active)
 		else if (!controls.invoke(function, active)) return
 
 		markDirty()

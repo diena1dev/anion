@@ -1,3 +1,7 @@
+
+TODO: REWORK THIS ENTIRE FILE TO BETTER MATCH PERSONAL VISION AND REFLECT THE STATE OF THE CODEBASE
+TOOD_ALT_TEXT: DELETE THIS FILE AND CREATE A NEW, machine_readme.md FILE IN ITS PLACE.
+
 # Machine System
 
 Machines are multiblock structures that own their tick logic and structure detection, built from

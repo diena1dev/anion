@@ -11,7 +11,7 @@ import dev.diena.anion.features.recipes.AnionRecipe
  *       until then a machine should hand this adapter a [supply] that reports an unlimited amount for
  *       AnionEnergy and a [draw] that always grants it, so recipes run at full rate for free.
  *
- * @param recipe  The generic recipe backing this machine operation.
+ * @param recipe The generic recipe backing this machine operation.
  */
 class MachineRecipeAdapter(
 	override val recipe: AnionRecipe,
