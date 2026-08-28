@@ -41,7 +41,7 @@ object NmsRegistry {
 	///// GENERIC REGISTRY
 	//////////////////////
 
-	private fun <T> lookup(
+	private fun <T: Any> lookup(
 
 		registryKey: ResourceKey<out Registry<T>>
 
@@ -60,7 +60,7 @@ object NmsRegistry {
 	 * Main thread only, and before the first player connects: registry ids are assigned in
 	 * registration order and shift for anyone already synced.
 	 */
-	fun <T> register(
+	fun <T: Any> register(
 
 		registryKey: ResourceKey<out Registry<T>>,
 		identifier: Identifier,
@@ -90,7 +90,7 @@ object NmsRegistry {
 	}
 
 	/** the holder for [identifier], or null if nothing is registered under it. */
-	fun <T> get(
+	fun <T: Any> get(
 
 		registryKey: ResourceKey<out Registry<T>>,
 		identifier: Identifier,
@@ -102,7 +102,7 @@ object NmsRegistry {
 			.orElse(null)
 
 	/** every identifier currently in [registryKey]. */
-	fun <T> keys(
+	fun <T: Any> keys(
 
 		registryKey: ResourceKey<out Registry<T>>
 

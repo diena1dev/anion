@@ -32,7 +32,21 @@ import org.bukkit.generator.ChunkGenerator
 object NmsLevel {
 
 	/**
+	 * Launders a null past a wrong nullability annotation. `net.minecraft.server.level` is
+	 * `@NullMarked`, so Kotlin reads the Paper-added `gen` and `biomeProvider` parameters as
+	 * non-null even though the constructor body guards both with `if (x != null)`. The cast erases,
+	 * so nothing is checked at runtime.
+	 */
+	@Suppress("UNCHECKED_CAST")
+	private fun <T> nullable(value: T?): T = value as T
+
+	/**
 	 * Builds and registers a level running [levelStem], returning the Bukkit view of it.
+	 *
+	 * Since 26.1 Bukkit treats a world's name and key as one identity, deriving the name from the
+	 * key as `namespace_key` for a namespaced key. Nothing here enforces that, but a [bukkitName]
+	 * that disagrees with [worldKey] leaves `getWorld(name)` and `getWorld(key)` describing the
+	 * same world by two unrelated identities.
 	 *
 	 * [spawnPosition] skips the spawn search, which never terminates usefully in a void world.
 	 * [bukkitGenerator] and [bukkitBiomeProvider] are optional overlays on top of the stem's own
@@ -94,14 +108,17 @@ object NmsLevel {
 			true,
 			LevelStem.OVERWORLD, // stem slot key, only read for the flat-world check
 			environment,
-			bukkitGenerator,
-			bukkitBiomeProvider,
+			nullable(bukkitGenerator),
+			nullable(bukkitBiomeProvider),
 			savedDataStorage,
 			loadedWorldData
 		)
 
+		// purely a carrier for the forced spawn: initWorld reads nothing off it but the spawn
+		// position, yaw and pitch. ofKey rather than ofNameAndKey, which demands the key be
+		// minecraft:<lowercased name> and rejects any namespaced key outright.
 		val spawnCarrier = spawnPosition?.let {
-			WorldCreator.ofNameAndKey(bukkitName, worldKey).forcedSpawnPosition(it, 0.0f, 0.0f)
+			WorldCreator.ofKey(worldKey).forcedSpawnPosition(it, 0.0f, 0.0f)
 		}
 
 		server.addLevel(serverLevel)
