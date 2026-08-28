@@ -1,4 +1,24 @@
-project structure
+# Anion
+the "official" Anti-Ion project
+
+upon the updating of this README, the current master branch has:
+- machines,
+- ships,
+- machines on ships,
+- custom pipes,
+- custom blocks,
+- custom items,
+- and custom recipes
+
+yes i use claude, no the entire project is not vibe-coded
+
+if i decide that something is not up-to-spec or is insufficiently understood by me, i will rewrite it in its entirety or partially
+
+additionally, you may find stray em-dashes in comments and giant blocks of text. ignore these, there was a commit a few weeks back where claude "optimized" all my comments, fucking over quite a few of them in the process.
+thank you, claude.
+
+the project structure:
+- which is probably outdated
 
 ```
 main
@@ -31,6 +51,14 @@ main
         |- keys
         \- registries
 ```
+
+everything below this used to be written by me, then claude started modifying it and i stopped caring
+
+a common theme of this project is me just being tired and not caring
+
+but hey, at the end of the day, if it works, it works.
+
+or something....
 
 ---
 MACHINES
