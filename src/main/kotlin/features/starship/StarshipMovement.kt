@@ -7,6 +7,8 @@ import dev.diena.anion.extensions.rotateWithAnion
 import dev.diena.anion.extensions.rotationOf
 import net.minecraft.core.Vec3i
 import net.minecraft.nbt.CompoundTag
+import net.minecraft.server.level.ServerLevel
+import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.PositionMoveRotation
 import net.minecraft.world.entity.Relative
 import net.minecraft.world.level.block.Blocks
@@ -55,6 +57,27 @@ object StarshipMovement {
 		val blockEntityBlockMap = rotateBlockEntities(rotationSteps, starship)
 		val newBlockMap = rotateBlocks(rotationSteps, starship, blockEntityBlockMap)
 		rotateEntities(rotationSteps, starship)
+
+		return newBlockMap
+
+	}
+
+	/** rewrites the ship into [destinationLevel] offset by [vectorToMoveIn], clearing the level it leaves.
+	 *  [Starship.level] must still be the level being left when this is called. */
+	fun changeLevel(
+
+		destinationLevel: ServerLevel,
+		vectorToMoveIn: Vec3i,
+		starship: Starship,
+
+	) : ConcurrentHashMap<Vec3i, BlockState> {
+
+		// grabbed before the blocks go, the hitbox query matches entities against ship cells in the old level
+		val carriedEntities = starship.hitbox.getEntitiesWithin()
+
+		val blockEntityBlockMap = changeLevelBlockEntities(destinationLevel, vectorToMoveIn, starship)
+		val newBlockMap = changeLevelBlocks(destinationLevel, vectorToMoveIn, starship, blockEntityBlockMap)
+		changeLevelEntities(destinationLevel, vectorToMoveIn, carriedEntities)
 
 		return newBlockMap
 
@@ -184,6 +207,130 @@ object StarshipMovement {
 				bukkitEntity.teleport(bukkitEntity.location.add(newX, newY, newZ))
 
 			}
+
+		}
+
+	}
+
+	//////////////////
+	// LEVEL TRANSFERS
+	//////////////////
+
+	private fun changeLevelBlocks(
+
+		destinationLevel: ServerLevel,
+		vectorToMoveIn: Vec3i,
+		starship: Starship,
+		blockEntityBlockMap: HashMap<Vec3i, BlockState>,
+
+	) : ConcurrentHashMap<Vec3i, BlockState> {
+
+		val sourceLevel = starship.level
+		val newBlockMap: ConcurrentHashMap<Vec3i, BlockState> = ConcurrentHashMap()
+
+		// translate blocks
+		for ((vec, blockState) in starship.blockHashMap) {
+
+			newBlockMap[vec + vectorToMoveIn] = blockState
+
+		}
+
+		// clear every cell out of the level being left
+		for (vec in starship.blockHashMap.keys) {
+
+			// 4. no observer updates, 16. no shape recalc, 32. no item drops
+			sourceLevel.setBlock(vec.blockPos, airBlock, 4 or 16 or 32)
+
+		}
+
+		// stamp the ship into the level being entered
+		for ((vec, blockState) in newBlockMap) {
+
+			if (vec in blockEntityBlockMap) continue
+
+			// 1. update neighboring blocks, 4. no observer updates, 16. no shape recalc
+			destinationLevel.setBlock(vec.blockPos, blockState, 1 or 4 or 16)
+
+		}
+
+		// TODO: DO NOT DO THIS, PACKETS MUST BE HANDLED IN STARSHIP
+		// two levels, two audiences: one sees only removals, the other only placements
+		StarshipPackets.sendSections(sourceLevel, emptySet(), starship.blockHashMap.keys, newBlockMap)
+		StarshipPackets.sendSections(destinationLevel, newBlockMap.keys, emptySet(), newBlockMap)
+
+		return newBlockMap
+
+	}
+
+	/** call this method before [changeLevelBlocks]! */
+	private fun changeLevelBlockEntities(
+
+		destinationLevel: ServerLevel,
+		vectorToMoveIn: Vec3i,
+		starship: Starship,
+
+	) : HashMap<Vec3i, BlockState> {
+
+		val sourceLevel                                     = starship.level
+		val blockEntityNbtMap: HashMap<Vec3i, CompoundTag>  = hashMapOf()
+		val blockEntityBlockMap: HashMap<Vec3i, BlockState> = hashMapOf()
+		val provider                                        = sourceLevel.registryAccess()
+
+		for (vec in starship.blockHashMap.keys) {
+
+			// store BEs and remove BE blocks
+			val blockEntity = sourceLevel.getBlockEntity(vec.blockPos) ?: continue
+			val nbt = blockEntity.saveWithFullMetadata(provider)
+			val newPos = vec + vectorToMoveIn
+
+			nbt.putInt("x", newPos.x)
+			nbt.putInt("y", newPos.y)
+			nbt.putInt("z", newPos.z)
+
+			blockEntityNbtMap[newPos] = nbt
+			blockEntityBlockMap[newPos] = sourceLevel.getBlockState(vec.blockPos)
+			sourceLevel.removeBlockEntity(vec.blockPos)
+
+		}
+
+		// then load ship BEs into the new level (setting blocks in the process)
+		for ((vec, nbt) in blockEntityNbtMap) {
+
+			val blockState = blockEntityBlockMap[vec] ?: continue
+			destinationLevel.setBlock(vec.blockPos, blockState, 4 or 16 or 32)
+
+			val newBlockEntity = BlockEntity.loadStatic(vec.blockPos, blockState, nbt, provider) ?: continue
+			destinationLevel.setBlockEntity(newBlockEntity)
+
+		}
+
+		return blockEntityBlockMap
+
+	}
+
+	/** carries [carriedEntities] across into [destinationLevel]. a cross-level hop is a full teleport,
+	 *  so players go through the same Bukkit path as everything else rather than a relative move packet. */
+	private fun changeLevelEntities(
+
+		destinationLevel: ServerLevel,
+		vectorToMoveIn: Vec3i,
+		carriedEntities: List<Entity>,
+
+	) {
+
+		val destinationWorld = destinationLevel.world
+
+		for (entity in carriedEntities) {
+
+			val bukkitEntity = entity.bukkitEntity
+			val destination = bukkitEntity.location.add(
+				vectorToMoveIn.x.toDouble(),
+				vectorToMoveIn.y.toDouble(),
+				vectorToMoveIn.z.toDouble()
+			)
+
+			destination.world = destinationWorld
+			bukkitEntity.teleport(destination)
 
 		}
 

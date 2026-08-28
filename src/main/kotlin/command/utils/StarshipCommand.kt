@@ -2,6 +2,7 @@ package dev.diena.anion.command.utils
 
 import com.destroystokyo.paper.event.server.ServerTickEndEvent
 import dev.astralchroma.processor.annotations.Command
+import dev.astralchroma.processor.annotations.CustomType
 import dev.astralchroma.processor.annotations.Name
 import dev.astralchroma.processor.annotations.Permission
 import dev.astralchroma.processor.annotations.Register
@@ -9,14 +10,17 @@ import dev.astralchroma.processor.annotations.Sender
 import dev.astralchroma.processor.annotations.Subcommand
 import dev.diena.anion.Anion
 import dev.diena.anion.Keys
+import dev.diena.anion.command.arguments.World
 import dev.diena.anion.data.database.AnionPersistence
 import dev.diena.anion.extensions.blockPos
 import dev.diena.anion.features.starship.Starship
 import dev.diena.anion.features.starship.StarshipSelection
+import net.kyori.adventure.key.Key
 import net.kyori.adventure.text.Component
 import net.minecraft.core.Vec3i
 import net.kyori.adventure.text.format.TextColor
 import net.minecraft.world.phys.Vec3
+import org.bukkit.Bukkit
 import org.bukkit.Color
 import org.bukkit.block.Block
 import org.bukkit.block.BlockFace
@@ -255,15 +259,32 @@ object StarshipCommand {
 		y: Int,
 		z: Int,
 		preserveVelocity: Boolean = true,
+		@CustomType(World::class) worldKey: Key? = null,
 
 		) {
 
 		val starship = getSelectedStarship(sender) ?: return
+		val destination = Vec3i(x, y, z)
 
-		if (starship.teleportInWorld(Vec3i(x, y, z), preserveVelocity)) {
-			sender.info("Teleported starship to Vec3i{$x, $y, $z}.")
+		val destinationWorld = worldKey?.let { Bukkit.getWorld(it) }
+
+		// no world given, or the one given is the one the ship is already in
+		if (destinationWorld == null || destinationWorld == starship.level.world) {
+
+			if (starship.teleportInWorld(destination, preserveVelocity)) {
+				sender.info("Teleported starship to Vec3i{$x, $y, $z}.")
+			} else {
+				sender.info("Failed to teleport starship by provided Vec3i{$x, $y, $z}!")
+			}
+
+			return
+
+		}
+
+		if (starship.changeWorld(destinationWorld, destination, preserveVelocity)) {
+			sender.info("Teleported starship to Vec3i{$x, $y, $z} in ${destinationWorld.name}.")
 		} else {
-			sender.info("Failed to teleport starship by provided Vec3i{$x, $y, $z}!")
+			sender.info("Failed to teleport starship to Vec3i{$x, $y, $z} in ${destinationWorld.name}!")
 		}
 
 	}

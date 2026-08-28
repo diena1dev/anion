@@ -6,6 +6,7 @@ import dev.diena.anion.extensions.plus
 import dev.diena.anion.extensions.stepsFromTo
 import dev.diena.anion.extensions.toFace
 import net.minecraft.core.Vec3i
+import net.minecraft.server.level.ServerLevel
 
 object StarshipCollision {
 
@@ -31,13 +32,44 @@ object StarshipCollision {
 
 	}
 
-	/** true if [pos] is somewhere a block can exist, both inside build height and inside the border. */
+	/**
+	 * [processLevelChangeCollision] returns whether the provided Starship can be stamped into [destinationLevel]
+	 * offset by [vectorToMoveIn]. None of the ship's cells exist over there yet, so unlike a same-level move
+	 * every destination cell has to be in bounds and air.
+	 *
+	 * @param vectorToMoveIn   The Vec3i offset from the ship's current position to its position in the new level.
+	 * @param destinationLevel The level the starship is entering.
+	 * @param starship         The Starship being moved.
+	 *
+	 * */
+	fun processLevelChangeCollision(
+
+		vectorToMoveIn: Vec3i,
+		destinationLevel: ServerLevel,
+		starship: Starship,
+
+	): Boolean {
+
+		for (vec in starship.blockHashMap.keys) {
+
+			val vecToMoveTo = vec + vectorToMoveIn
+
+			if (!inBounds(vecToMoveTo, destinationLevel)) return false
+			if (!destinationLevel.getBlockState(vecToMoveTo.blockPos).isAir) return false
+
+		}
+
+		return true
+
+	}
+
+	/** true if [pos] is somewhere a block can exist in [level], both inside build height and inside the border. */
 	// off the primitives rather than a BlockPos- this runs once per ship block per march step
-	private fun inBounds(pos: Vec3i, starship: Starship): Boolean {
+	private fun inBounds(pos: Vec3i, level: ServerLevel): Boolean {
 
-		if (starship.level.isOutsideBuildHeight(pos.y)) return false
+		if (level.isOutsideBuildHeight(pos.y)) return false
 
-		return starship.level.worldBorder.isWithinBounds(pos.x.toDouble(), pos.z.toDouble())
+		return level.worldBorder.isWithinBounds(pos.x.toDouble(), pos.z.toDouble())
 
 	}
 
@@ -52,7 +84,7 @@ object StarshipCollision {
 
 			val vecToMoveTo = vec+vectorToMoveIn
 
-			if (!inBounds(vecToMoveTo, starship)) return false // a cell the ship owns is still one it may not enter
+			if (!inBounds(vecToMoveTo, starship.level)) return false // a cell the ship owns is still one it may not enter
 
 			// if block to move to does already exist in ship, skip recheck check
 			if (starship.blockHashMap[vecToMoveTo] == null) {
@@ -134,7 +166,7 @@ object StarshipCollision {
 			// rotate about the ship origin
 			val vecToMoveTo = starship.origin + rotateVec(vec - starship.origin, steps)
 
-			if (!inBounds(vecToMoveTo, starship)) return false
+			if (!inBounds(vecToMoveTo, starship.level)) return false
 
 			// if block to move to does already exist in ship, skip recheck check
 			if (starship.blockHashMap[vecToMoveTo] == null) {
