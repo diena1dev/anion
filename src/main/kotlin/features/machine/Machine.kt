@@ -26,72 +26,6 @@ import org.bukkit.block.data.BlockData
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
-/// Machine member inventory — every variable and function of the base class,
-/// grouped by who supplies it and who is allowed to touch it.
-//|
-//| [CONSTRUCTOR — type config. val, immutable. one set of values per registered machine type]
-//|- displayName: String
-//|- blockSet: BlockSet?                                 // structure definition, compared at origin+rotation.
-//|                                                      // null for machines that don't describe themselves as a
-//|                                                      // fixed block layout — they own isIntact() instead
-//|- namespacedKey: NamespacedKey = adaptedFromDisplayName // AnionResource impl, used as machine-type registry key
-//|
-//| [INSTANCE STATE — var, owned by base. written ONLY by assemble()/load()/pipeline, subclasses read]
-//|- uuid: UUID                  lateinit                // identity in activeMachines + database
-//|- level: ServerLevel          lateinit
-//|- origin: Vec3i               lateinit                // core block world pos, rotation pivot
-//|- rotation: Rotation          = NONE                  // solved during assembly wrench-check
-//|- resolvedStructure           = mutableMapOf()        // the variant that actually filled each cell at assembly.
-//|                                                      // frozen until reassembly: a cell only satisfies the
-//|                                                      // structure again if THIS block comes back
-//|- buffers                     = mutableMapOf()        // resource stores. survive a broken structure,
-//|                                                      // destroyed on disassembly
-//|- intact: Boolean             = false; protected set  // cached structure result, gates tick(). written by
-//|                                                      // activate() and revalidate()
-//|- dirty: Boolean              = false                 // persistence flag, cleared on save. means
-//|                                                      // "origin/rotation/structure changed", not "ticked"
-//|- starship: Starship?         = null; internal set    // carrier ship, null if grounded. owned by StarshipMachines
-//|
-//| TODO: data channels. a machine sends a signal along a line and whatever grabs that signal can use
-//|       it — a mainframe picks the signal up and reroutes it based on the config stored for that
-//|       signature. not a map of channels hanging off the machine.
-//|
-//| [FINAL PIPELINE — fun, base implements, nobody overrides]
-//|- assemble(level, origin, rotation): Machine?   // resolve structure, register, persist, onAssemble(). null if it doesn't fit
-//|- load(uuid, level, origin, rotation, tag): Machine
-//|                              // db restore: bind, loadFrom(tag), register, onAssemble()
-//|- saveTo(tag)                 // full payload: frozen structure + buffer contents + saveState(). serializer-only
-//|- disassemble()               // onDisassemble(), spill buffers, detach from carrier, deregister, delete save
-//|- relocate(newOrigin, addedRotation)  // ship-driven move/rotate, then onRelocate()
-//|- revalidate()                // structure re-check. tears the machine down past DISASSEMBLY_THRESHOLD
-//|- runTick()                   // ticker entry: bail if carrier is mid-move, else if (intact) tick()
-//|- runSlowTick()               // ticker entry: bail if carrier is mid-move, else if (intact) slowTick()
-//|
-//| [PROTECTED UTILS — fun, subclasses call, never override]
-//|- localToWorld(offset): Vec3i                         // origin-relative, rotation-applied
-//|- blockDataAt(offset): BlockData                      // world read at local offset
-//|- setBlockAt(offset, blockData)                       // committed sync
-//|- markDirty()
-//|
-//| [HOOKS — subclasses implement/override]
-//|- tick()             abstract  every game tick, main thread, only runs while intact
-//|- slowTick()         abstract  every second, main thread, only runs while intact
-//|- isIntact(): Boolean open     fail-fast check against the frozen structure. allocation free — this is
-//|                               the one the tick gate uses. override for blockSet-less machines
-//|- structureResult()  open      full check: also reports which cells are broken. allocates, so it only
-//|                               runs on revalidate(). override alongside isIntact()
-//|- onStructureChanged(result) open  ran after every revalidate(). tank drain, break particles
-//|- onAssemble()       open      extra init not covered by pipeline
-//|- onDisassemble()    open      extra teardown: flush recipes, shutdown attached entities
-//|- onRelocate()       open      fix up cached absolute positions after a ship moved this machine
-//|- saveState(tag)     open      write mutable state that cannot be re-derived (progress, extension, ...)
-//\- loadState(tag)     open      read it back. runs after bind(), before registration
-//
-// subclass adds ONLY: (1) family config as constructor vals (doorWidth, doorMaterial, ...)
-//                     (2) mutable behavior state (extension: Int, progress: Int, ...)
-// never add: cached world blocks, values derivable from blockSet, or anything a component owns
-
-
 /** Outcome of a structure check: whether every cell still matches, and which ones do not. */
 data class StructureResult(
 
@@ -114,6 +48,9 @@ data class AssemblyCandidate(
 // fun is a static callback that cannot be changed
 // open functions can have super calls that still use the original logic + whatever other things you add
 /** IMPORTANT: **Do not** access any lateinit vars from outside of functions. */
+// as you might be able to tell, this was originally made just by me
+// i then offloaded a lot of the thinking to claude after i established a simple structure
+// TODO: make this not suck as much
 abstract class Machine(
 
 	displayName: String,    // self-explanatory
